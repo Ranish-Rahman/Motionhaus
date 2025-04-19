@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= product.name %> - MotionHaus</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: #fff;
+      color: #000;
+      --card-bg: #ddd;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    .breadcrumb a {
+      color: #666;
+      text-decoration: none;
+    }
+
+    .breadcrumb span {
+      color: #666;
+    }
+
+    .product-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+
+    .product-images {
+      position: relative;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .main-image {
+      width: 100%;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      cursor: zoom-in;
+    }
+
+    .main-image img {
+      max-width: 100%;
+      max-height: 124%;
+      object-fit: contain;
+      transition: transform 0.3s ease;
+    }
+
+    .zoomed {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    .zoomed img {
+      max-width: 90%;
+      max-height: 90vh;
+      object-fit: contain;
+    }
+
+    .close-zoom {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 30px;
+      color: #000;
+      cursor: pointer;
+      z-index: 1001;
+      width: 40px;
+      height: 40px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .nav-button {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .prev-button {
+      left: 10px;
+    }
+
+    .next-button {
+      right: 10px;
+    }
+
+    .thumbnails {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .thumbnail {
+      width: 80px;
+      height: 80px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .thumbnail.active {
+      border-color: #000;
+    }
+
+    .thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .product-info {
+      padding: 20px 0;
+    }
+
+    .product-name {
+      font-size: 40px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .product-price {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 30px;
+    }
+
+    .size-selector {
+      margin-bottom: 30px;
+    }
+
+    .size-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .size-select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      appearance: none;
+      background: url("data:image/svg+xml;charset=utf-8,%3Csvg width='12' height='8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 7.4L.6 2 2 .6l4 4 4-4L11.4 2z' fill='%23000'/%3E%3C/svg%3E") no-repeat right 15px center;
+    }
+
+    .quantity-selector {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .quantity-button {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #ddd;
+      background: none;
+      font-size: 20px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .quantity-input {
+      width: 60px;
+      height: 40px;
+      border: 1px solid #ddd;
+      text-align: center;
+      font-size: 16px;
+      border-radius: 4px;
+    }
+
+    .add-to-cart {
+      width: 100%;
+      padding: 15px;
+      background: #e7e7e7;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+
+    .shop-pay-button {
+      width: 100%;
+      padding: 15px;
+      background: #5a31f4;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .more-payment-options {
+      width: 100%;
+      text-align: center;
+      color: #000;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin-bottom: 30px;
+    }
+
+    .info-section {
+      border-top: 1px solid #ddd;
+      padding: 20px 0;
+    }
+
+    .info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .info-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .info-content {
+      display: none;
+      padding: 20px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .info-content.active {
+      display: block;
+    }
+
+    .expand-icon {
+      font-size: 24px;
+    }
+    header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 50px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .logo {
+    font-size: 24px;
+    font-weight: 800;
+  }
+  
+  nav a {
+    margin: 0 15px;
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+  }
+  
+  .icons .icon {
+    margin-left: 20px;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  .stock-info {
+    margin-top: 10px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .stock-label {
+    color: #666;
+  }
+  
+  .stock-count {
+    font-weight: 600;
+  }
+  
+  .in-stock {
+    color: #2ecc71;
+  }
+  
+  .out-of-stock {
+    color: #e74c3c;
+  }
+
+  .ratings-section {
+    padding: 10px 0;
+  }
+  
+  .overall-rating h4 {
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #333;
+  }
+  
+  .stars {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .star {
+    color: #ddd;
+    font-size: 24px;
+  }
+  
+  .star.filled {
+    color: #ffd700;
+  }
+  
+  .rating-value {
+    margin-left: 8px;
+    color: #666;
+    font-size: 14px;
+  }
+
+   /* ===== FOOTER ===== */
+   .footer {
+    background: var(--card-bg);
+    padding: 60px 80px 30px;
+    font-size: 14px;
+  }
+  
+  .footer-main {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-top: 60px;
+    gap: 40px;
+  }
+  
+  .footer-about {
+    max-width: 300px;
+  }
+  
+  .footer-about p {
+    margin: 20px 0;
+    line-height: 1.5;
+    color: var(--footer-text);
+  }
+  
+  .social-icons {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  
+  .social-icons .icon {
+    font-size: 16px;
+    padding: 10px;
+    background: var(--social-icon-bg);
+    border: 1px solid var(--social-icon-border);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  .footer-links {
+    display: flex;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+  
+  .footer-links div h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  
+  .footer-links div p {
+    margin: 6px 0;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--footer-link);
+  }
+  
+  .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--footer-border);
+    font-size: 12px;
+    color: #888;
+  }
+  
+  .payment-icons img {
+    height: 24px;
+    margin-left: 10px;
+  }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">MotionHaus</div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/products">Shop</a>
+      <a href="#">Contact us</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="icons">
+      <i class="icon">♡</i>
+      <i class="icon">👤</i>
+      <i class="icon">🛒</i>
+    </div>
+  
+    
+  </header>
+
+
+  <div class="container">
+    <input type="hidden" id="isBlocked" value="<%= product.isBlocked || false %>">
+    <div class="breadcrumb">
+      <a href="/">Home</a>
+      <span>></span>
+      <a href="/products?brand=<%= product.brand %>"><%= product.brand %></a>
+      <span>></span>
+      <span><%= product.name %></span>
+    </div>
+
+    <div class="product-details">
+      <div class="product-images">
+        <button class="nav-button prev-button">‹</button>
+        <div class="main-image">
+          <img src="<%= product.images[0] %>" alt="<%= product.name %>" id="mainImage">
+        </div>
+        <button class="nav-button next-button">›</button>
+        
+        <div class="thumbnails">
+          <% product.images.forEach((image, index) => { %>
+            <div class="thumbnail <%= index === 0 ? 'active' : '' %>" onclick="changeImage('<%= image %>', this)">
+              <img src="<%= image %>" alt="<%= product.name %> thumbnail">
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="product-info">
+        <h1 class="product-name"><%= product.name %></h1>
+        <div class="product-price">Rs. <%= product.price.toFixed(2) %></div>
+
+        <div class="size-selector">
+          <label class="size-label">SIZE</label>
+          <select class="size-select">
+            <% product.sizes.forEach(size => { %>
+              <option value="<%= size %>"><%= size %></option>
+            <% }) %>
+          </select>
+          <div class="stock-info">
+            <span class="stock-label">Available Stock:</span>
+            <span class="stock-count <%= product.stock > 0 ? 'in-stock' : 'out-of-stock' %>">
+              <%= product.stock %> units
+            </span>
+          </div>
+        </div>
+
+        <div class="quantity-selector">
+          <button class="quantity-button" onclick="updateQuantity(-1)">−</button>
+          <input type="number" class="quantity-input" value="1" min="1" max="<%= product.stock %>" id="quantity">
+          <button class="quantity-button" onclick="updateQuantity(1)">+</button>
+        </div>
+
+        <button class="add-to-cart" onclick="addToCart()">ADD TO CART</button>
+        <button class="shop-pay-button">
+          <svg width="20" height="20" fill="#fff" viewBox="0 0 24 24">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22.5c-5.799 0-10.5-4.701-10.5-10.5S6.201 1.5 12 1.5 22.5 6.201 22.5 12 17.799 22.5 12 22.5z"/>
+          </svg>
+          Buy 
+        </button>
+        <button class="more-payment-options">More payment options</button>
+
+        <div class="info-section">
+          <div class="info-header" onclick="toggleSection('beforePurchase')">
+            <h3>Before You Purchase</h3>
+            <span class="expand-icon">+</span>
+          </div>
+          <div class="info-content" id="beforePurchase">
+            <p><%= product.description %></p>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <div class="info-header" onclick="toggleSection('ratings')">
+            <h3>Ratings & Reviews</h3>
+            <span class="expand-icon">+</span>
+          </div>
+          <div class="info-content" id="ratings">
+            <div class="ratings-section">
+              <div class="overall-rating">
+                <h4>Customer Ratings</h4>
+                <div class="stars">
+                  <% const rating = product.rating || 0 %>
+                  <% for(let i = 1; i <= 5; i++) { %>
+                    <span class="star <%= i <= rating ? 'filled' : '' %>">★</span>
+                  <% } %>
+                  <span class="rating-value">(<%= rating %>/5)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <div class="info-header" onclick="toggleSection('care')">
+            <h3>Care & Process Instructions</h3>
+            <span class="expand-icon">+</span>
+          </div>
+          <div class="info-content" id="care">
+            <p>Product care instructions and maintenance guidelines.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 40px 40px 60px; background: #fff;">
+    <h2 style="font-size: 28px; font-weight: 600; margin-bottom: 40px;">Selected For You</h2>
+  
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 32px;">
+      <% recommendedProducts.forEach(product => { %>
+        <a href="/products/<%= product._id %>" style="text-decoration: none; color: inherit;">
+          <div>
+            <div style="position: relative; padding-bottom: 100%; background: #f5f5f5; margin-bottom: 16px;">
+              <img 
+                src="<%= product.images[0] %>" 
+                alt="<%= product.name %>" 
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+              />
+            </div>
+            <h3 style="font-size: 16px; font-weight: 400; margin: 0 0 8px; color: #000; line-height: 1.2;"><%= product.name %></h3>
+            <p style="margin: 0; font-size: 16px; color: #000;">From Rs. <%= product.price.toFixed(2) %></p>
+          </div>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+  
+  <footer class="footer">
+ 
+  
+    <div class="footer-main">
+      <div class="footer-about">
+        <h3 class="logo">MOTIONHAUS</h3>
+        <p>We have clothes that suits your style and<br>which you're proud to wear. From<br>women to men.</p>
+        <div class="social-icons">
+          <i class="icon">🐦</i>
+          <i class="icon">👍</i>
+          <i class="icon">📷</i>
+          <i class="icon">💻</i>
+        </div>
+      </div>
+  
+      <div class="footer-links">
+        <div>
+          <h4>COMPANY</h4>
+          <p>About</p>
+          <p>Features</p>
+          <p>Works</p>
+          <p>Career</p>
+        </div>
+        <div>
+          <h4>HELP</h4>
+          <p>Customer Support</p>
+          <p>Delivery Details</p>
+          <p>Terms & Conditions</p>
+          <p>Privacy Policy</p>
+        </div>
+        <div>
+          <h4>FAQ</h4>
+          <p>Account</p>
+          <p>Manage Deliveries</p>
+          <p>Orders</p>
+          <p>Payments</p>
+        </div>
+        <div>
+          <h4>RESOURCES</h4>
+          <p>Free eBooks</p>
+          <p>Development Tutorial</p>
+          <p>How to - Blog</p>
+          <p>Youtube Playlist</p>
+        </div>
+      </div>
+    </div>
+  
+    <div class="footer-bottom">
+      <p>Shop.co © 2000-2023, All Rights Reserved</p>
+      <div class="payment-icons">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Visa" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Mastercard" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/174/174861.png" alt="Paypal" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Apple Pay" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Google Pay" width="24" height="24">
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let currentImageIndex = 0;
+    const images = JSON.parse('<%- JSON.stringify(product.images) %>');
+    const maxStock = parseInt('<%- product.stock %>');
+    const isBlocked = document.getElementById('isBlocked').value === 'true';
+
+    // Check if product is blocked or unavailable
+    function checkProductAvailability() {
+      if (isBlocked || maxStock <= 0) {
+        window.location.href = '/products';
+        return false;
+      }
+      return true;
+    }
+
+    // Add event listener for page load
+    window.addEventListener('load', checkProductAvailability);
+
+    function changeImage(src, thumbnail) {
+      if (!checkProductAvailability()) return;
+      document.getElementById('mainImage').src = src;
+      document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
+      thumbnail.classList.add('active');
+      currentImageIndex = images.indexOf(src);
+    }
+
+    function navigateImages(direction) {
+      if (!checkProductAvailability()) return;
+      currentImageIndex = (currentImageIndex + direction + images.length) % images.length;
+      const newSrc = images[currentImageIndex];
+      const thumbnails = document.querySelectorAll('.thumbnail');
+      document.getElementById('mainImage').src = newSrc;
+      thumbnails.forEach(t => t.classList.remove('active'));
+      thumbnails[currentImageIndex].classList.add('active');
+    }
+
+    // Add zoom functionality
+    document.getElementById('mainImage').addEventListener('click', function() {
+      if (!checkProductAvailability()) return;
+      const zoomedContainer = document.createElement('div');
+      zoomedContainer.className = 'zoomed';
+      
+      const closeButton = document.createElement('div');
+      closeButton.className = 'close-zoom';
+      closeButton.innerHTML = '×';
+      closeButton.onclick = function(e) {
+        e.stopPropagation();
+        zoomedContainer.remove();
+      };
+      
+      const zoomedImage = document.createElement('img');
+      zoomedImage.src = this.src;
+      zoomedImage.alt = this.alt;
+      
+      zoomedContainer.appendChild(closeButton);
+      zoomedContainer.appendChild(zoomedImage);
+      document.body.appendChild(zoomedContainer);
+      
+      zoomedContainer.onclick = function() {
+        this.remove();
+      };
+    });
+
+    document.querySelector('.prev-button').addEventListener('click', () => navigateImages(-1));
+    document.querySelector('.next-button').addEventListener('click', () => navigateImages(1));
+
+    function updateQuantity(change) {
+      if (!checkProductAvailability()) return;
+      const input = document.getElementById('quantity');
+      const newValue = Math.max(1, Math.min(maxStock, parseInt(input.value) + change));
+      input.value = newValue;
+    }
+
+    function toggleSection(id) {
+      if (!checkProductAvailability()) return;
+      const content = document.getElementById(id);
+      const header = content.previousElementSibling;
+      const icon = header.querySelector('.expand-icon');
+      
+      if (content.classList.contains('active')) {
+        content.classList.remove('active');
+        icon.textContent = '+';
+      } else {
+        content.classList.add('active');
+        icon.textContent = '−';
+      }
+    }
+
+    function addToCart() {
+      if (!checkProductAvailability()) return;
+      const size = document.querySelector('.size-select').value;
+      const quantity = document.getElementById('quantity').value;
+      // Add your cart logic here
+      alert(`Added ${quantity} pairs of size ${size} to cart`);
+    }
+
+    // Add event listeners for all interactive elements
+    document.querySelectorAll('button, select, input').forEach(element => {
+      element.addEventListener('click', checkProductAvailability);
+    });
+  </script>
+</body>
+</html>

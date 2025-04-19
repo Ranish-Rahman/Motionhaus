@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log in</title>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">MotionHaus</div>
+    <a href="/" class="back">&larr; Back</a>
+  </header>
+
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-form">
+        <h2>Log in</h2>
+        <form id="loginForm" action="/login" method="POST">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" autocomplete="email" required />
+          <div class="error" id="emailError"></div>
+
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="password" name="password" autocomplete="current-password" required />
+            <span class="toggle-password">Hide</span>
+          </div>
+          <div class="error" id="passwordError"></div>
+
+          <button type="submit" class="login-btn">Log in</button>
+          <a href="/forgot-password" class="forgot">Forgot password?</a>
+        </form>
+      </div>
+
+      <div class="divider">
+        <div class="line"></div>
+        <span>OR</span>
+        <div class="line"></div>
+      </div>
+
+      <div class="google-login">
+        <form id="googleLoginForm" action="/auth/google" method="GET">
+          <button type="submit" class="google-btn" id="googleLoginBtn" autocomplete="off">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" />
+            Continue with Google
+          </button>
+        </form>
+      </div>
+    </div>
+    <a href="/help" class="cant-login">Can't log in?</a>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const googleLoginForm = document.getElementById('googleLoginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const emailError = document.getElementById('emailError');
+    const passwordError = document.getElementById('passwordError');
+    const togglePassword = document.querySelector('.toggle-password');
+
+    // Toggle password visibility
+    togglePassword.addEventListener('click', () => {
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        togglePassword.textContent = 'Hide';
+      } else {
+        passwordInput.type = 'password';
+        togglePassword.textContent = 'Show';
+      }
+    });
+
+    // Handle form submission
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      emailError.textContent = '';
+      passwordError.textContent = '';
+
+      try {
+        const response = await fetch('/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: emailInput.value,
+            password: passwordInput.value
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          window.location.href = '/home';
+        } else {
+          if (data.message.includes('email')) {
+            emailError.textContent = data.message;
+          } else if (data.message.includes('password')) {
+            passwordError.textContent = data.message;
+          } else {
+            alert(data.message);
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+      }
+    });
+
+    // Handle Google login
+    googleLoginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      window.location.href = '/auth/google';
+    });
+
+    // Check for authentication status
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch('/auth/status');
+        const data = await response.json();
+        
+        if (data.authenticated) {
+          window.location.href = '/home';
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+      }
+    };
+
+    // Check auth status on page load
+    checkAuthStatus();
+
+    // Handle Google OAuth errors
+    document.addEventListener('DOMContentLoaded', function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+      
+      if (error) {
+        let errorMessage = 'An error occurred during login.';
+        
+        switch (error) {
+          case 'auth_failed':
+            errorMessage = 'Authentication failed. Please try again.';
+            break;
+          case 'login_failed':
+            errorMessage = 'Login failed. Please try again.';
+            break;
+          case 'no_user':
+            errorMessage = 'No account found. Please sign up first.';
+            break;
+        }
+        
+        alert(errorMessage);
+        
+        // Clear the error from URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    });
+  </script>
+</body>
+</html>
+
+<style>
+  * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #fff;
+  color: #333;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  border-bottom: 2px solid #00a3ff;
+  font-weight: bold;
+}
+
+.logo {
+  font-size: 20px;
+}
+
+.back {
+  color: #333;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 60px;
+}
+
+.login-card {
+  display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 50px;
+    max-width: 783px;
+    width: 100%;
+    padding: 70px;
+    margin-top: 0px;
+}
+
+.login-form {
+  flex: 1;
+}
+
+.login-form h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+form label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+form input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #999;
+  cursor: pointer;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: #ccc;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 30px;
+  border: none;
+  opacity: 0.7;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.forgot {
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  margin-top: 10px;
+  text-decoration: none;
+  color: #000;
+  font-weight: 500;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.divider span {
+  font-size: 14px;
+  color: #999;
+  font-weight: bold;
+}
+
+.google-login {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border: 1px solid #ccc;
+  border-radius: 30px;
+  text-decoration: none;
+  color: #000;
+  font-weight: 500;
+  background: #fff;
+}
+
+.google-btn img {
+  width: 18px;
+}
+
+.cant-login {
+  font-size: 14px;
+  color: #000;
+  text-decoration: underline;
+  margin-top: 30px;
+}
+.divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 20px;
+  height: 100%;
+}
+
+.divider span {
+  font-weight: bold;
+  color: #999;
+  margin: 10px 0;
+}
+
+.divider .line {
+  width: 1px;
+  height: 150px;
+  background-color: #ccc;
+}
+
+
+</style>

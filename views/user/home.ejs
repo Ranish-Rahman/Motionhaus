@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MotionHaus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  
+</head>
+<body>
+  <header>
+    <div class="logo">MotionHaus</div>
+    <nav>
+      <a href="/home">Home</a>
+      <a href="/products">Shop</a>
+      <a href="#">Contact us</a>
+      <a href="#">About</a>
+      <% if (user) { %>
+        <a href="#" id="logoutLink">Logout</a>
+      <% } else { %>
+        <a href="/login">Login</a>
+      <% } %>
+    </nav>
+    <div class="icons">
+      <i class="icon">♡</i>
+      <i class="icon">👤</i>
+      <i class="icon">🛒</i>
+    </div>
+    <div class="theme-toggle">
+      <label class="switch">
+        <input type="checkbox" id="darkModeToggle">
+        <span class="slider round"></span>
+      </label>
+    </div>
+    
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="overlay">
+        <p class="label">What people said</p>
+        <h1>Love the way they handle the order.</h1>
+        <p class="quote">Very professional and friendly at the same time. They packed the order on schedule and the detail of their wrapping is top notch. One of my best experience for buying online items. Surely will come back for another purchase.</p>
+        <p class="author">Samantha William</p>
+        <p class="role">Fashion Enthusiast</p>
+      </div>
+      <img src="/image/heroimg.webp" alt="Hero Image" />
+    </section>
+
+    <!-- Casual Inspirations Section -->
+    <section class="inspiration">
+      <div class="text">
+        <h2>Casual<br>Inspirations</h2>
+        <p>Step into style with our latest sneaker collection. Designed for comfort and crafted for fashion, our shoes are perfect for any occasion. Explore now and elevate your look!</p>
+        <button>Browse Inspirations</button>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <div class="caption">Say it with Shirt</div>
+          <video autoplay muted loop class="background-video">
+            <source src="/image/cardvid.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+        <div class="card">
+          <video autoplay muted loop class="background-video">
+            <source src="/image/card2vid.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </div>
+        <div class="card">
+          <video autoplay muted loop class="background-video">
+            <source src="/image/adidasvid.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </div>
+      </div>
+      
+    </section>
+    <div class="spacer-bar">
+      <img src="/image/jordan.png" alt="Jordan Logo">
+      <img src="/image/nike.png" alt="Nike Logo">
+      <img src="/image/adidass.png" alt="Adidas Logo">
+      <img src="/image/newbalance.png" alt="New Balance Logo">
+    </div>
+    
+
+    <section class="testimonials">
+        <div class="testimonial">
+          <img src="/image/card4img.jpg" alt="Testimonial 1">
+          <div class="overlay">
+            <p>What people said</p>
+            <h3>Love the way they handle the order.</h3>
+            <p class="description">Very professional and friendly at the same time. They packed the order on schedule and the detail of their wrapping is top notch...</p>
+            <p class="name">Samantha William<br><span>Fashion Enthusiast</span></p>
+          </div>
+        </div>
+        <div class="testimonial">
+          <img src="/image/card5img.jpg" alt="Testimonial 2">
+          <div class="overlay">
+            <p>What people said</p>
+            <h3>Love the way they handle the order.</h3>
+            <p class="description">Very professional and friendly at the same time...</p>
+            <p class="name">Samantha William<br><span>Fashion Enthusiast</span></p>
+          </div>
+        </div>
+        <!-- <div class="testimonial large">
+          <img src="/image/card6img.png" alt="Testimonial 3">
+          <div class="overlay">
+            <p>What people said</p>
+            <h3>Love the way they handle the order.</h3>
+            <p class="description">Very professional and friendly at the same time...</p>
+            <p class="name">Samantha William<br><span>Fashion Enthusiast</span></p>
+          </div>
+        </div> -->
+
+  </main>
+  <section class="hero-2">
+    <div class="overlay">
+      <p class="label">What people said</p>
+      <h1>Love the way they handle the order.</h1>
+      <p class="quote">Very professional and friendly at the same time. They packed the order on schedule and the detail of their wrapping is top notch. One of my best experience for buying online items. Surely will come back for another purchase.</p>
+      <p class="author">Samantha William</p>
+      <p class="role">Fashion Enthusiast</p>
+    </div>
+    <!-- <img src="/image/card6img.png" alt="Hero Image" /> -->
+    <video autoplay muted loop class="background-video">
+        <source src="/image/hero2vid.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+      
+  </section>
+</section>
+   <section class="features">
+      <h2>Why you'll love to<br>shop on our website</h2>
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="icon">&#10084;</div>
+          <h4>Take care with love</h4>
+          <p>We take care your package with full of attention and of course full of love. We want to make sure you'll receive your package like you receive your birthday gift.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">&#10227;</div>
+          <h4>Refund Process</h4>
+          <p>Refund is a such bad experience and we don't want that thing happen to you. But when it's happen we will make sure you will through smooth and friendly process.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">&#128222;</div>
+          <h4>Friendly Customer Service</h4>
+          <p>You do not need to worry when you want to check your package. We will always answer whatever your questions. Just click on the chat icon and we will talk.</p>
+        </div>
+      </div>
+    </section>
+<footer class="footer">
+ 
+  
+    <div class="footer-main">
+      <div class="footer-about">
+        <h3 class="logo">MOTIONHAUS</h3>
+        <p>We have clothes that suits your style and<br>which you're proud to wear. From<br>women to men.</p>
+        <div class="social-icons">
+          <i class="icon">🐦</i>
+          <i class="icon">👍</i>
+          <i class="icon">📷</i>
+          <i class="icon">💻</i>
+        </div>
+      </div>
+  
+      <div class="footer-links">
+        <div>
+          <h4>COMPANY</h4>
+          <p>About</p>
+          <p>Features</p>
+          <p>Works</p>
+          <p>Career</p>
+        </div>
+        <div>
+          <h4>HELP</h4>
+          <p>Customer Support</p>
+          <p>Delivery Details</p>
+          <p>Terms & Conditions</p>
+          <p>Privacy Policy</p>
+        </div>
+        <div>
+          <h4>FAQ</h4>
+          <p>Account</p>
+          <p>Manage Deliveries</p>
+          <p>Orders</p>
+          <p>Payments</p>
+        </div>
+        <div>
+          <h4>RESOURCES</h4>
+          <p>Free eBooks</p>
+          <p>Development Tutorial</p>
+          <p>How to - Blog</p>
+          <p>Youtube Playlist</p>
+        </div>
+      </div>
+    </div>
+  
+    <div class="footer-bottom">
+      <p>Shop.co © 2000-2023, All Rights Reserved</p>
+      <div class="payment-icons">
+        <img src="/images/visa.png" alt="Visa">
+        <img src="/images/mastercard.png" alt="Mastercard">
+        <img src="/images/paypal.png" alt="Paypal">
+        <img src="/images/applepay.png" alt="Apple Pay">
+        <img src="/images/googlepay.png" alt="Google Pay">
+      </div>
+    </div>
+  </footer>
+  <script>
+    const toggle = document.getElementById('darkModeToggle');
+    const body = document.body;
+  
+    // Load preference from localStorage
+    if (localStorage.getItem('theme') === 'dark') {
+      body.classList.add('dark-mode');
+      toggle.checked = true;
+    }
+  
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) {
+        body.classList.add('dark-mode');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        body.classList.remove('dark-mode');
+        localStorage.setItem('theme', 'light');
+      }
+    });
+
+    document.getElementById('logoutLink')?.addEventListener('click', function(e) {
+      e.preventDefault();
+      fetch('/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      })
+      .then(response => {
+        if (response.ok) {
+          window.location.href = '/login';
+        }
+      })
+      .catch(error => {
+        console.error('Logout error:', error);
+      });
+    });
+  </script>
+  
+</body>
+</html>
+
+<style>
+
+  /* ===== CSS VARIABLES FOR THEMES ===== */
+  :root {
+    --bg: #fff;
+    --text: #000;
+    --border: #eee;
+    --card-bg: #ddd;
+    --caption: white;
+    --caption-shadow: rgba(0,0,0,0.5);
+    --feature-icon-bg: #000;
+    --feature-icon-color: #fff;
+    --footer-text: #333;
+    --footer-link: #444;
+    --footer-border: #ddd;
+    --social-icon-bg: #fff;
+    --social-icon-border: #ccc;
+  }
+  
+  body.dark-mode {
+  --bg: #111;
+  --text: #fff;
+  --border: #333;
+  --card-bg: #1a1a1a;
+  --caption: white;
+  --caption-shadow: rgba(0,0,0,0.7);
+  --feature-icon-bg: #fff;
+  --feature-icon-color: #000;
+  --footer-text: #bbb;
+  --footer-link: #ccc;
+  --footer-border: #444;
+  --social-icon-bg: #222;
+  --social-icon-border: #444;
+}
+
+  
+  /* ===== BODY & GLOBAL ===== */
+  body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+  
+  /* ===== HEADER ===== */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 50px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .logo {
+    font-size: 24px;
+    font-weight: 800;
+  }
+  
+  nav a {
+    margin: 0 15px;
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+  }
+  
+  .icons .icon {
+    margin-left: 20px;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  
+  /* ===== HERO SECTIONS ===== */
+  .hero,
+  .hero-2 {
+    position: relative;
+    margin: 40px 80px;
+    border-radius: 16px;
+    overflow: hidden;
+    height: 50vh;
+  }
+  
+  .hero-2 {
+    margin: 10px 80px;
+    height: 55vh;
+  }
+  
+  .hero img,
+  .hero-2 img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  
+  /* ===== OVERLAY TEXT ===== */
+  .overlay {
+    position: absolute;
+    top: 40px;
+    left: 40px;
+    color: white;
+    max-width: 500px;
+  }
+  
+  .overlay .label {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+  
+  .overlay h1 {
+    font-size: 28px;
+    margin: 10px 0;
+    font-weight: 600;
+  }
+  
+  .overlay .quote {
+    font-size: 13px;
+    margin: 15px 0;
+    line-height: 1.5;
+    opacity: 0.9;
+  }
+  
+  .overlay .author {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  
+  .overlay .role {
+    font-size: 10px;
+    opacity: 0.6;
+  }
+  
+  /* ===== INSPIRATION SECTION ===== */
+  .inspiration {
+    display: flex;
+    justify-content: space-between;
+    margin: 60px 80px;
+    gap: 40px;
+  }
+  
+  .inspiration .text {
+    flex: 1;
+  }
+  
+  .inspiration .text h2 {
+    font-size: 48px;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+  
+  .inspiration .text p {
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 20px 0;
+    max-width: 350px;
+  }
+  
+  .inspiration .text button {
+    padding: 10px 20px;
+    border: 1px solid var(--text);
+    background: transparent;
+    cursor: pointer;
+    font-weight: 500;
+    border-radius: 50px;
+    color: var(--text);
+  }
+  
+  /* ===== CARDS ===== */
+  .cards {
+    display: flex;
+    gap: 20px;
+    flex: 2;
+  }
+  
+  .card {
+    position: relative;
+    flex: 1;
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  
+  .card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+  }
+  
+  .caption {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: var(--caption);
+    font-size: 14px;
+    font-weight: 600;
+    text-shadow: 1px 1px 4px var(--caption-shadow);
+  }
+  
+  /* ===== SPACER ===== */
+  .spacer-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 100px; /* space between logos */
+  padding: 20px 0;
+  background-color: #111; /* optional for visual separation */
+}
+
+.spacer-bar img {
+  height: 40px;
+  width: auto;
+  opacity: 0.9;
+  transition: transform 0.3s ease;
+}
+
+.spacer-bar img:hover {
+  transform: scale(1.1);
+  opacity: 1;
+}
+
+  /* ===== TESTIMONIALS ===== */
+  .testimonials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 40px 80px;
+    justify-content: space-between;
+  }
+  
+  .testimonial {
+    position: relative;
+    flex: 1;
+    min-width: 300px;
+    border-radius: 22px;
+    overflow: hidden;
+    height: 400px;
+  }
+  
+  .testimonial img {
+    width: 100%;
+    height: 120%;
+    object-fit: cover;
+  }
+  
+  .testimonial .overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    max-width: 300px;
+  }
+  
+  .testimonial .overlay .label,
+  .testimonial .overlay .quote,
+  .testimonial .overlay .author,
+  .testimonial .overlay .role {
+    color: white;
+  }
+  
+  /* ===== WHY SHOP ===== */
+  .why-shop {
+    padding: 60px 80px;
+    background: var(--bg);
+    text-align: left;
+  }
+  
+  .why-shop h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 30px;
+  }
+  
+  .why-shop .features {
+    display: flex;
+    justify-content: space-between;
+    gap: 40px;
+  }
+  
+  .feature {
+    flex: 1;
+    text-align: center;
+  }
+  
+  .feature .icon {
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+  
+  .feature h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  
+  .feature p {
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1.4;
+  }
+  
+  /* ===== FEATURES SECTION ===== */
+  .features {
+    background: var(--bg);
+    padding: 60px 45px;
+    text-align: center;
+  }
+  
+  .features h2 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 40px;
+  }
+  
+  .features-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 40px;
+    margin-top: 20px;
+  }
+  
+  .feature-item {
+    flex: 1;
+    max-width: 300px;
+    text-align: left;
+  }
+  
+  .feature-item .icon {
+    font-size: 32px;
+    background: var(--feature-icon-bg);
+    color: var(--feature-icon-color);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin-bottom: 12px;
+  }
+  
+  .feature-item h4 {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  
+  .feature-item p {
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1.4;
+  }
+  
+  /* ===== FOOTER ===== */
+  .footer {
+    background: var(--card-bg);
+    padding: 60px 80px 30px;
+    font-size: 14px;
+  }
+  
+  .footer-main {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-top: 60px;
+    gap: 40px;
+  }
+  
+  .footer-about {
+    max-width: 300px;
+  }
+  
+  .footer-about p {
+    margin: 20px 0;
+    line-height: 1.5;
+    color: var(--footer-text);
+  }
+  
+  .social-icons {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  
+  .social-icons .icon {
+    font-size: 16px;
+    padding: 10px;
+    background: var(--social-icon-bg);
+    border: 1px solid var(--social-icon-border);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  .footer-links {
+    display: flex;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+  
+  .footer-links div h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  
+  .footer-links div p {
+    margin: 6px 0;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--footer-link);
+  }
+  
+  .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--footer-border);
+    font-size: 12px;
+    color: #888;
+  }
+  
+  .payment-icons img {
+    height: 24px;
+    margin-left: 10px;
+  }
+  
+  /* ===== VIDEO BACKGROUND ===== */
+  .background-video {
+    position: relative;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -1;
+  }
+  
+  /* Toggle Switch Styles */
+.theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0;
+  right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #333;
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+  </style>
+  

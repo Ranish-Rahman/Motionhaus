@@ -1,0 +1,47 @@
+<script>
+    document.querySelectorAll('.block-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const userId = this.dataset.userId;
+            const action = this.dataset.action;
+            const row = this.closest('tr');
+            
+            try {
+                const response = await fetch(`/admin/users/${userId}/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update UI only after successful server response
+                    const statusCell = row.querySelector('.status-cell');
+                    const blockBtn = row.querySelector('.block-btn');
+                    
+                    if (action === 'block') {
+                        statusCell.textContent = 'Blocked';
+                        statusCell.classList.add('text-danger');
+                        blockBtn.textContent = 'Unblock';
+                        blockBtn.dataset.action = 'unblock';
+                        blockBtn.classList.remove('btn-danger');
+                        blockBtn.classList.add('btn-success');
+                    } else {
+                        statusCell.textContent = 'Active';
+                        statusCell.classList.remove('text-danger');
+                        blockBtn.textContent = 'Block';
+                        blockBtn.dataset.action = 'block';
+                        blockBtn.classList.remove('btn-success');
+                        blockBtn.classList.add('btn-danger');
+                    }
+                } else {
+                    alert(data.message || 'Operation failed');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request');
+            }
+        });
+    });
+</script> 

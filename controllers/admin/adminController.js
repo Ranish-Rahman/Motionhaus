@@ -1,0 +1,325 @@
+// Render admin login page
+import User from '../../models/userModel.js';
+import Admin from '../../models/adminModel.js';
+import Category from '../../models/categoryModel.js';
+import path from 'path';
+
+export const getAdminLogin = (req, res) => {
+  console.log('Admin login page requested');
+  if (req.session.admin) {
+    console.log('Admin already logged in, redirecting to dashboard');
+    return res.redirect('/admin/dashboard');
+  }
+  res.render('admin/login', { 
+    title: 'Admin Login',
+    error: null 
+  });
+};
+
+// Handle admin login
+export const postAdminLogin = async (req, res) => {
+  console.log('Login request received:', {
+    body: req.body,
+    headers: req.headers,
+    session: req.session
+  });
+
+  try {
+    const { email, password } = req.body;
+    
+    // Validate input
+    if (!email || !password) {
+      console.log('Missing credentials');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email and password are required' 
+      });
+    }
+
+    // Get admin credentials from environment variables
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      console.log('Admin credentials verified');
+      
+      // Create admin session
+      req.session.admin = {
+        email: email,
+        loggedIn: true,
+        role: 'admin'
+      };
+
+      console.log('Admin session created:', req.session.admin);
+      
+      return res.json({ 
+        success: true, 
+        redirect: '/admin/dashboard' 
+      });
+    }
+
+    console.log('Invalid credentials provided');
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Invalid email or password' 
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+
+    return res.status(500).json({ 
+      success: false, 
+      message: 'An error occurred during login. Please try again.' 
+    });
+  }
+};
+
+// Render admin dashboard
+export const customers = async (req, res) => {
+  console.log('Admin dashboard requested');
+  console.log('Session data:', req.session);
+  console.log('Request headers:', req.headers);
+  console.log('Request cookies:', req.cookies);
+
+  try {
+    // Check if admin is logged in
+    if (!req.session.admin) {
+      console.log('No admin session found, redirecting to login');
+      return res.redirect('/admin/login');
+    }
+
+    // Get query parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    const skip = (page - 1) * limit;
+
+    // Build search query
+    const searchQuery = search ? {
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ]
+    } : {};
+
+    // Fetch users with pagination, sorting, and search
+    let users;
+    try {
+      console.log('Attempting to fetch users from database');
+      const totalUsers = await User.countDocuments(searchQuery);
+      users = await User.find(searchQuery, 'name email role status isBlocked createdAt')
+        .sort({ createdAt: -1 }) // Sort by latest first
+        .skip(skip)
+        .limit(limit);
+      
+      console.log('Users fetched successfully:', users.length);
+      
+      // Update user status based on isBlocked
+      users = users.map(user => ({
+        ...user.toObject(),
+        status: user.isBlocked ? 'blocked' : 'active'
+      }));
+
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalUsers / limit);
+      const pagination = {
+        currentPage: page,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        nextPage: page + 1,
+        prevPage: page - 1
+      };
+      
+      // Render dashboard with proper data
+      console.log('Rendering dashboard with users:', users.length);
+      res.render('admin/customers', {
+        title: 'Customers',
+        users: users || [],
+        admin: req.session.admin,
+        path: req.path,
+        pagination,
+        search,
+        totalUsers
+      });
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      console.error('Error details:', {
+        name: dbError.name,
+        message: dbError.message,
+        stack: dbError.stack
+      });
+      return res.status(500).render('error', {
+        title: 'Error',
+        message: 'Failed to fetch users from database'
+      });
+    }
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load dashboard'
+    });
+  }
+};
+
+// Handle admin logout
+export const handleLogout = (req, res) => {
+  console.log('Admin logout requested');
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+      return res.redirect('/admin/dashboard');
+    }
+    console.log('Admin session destroyed');
+    res.redirect('/admin/login');
+  });
+};
+
+// Block a user
+export const blockUser = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+    
+    user.isBlocked = true;
+    user.status = 'blocked';
+    await user.save();
+    
+    res.json({ 
+      success: true,
+      message: 'User blocked successfully'
+    });
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to block user',
+      error: error.message
+    });
+  }
+};
+
+// Unblock a user
+export const unblockUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+    
+    user.isBlocked = false;
+    user.status = 'active';
+    await user.save();
+    
+    res.json({ 
+      success: true,
+      message: 'User unblocked successfully'
+    });
+  } catch (error) {
+    console.error('Unblock user error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to unblock user',
+      error: error.message
+    });
+  }
+};
+
+// Dashboard controller
+export const dashboard = async (req, res) => {
+  try {
+    // Check if admin is logged in
+    if (!req.session.admin) {
+      return res.redirect('/admin/login');
+    }
+
+    // Get statistics
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ isBlocked: false });
+    const blockedUsers = await User.countDocuments({ isBlocked: true });
+    const totalCategories = await Category.countDocuments();
+
+    // Get recent activity (last 5 users)
+    const recentUsers = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Format recent activity
+    const recentActivity = recentUsers.map(user => ({
+      icon: 'person',
+      title: `New user registered: ${user.name}`,
+      time: new Date(user.createdAt).toLocaleString()
+    }));
+
+    // Render dashboard with data
+    res.render('admin/dashboard', {
+      title: 'Dashboard',
+      admin: req.session.admin,
+      path: req.path,
+      stats: {
+        totalUsers,
+        activeUsers,
+        blockedUsers,
+        totalCategories
+      },
+      recentActivity
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load dashboard'
+    });
+  }
+};
+
+// Delete user
+export const deleteUser = async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        console.log('Deleting user:', userId);
+
+        // Find and delete the user
+        const user = await User.findByIdAndDelete(userId);
+        if (!user) {
+            console.log('User not found:', userId);
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        console.log('User deleted successfully:', user);
+        res.json({ 
+            success: true, 
+            message: 'User deleted successfully' 
+        });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error deleting user' 
+        });
+    }
+};

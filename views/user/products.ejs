@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products | MotionHaus</title>
+  <style>
+   
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      background: #fff;
+      color: #000;
+      --card-bg: #ddd;
+    }
+
+    header, .filters, .product-grid, .search-sort {
+      padding: 20px;
+    }
+
+    header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 50px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .logo {
+    font-size: 24px;
+    font-weight: 800;
+  }
+  
+  nav a {
+    margin: 0 15px;
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+  }
+  
+  .icons .icon {
+    margin-left: 20px;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+
+    .container {
+      display: flex;
+    }
+
+    .filters {
+      width: 250px;
+      border-right: 1px solid #eee;
+    }
+
+    .filters h3 {
+      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .filters .section {
+      margin-bottom: 20px;
+    }
+
+    .filters .size-buttons button {
+      margin: 5px;
+      padding: 6px 11px;
+      border: 1px solid #ccc;
+      background: white;
+      cursor: pointer;
+    }
+
+    .search-sort {
+      flex: 1;
+    }
+
+    .search-bar {
+      display: flex;
+      margin-bottom: 30px;
+    }
+
+    .search-container {
+      display: flex;
+      align-items: center;
+      border: 1px solid #ccc;
+      background: #f6f6f6;
+      padding: 8px 12px;
+      width: 250px;
+      border-radius: 2px;
+    }
+
+    .search-container input {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 14px;
+      flex: 1;
+
+    }
+
+    .search-icon {
+      margin-right: 10px;
+      color: #555;
+    }
+
+    .filter-buttons {
+      margin-bottom: 20px;
+    }
+
+    .filter-buttons button {
+      margin-right: 10px;
+      padding: 8px 16px;
+      border: 1px solid #000;
+      background: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    .product-card {
+      background: #fff;
+      padding: 0;
+      text-align: left;
+      border-radius: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      border: none;
+      width: 100%;
+      margin: 0;
+      text-decoration: none;
+    }
+
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: none;
+    }
+
+    .image-wrapper {
+      position: relative;
+      width: 100%;
+      padding-bottom: 100%;
+      background: #f4f4f4;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .image-wrapper img {
+      position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 114%;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+    }
+
+    .brand-logo {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #000;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: none;
+      padding: 0;
+    }
+
+    .product-info {
+      padding: 0;
+    }
+
+    .title {
+      font-size: 15px;
+      font-weight: 500;
+      color: #000;
+      margin: 0;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+
+    .price {
+      font-size: 15px;
+      font-weight: 400;
+      color: #000;
+      margin: 0;
+    }
+
+    .meta {
+      display: none;
+    }
+
+    .product-grid a {
+      text-decoration: none;
+    }
+
+    @media (max-width: 1200px) {
+      .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .product-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    background: var(--card-bg);
+    padding: 60px 80px 30px;
+    font-size: 14px;
+  }
+  
+  .footer-main {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-top: 60px;
+    gap: 40px;
+  }
+  
+  .footer-about {
+    max-width: 300px;
+  }
+  
+  .footer-about p {
+    margin: 20px 0;
+    line-height: 1.5;
+    color: var(--footer-text);
+  }
+  
+  .social-icons {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  
+  .social-icons .icon {
+    font-size: 16px;
+    padding: 10px;
+    background: var(--social-icon-bg);
+    border: 1px solid var(--social-icon-border);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  .footer-links {
+    display: flex;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+  
+  .footer-links div h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  
+  .footer-links div p {
+    margin: 6px 0;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--footer-link);
+  }
+  
+  .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--footer-border);
+    font-size: 12px;
+    color: #888;
+  }
+  
+  .payment-icons img {
+    height: 24px;
+    margin-left: 10px;
+  }
+  
+  .filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding-bottom: 10px;
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.toggle-icon {
+  font-size: 22px;
+  font-weight: bold;
+}
+.filter-subgroup input[type="number"] {
+  width: 60px;
+  padding: 4px;
+  margin-top: 5px;
+  font-size: 13px;
+}
+.filter-subgroup button {
+  padding: 4px 10px;
+  background: #000;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.error {
+  text-align: center;
+  padding: 20px;
+  color: #dc3545;
+}
+
+.size-option {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  cursor: pointer;
+}
+
+.size-option input[type="checkbox"] {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.size-label {
+  font-size: 14px;
+  color: #333;
+}
+
+.size-option:hover .size-label {
+  color: #000;
+}
+
+  </style>
+</head>
+<body>
+  <!-- <header>
+    <div>
+      <span style="font-size: 22px;">☰</span>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/collections">Collections</a>
+        <a href="/new">New</a>
+      </nav>
+    </div>
+    <div class="top-icons">
+      <div>👜</div>
+      <div>👤</div>
+    </div>
+  </header> -->
+  <header>
+    <div class="logo">MotionHaus</div>
+    <nav>
+      <a href="/home">Home</a>
+      <a href="/products">Shop</a>
+      <a href="#">Contact us</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="icons">
+      <i class="icon">♡</i>
+      <i class="icon">👤</i>
+      <i class="icon">🛒</i>
+    </div>
+  
+    
+  </header>
+
+
+
+  <div class="container">
+    <!-- Filters -->
+    <aside class="filters">
+      <div class="section">
+        <h2>Filters</h2>
+      </div>
+    
+      <div class="section">
+        <div class="filter-header" onclick="toggleDropdown(this)">
+          <h3>Size</h3>
+          <span class="toggle-icon">+</span>
+        </div>
+        <div class="filter-options" style="display: none;">
+          <% 
+            const sizes = [5, 6, 7, 8, 9, 10, 11, 12];
+            const selectedSizes = Array.isArray(query.size) ? query.size : (query.size ? [query.size] : []);
+          %>
+          <% sizes.forEach(size => { %>
+            <label class="size-option">
+              <input 
+                type="checkbox" 
+                name="size" 
+                value="<%= size %>" 
+                <%= selectedSizes.includes(size.toString()) ? 'checked' : '' %>
+                onchange="applySizeFilter()"
+              >
+              <span class="size-label"><%= size %></span>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+
+
+      <hr />
+      <div class="section">
+        <div class="filter-header" onclick="toggleDropdown(this)">
+          <h3>Sort</h3>
+          <span class="toggle-icon">+</span>
+        </div>
+        <div class="filter-options" style="display: none;">
+          <label><input type="radio" name="sort" value="price-asc" <%= query.sort === 'price-asc' ? 'checked' : '' %> onchange="applySort(this)"> Price: Low to High</label><br>
+          <label><input type="radio" name="sort" value="price-desc" <%= query.sort === 'price-desc' ? 'checked' : '' %> onchange="applySort(this)"> Price: High to Low</label><br>
+          <label><input type="radio" name="sort" value="az" <%= query.sort === 'az' ? 'checked' : '' %> onchange="applySort(this)"> A–Z</label><br>
+          <label><input type="radio" name="sort" value="za" <%= query.sort === 'za' ? 'checked' : '' %> onchange="applySort(this)"> Z–A</label>
+        </div>
+      </div>
+      <hr />
+      <div class="section">
+        <div class="filter-header" onclick="toggleDropdown(this)">
+          <h3>Filter</h3>
+          <span class="toggle-icon">+</span>
+        </div>
+        <div class="filter-options" style="display: none;">
+          
+          <!-- Category filter -->
+          <div class="filter-subgroup">
+            <strong style="font-size: 14px;">Category</strong>
+            <div>
+              <label>
+                <input type="radio" name="category" value="Sneakers" 
+                  <%= query.category === 'Sneakers' ? 'checked' : '' %> 
+                  onchange="applyFilters()"> Sneakers
+              </label>
+            </div>
+            <div>
+              <label>
+                <input type="radio" name="category" value="Running Shoes" 
+                  <%= query.category === 'Running Shoes' ? 'checked' : '' %> 
+                  onchange="applyFilters()"> Running Shoes
+              </label>
+            </div>
+            <div>
+              <label>
+                <input type="radio" name="category" value="All" 
+                  <%= !query.category || query.category === 'All' ? 'checked' : '' %> 
+                  onchange="applyFilters()"> All Products
+              </label>
+            </div>
+          </div>
+      
+          <!-- Price range filter -->
+          <div class="filter-subgroup" style="margin-top: 15px;">
+            <strong style="font-size: 14px;">Price Range</strong><br>
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+              <input type="number" id="minPrice" placeholder="Min" value="<%= minPrice || '' %>" min="0" style="width: 80px;"> 
+              <span>-</span>
+              <input type="number" id="maxPrice" placeholder="Max" value="<%= maxPrice || '' %>" min="0" style="width: 80px;">
+            </div>
+            <button onclick="applyPriceFilter()" style="margin-top: 10px; padding: 6px 12px; background: #000; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+              Apply Price Filter
+            </button>
+          </div>
+
+          <!-- Reset Filters Button -->
+          <div class="filter-subgroup" style="margin-top: 20px;">
+            <button onclick="resetFilters()" style="width: 100%; padding: 8px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Reset All Filters
+            </button>
+          </div>
+      
+        </div>
+      </div>
+
+      
+  
+    
+      <hr />
+    
+    
+      
+    </aside>
+
+
+    <!-- Main Section -->
+    <main class="search-sort">
+      <div class="search-bar">
+        <div class="search-container">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            id="liveSearchInput"
+            placeholder="Search products..."
+            autocomplete="off"
+          />
+        </div>
+      </div>
+
+
+      
+
+      
+
+      <section class="product-grid" id="productGrid">
+        <% if (products && products.length === 0) { %>
+          <div class="no-products">No products found.</div>
+        <% } else { %>
+          <% products.forEach(product => { %>
+            <% if (!product.isBlocked) { %>
+              <a href="/products/<%= product._id %>" class="product-card" data-id="<%= product._id %>">
+                <div class="image-wrapper">
+                  <% if (product.images && product.images.length > 0) { %>
+                    <img src="<%= product.images[0] %>" 
+                         alt="<%= product.name %>" 
+                         onerror="console.error('Failed to load image:', this.src)" />
+                  <% } else { %>
+                    <div class="no-image-placeholder">No Image Available</div>
+                  <% } %>
+                  <div class="brand-logo">
+                    <% if (product.brand) { %>
+                      <%= product.brand %>
+                    <% } else { %>
+                      MotionHaus
+                    <% } %>
+              </div>
+            </div>
+        
+                <div class="product-info">
+                  <div class="meta">Sneakers</div>
+                  <div class="title"><%= product.name %></div>
+                  <div class="price">From Rs. <%= product.price.toFixed(2) %></div>
+                </div>
+              </a>
+            <% } %>
+          <% }) %>
+        <% } %>
+      </section>
+    </main>
+  </div>
+  <footer class="footer">
+ 
+  
+    <div class="footer-main">
+      <div class="footer-about">
+        <h3 class="logo">MOTIONHAUS</h3>
+        <p>We have clothes that suits your style and<br>which you're proud to wear. From<br>women to men.</p>
+        <div class="social-icons">
+          <i class="icon">🐦</i>
+          <i class="icon">👍</i>
+          <i class="icon">📷</i>
+          <i class="icon">💻</i>
+        </div>
+      </div>
+  
+      <div class="footer-links">
+        <div>
+          <h4>COMPANY</h4>
+          <p>About</p>
+          <p>Features</p>
+          <p>Works</p>
+          <p>Career</p>
+        </div>
+        <div>
+          <h4>HELP</h4>
+          <p>Customer Support</p>
+          <p>Delivery Details</p>
+          <p>Terms & Conditions</p>
+          <p>Privacy Policy</p>
+        </div>
+        <div>
+          <h4>FAQ</h4>
+          <p>Account</p>
+          <p>Manage Deliveries</p>
+          <p>Orders</p>
+          <p>Payments</p>
+        </div>
+        <div>
+          <h4>RESOURCES</h4>
+          <p>Free eBooks</p>
+          <p>Development Tutorial</p>
+          <p>How to - Blog</p>
+          <p>Youtube Playlist</p>
+        </div>
+      </div>
+    </div>
+  
+    <div class="footer-bottom">
+      <p>Shop.co © 2000-2023, All Rights Reserved</p>
+      <div class="payment-icons">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Visa" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Mastercard" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/174/174861.png" alt="Paypal" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Apple Pay" width="24" height="24">
+        <img src="https://cdn-icons-png.flaticon.com/512/179/179457.png" alt="Google Pay" width="24" height="24">
+      </div>
+    </div>
+  </footer>
+    <script>
+      function toggleDropdown(el) {
+        const options = el.nextElementSibling;
+        const icon = el.querySelector('.toggle-icon');
+        const isOpen = options.style.display === 'block';
+        options.style.display = isOpen ? 'none' : 'block';
+        icon.textContent = isOpen ? '+' : '−';
+      }
+
+      function applySort(input) {
+        const url = new URL(window.location);
+        url.searchParams.set('sort', input.value);
+        window.location = url.toString();
+      }
+
+      function applyFilters() {
+        const url = new URL(window.location);
+
+        // Category
+        const category = document.querySelector('input[name="category"]:checked');
+        if (category && category.value !== 'All') {
+          url.searchParams.set('category', category.value);
+        } else {
+          url.searchParams.delete('category');
+        }
+
+        // Price Range
+        const min = document.getElementById('minPrice').value;
+        const max = document.getElementById('maxPrice').value;
+        if (min) url.searchParams.set('minPrice', min);
+        else url.searchParams.delete('minPrice');
+        if (max) url.searchParams.set('maxPrice', max);
+        else url.searchParams.delete('maxPrice');
+
+        window.location = url.toString();
+      }
+
+      // Initialize filter dropdowns
+      document.addEventListener('DOMContentLoaded', function() {
+        const filterHeaders = document.querySelectorAll('.filter-header');
+        filterHeaders.forEach(header => {
+          const options = header.nextElementSibling;
+          const icon = header.querySelector('.toggle-icon');
+          if (options.querySelector('input:checked') || 
+              (options.querySelector('#minPrice') && options.querySelector('#minPrice').value) ||
+              (options.querySelector('#maxPrice') && options.querySelector('#maxPrice').value)) {
+            options.style.display = 'block';
+            icon.textContent = '−';
+          }
+        });
+      });
+
+      const searchInput = document.getElementById('liveSearchInput');
+      const productGrid = document.getElementById('productGrid');
+      let searchTimeout;
+
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        // Don't reload page if query is empty or too short
+        if (query.length < 2) {
+          return;
+        }
+
+        searchTimeout = setTimeout(async () => {
+          try {
+            // Show loading state
+            productGrid.innerHTML = '<div class="loading">Searching...</div>';
+
+            const response = await fetch(`/search-live?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Search failed');
+
+            const products = await response.json();
+
+            // Clear previous results
+            productGrid.innerHTML = '';
+
+            if (products.length === 0) {
+              productGrid.innerHTML = '<div class="no-products">No products found</div>';
+              return;
+            }
+
+            // Create and append new product cards
+            products.forEach(product => {
+              const card = document.createElement('div');
+              card.className = 'product-card';
+              card.setAttribute('data-id', product.id);
+
+              card.innerHTML = `
+                <div class="image-wrapper">
+                  <img src="${product.imageUrl}" alt="${product.name}" 
+                       onerror="this.onerror=null; this.src='/images/placeholder.jpg'">
+                  <div class="brand-logo">${product.brand}</div>
+                </div>
+                <div class="product-info">
+                  <div class="meta">Sneakers</div>
+                  <div class="title">${product.name}</div>
+                  <div class="price">From Rs. ${product.price.toFixed(2)}</div>
+                </div>
+              `;
+
+              productGrid.appendChild(card);
+            });
+          } catch (error) {
+            console.error('Search error:', error);
+            productGrid.innerHTML = '<div class="error">Error searching products. Please try again.</div>';
+          }
+        }, 300); // 300ms debounce
+      });
+
+      // Initialize search input with current search value
+      document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('liveSearchInput');
+        if (searchInput) {
+          searchInput.value = '<%= search %>';
+        }
+      });
+
+      // Add debug logging
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('Current category:', '<%= query.category %>');
+        console.log('Available categories:', '<%= categories %>');
+        console.log('Products:', '<%= JSON.stringify(products) %>');
+      });
+
+      function applySizeFilter() {
+        const url = new URL(window.location);
+        const checkedSizes = Array.from(document.querySelectorAll('input[name="size"]:checked')).map(input => input.value);
+        
+        // Remove all existing size parameters
+        url.searchParams.delete('size');
+        
+        // Add each selected size as a separate parameter
+        checkedSizes.forEach(size => {
+          url.searchParams.append('size', size);
+        });
+
+        // If no sizes are selected, remove the size parameter completely
+        if (checkedSizes.length === 0) {
+          url.searchParams.delete('size');
+        }
+
+        // Preserve other existing filters
+        const category = document.querySelector('input[name="category"]:checked');
+        if (category && category.value !== 'All') {
+          url.searchParams.set('category', category.value);
+        }
+
+        const sort = document.querySelector('input[name="sort"]:checked');
+        if (sort) {
+          url.searchParams.set('sort', sort.value);
+        }
+
+        // Preserve price filters
+        const minPrice = document.getElementById('minPrice').value;
+        const maxPrice = document.getElementById('maxPrice').value;
+        if (minPrice) url.searchParams.set('minPrice', minPrice);
+        if (maxPrice) url.searchParams.set('maxPrice', maxPrice);
+
+        window.location.href = url.toString();
+      }
+
+      // Initialize filter dropdowns
+      document.addEventListener('DOMContentLoaded', function() {
+        const filterHeaders = document.querySelectorAll('.filter-header');
+        filterHeaders.forEach(header => {
+          const options = header.nextElementSibling;
+          const icon = header.querySelector('.toggle-icon');
+          
+          // Check if any size is selected to determine initial state
+          const hasSelectedSizes = options.querySelectorAll('input[name="size"]:checked').length > 0;
+          
+          if (hasSelectedSizes) {
+            options.style.display = 'block';
+            icon.textContent = '−';
+          }
+        });
+      });
+
+      function resetFilters() {
+        // Clear all filter inputs
+        document.querySelectorAll('input[name="category"]').forEach(input => {
+          input.checked = false;
+        });
+        document.getElementById('minPrice').value = '';
+        document.getElementById('maxPrice').value = '';
+        document.querySelectorAll('input[name="size"]').forEach(input => {
+          input.checked = false;
+        });
+        document.querySelectorAll('input[name="sort"]').forEach(input => {
+          input.checked = false;
+        });
+
+        // Redirect to base products page without any query parameters
+        window.location.href = '/products';
+      }
+
+      function applyPriceFilter() {
+        const url = new URL(window.location);
+        const minPrice = document.getElementById('minPrice').value;
+        const maxPrice = document.getElementById('maxPrice').value;
+
+        // Validate price inputs
+        if (minPrice && maxPrice && parseFloat(minPrice) > parseFloat(maxPrice)) {
+          alert('Minimum price cannot be greater than maximum price');
+          return;
+        }
+
+        // Clear existing price parameters
+        url.searchParams.delete('minPrice');
+        url.searchParams.delete('maxPrice');
+
+        // Add new price parameters if they exist
+        if (minPrice) url.searchParams.set('minPrice', minPrice);
+        if (maxPrice) url.searchParams.set('maxPrice', maxPrice);
+
+        // Preserve other existing filters
+        const category = document.querySelector('input[name="category"]:checked');
+        if (category && category.value !== 'All') {
+          url.searchParams.set('category', category.value);
+        }
+
+        const sort = document.querySelector('input[name="sort"]:checked');
+        if (sort) {
+          url.searchParams.set('sort', sort.value);
+        }
+
+        // Get selected sizes
+        const selectedSizes = Array.from(document.querySelectorAll('input[name="size"]:checked'))
+          .map(input => input.value);
+        
+        // Remove all existing size parameters
+        url.searchParams.delete('size');
+        
+        // Add each selected size
+        selectedSizes.forEach(size => {
+          url.searchParams.append('size', size);
+        });
+
+        // Reload the page with all filters
+        window.location.href = url.toString();
+      }
+
+      // Initialize price inputs with current values
+      document.addEventListener('DOMContentLoaded', function() {
+        const minPriceInput = document.getElementById('minPrice');
+        const maxPriceInput = document.getElementById('maxPrice');
+        
+        if (minPriceInput && maxPriceInput) {
+          minPriceInput.value = '<%= minPrice || "" %>';
+          maxPriceInput.value = '<%= maxPrice || "" %>';
+        }
+      });
+    </script>
+</body>
+</html>
