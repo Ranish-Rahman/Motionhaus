@@ -1,4 +1,5 @@
 import Product from '../../models/ProductModel.js';
+import Category from '../../models/categoryModel.js';
 
 // List products for users
 export const listProducts = async (req, res) => {
@@ -7,7 +8,10 @@ export const listProducts = async (req, res) => {
     const { search, sort, minPrice, maxPrice, category, size } = req.query;
     
     // Build query
-    let query = { isDeleted: false };
+    let query = { 
+      isDeleted: false,
+      isBlocked: false
+    };
     
     if (search) {
       query.name = { $regex: search, $options: 'i' };
@@ -24,9 +28,21 @@ export const listProducts = async (req, res) => {
       }
     }
 
+    // Fetch active categories from Category model
+    const categories = await Category.find({ 
+      isDeleted: false
+    }).select('name');
+
+    // Get list of active category names
+    const activeCategoryNames = categories.map(cat => cat.name);
+
     // Add category filter if provided
     if (category && category !== 'All') {
-      query.category = { $regex: new RegExp(`^${category}$`, 'i') };
+      // Use exact matching for category
+      query.category = category;
+    } else {
+      // When no category is selected, only show products from active categories
+      query.category = { $in: activeCategoryNames };
     }
 
     // Add size filter if provided
@@ -58,12 +74,16 @@ export const listProducts = async (req, res) => {
     const products = await Product.find(query)
       .sort(sortOptions);
 
-    // Fetch all unique categories from products
-    const categories = [...new Set(products.map(product => product.category))];
+    console.log('Category filter:', category);
+    console.log('Active categories:', activeCategoryNames);
+    console.log('Found products:', products.length);
+    if (products.length > 0) {
+      console.log('Sample product categories:', products.map(p => p.category));
+    }
 
     res.render('user/products', {
       products,
-      categories,
+      categories: categories.map(cat => cat.name),
       selectedCategories: category ? [category] : [],
       search: search || '',
       sort: sort || '',

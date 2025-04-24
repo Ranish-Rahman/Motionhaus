@@ -9,7 +9,8 @@ export const getCategories = async (req, res) => {
         const skip = (page - 1) * limit;
         const search = req.query.search || '';
 
-        const query = { isDeleted: false };
+        // Remove isDeleted filter to show all categories
+        const query = {};
         if (search) {
             query.name = { $regex: search, $options: 'i' };
         }
@@ -242,6 +243,34 @@ export const softDeleteCategory = async (req, res) => {
     } catch (error) {
         console.error('Error deleting category:', error);
         req.flash('error', 'Error deleting category');
+        res.redirect('/admin/categories');
+    }
+};
+
+// Restore deleted category
+export const restoreCategory = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            req.flash('error', 'Invalid category ID');
+            return res.redirect('/admin/categories');
+        }
+
+        const category = await Category.findByIdAndUpdate(
+            req.params.id,
+            { isDeleted: false },
+            { new: true }
+        );
+
+        if (!category) {
+            req.flash('error', 'Category not found');
+            return res.redirect('/admin/categories');
+        }
+
+        req.flash('success', 'Category restored successfully');
+        res.redirect('/admin/categories');
+    } catch (error) {
+        console.error('Error restoring category:', error);
+        req.flash('error', 'Error restoring category');
         res.redirect('/admin/categories');
     }
 };

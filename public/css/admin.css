@@ -1,0 +1,30 @@
+/* Category Management Styles */
+.deleted-category {
+  opacity: 0.7;
+  background-color: #f8f8f8;
+}
+
+.deleted-category td {
+  color: #666;
+}
+
+.restore-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.3s;
+}
+
+.restore-btn:hover {
+  background-color: #218838;
+}
+
+.restore-btn i {
+  font-size: 14px;
+} 

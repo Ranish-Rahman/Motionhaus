@@ -279,13 +279,10 @@ export const listProducts = async (req, res) => {
       }
     }
 
-    // Fetch all unique categories from the database first
-    const allProducts = await Product.find({ 
-      isDeleted: false,
-      isBlocked: false // Filter out blocked products here too
-    });
-    const categories = [...new Set(allProducts.map(product => product.category))];
-    console.log('All available categories in database:', categories);
+    // Fetch all active categories from the Category model
+    const categories = await Category.find({ 
+      isDeleted: false 
+    }).select('name');
 
     // Fetch filtered products
     const products = await Product.find(query)
@@ -301,7 +298,7 @@ export const listProducts = async (req, res) => {
 
     res.render('user/products', {
       products,
-      categories, // Use the categories from all products
+      categories: categories.map(cat => cat.name),
       selectedCategories: category ? [category] : [],
       search: search || '',
       sort: sort || '',

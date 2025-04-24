@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Category Management</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     * {
@@ -192,19 +193,28 @@
           <tbody id="categoryTableBody">
             <% if (categories && categories.length > 0) { %>
               <% categories.forEach(category => { %>
-                <tr>
+                <tr class="<%= category.isDeleted ? 'deleted-category' : '' %>">
                   <td><%= category.name %></td>
                   <td class="action-buttons">
-                    <a href="/admin/categories/edit/<%= category._id %>" class="edit-btn">
-                      <i class="bi bi-pencil"></i>
-                      Edit
-                    </a>
-                    <form action="/admin/categories/delete/<%= category._id %>" method="POST" style="display: inline;">
-                      <button type="submit" class="delete-btn" onclick="return confirm('Are you sure you want to delete this category?')">
-                        <i class="bi bi-trash"></i>
-                        Delete
-                      </button>
-                    </form>
+                    <% if (!category.isDeleted) { %>
+                      <a href="/admin/categories/edit/<%= category._id %>" class="edit-btn">
+                        <i class="bi bi-pencil"></i>
+                        Edit
+                      </a>
+                      <form action="/admin/categories/delete/<%= category._id %>" method="POST" style="display: inline;">
+                        <button type="submit" class="delete-btn">
+                          <i class="bi bi-trash"></i>
+                          Delete
+                        </button>
+                      </form>
+                    <% } else { %>
+                      <form action="/admin/categories/restore/<%= category._id %>" method="POST" style="display: inline;">
+                        <button type="submit" class="restore-btn">
+                          <i class="bi bi-arrow-counterclockwise"></i>
+                          Restore
+                        </button>
+                      </form>
+                    <% } %>
                   </td>
                 </tr>
               <% }); %>
@@ -264,6 +274,58 @@
           } else {
             row.style.display = 'none';
           }
+        });
+      });
+
+      // Handle delete buttons
+      const deleteButtons = document.querySelectorAll('.delete-btn');
+      deleteButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+          e.preventDefault();
+          const form = this.closest('form');
+          const categoryName = this.closest('tr').querySelector('td:first-child').textContent;
+
+          Swal.fire({
+            title: 'Delete Category',
+            text: `Are you sure you want to delete "${categoryName}"?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'No, cancel!',
+            reverseButtons: true
+          }).then((result) => {
+            if (result.isConfirmed) {
+              form.submit();
+            }
+          });
+        });
+      });
+
+      // Handle restore buttons
+      const restoreButtons = document.querySelectorAll('.restore-btn');
+      restoreButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+          e.preventDefault();
+          const form = this.closest('form');
+          const categoryName = this.closest('tr').querySelector('td:first-child').textContent;
+
+          Swal.fire({
+            title: 'Restore Category',
+            text: `Are you sure you want to restore "${categoryName}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, restore it!',
+            cancelButtonText: 'No, cancel!',
+            reverseButtons: true
+          }).then((result) => {
+            if (result.isConfirmed) {
+              form.submit();
+            }
+          });
         });
       });
     });

@@ -457,25 +457,22 @@
             <strong style="font-size: 14px;">Category</strong>
             <div>
               <label>
-                <input type="radio" name="category" value="Sneakers" 
-                  <%= query.category === 'Sneakers' ? 'checked' : '' %> 
-                  onchange="applyFilters()"> Sneakers
-              </label>
-            </div>
-            <div>
-              <label>
-                <input type="radio" name="category" value="Running Shoes" 
-                  <%= query.category === 'Running Shoes' ? 'checked' : '' %> 
-                  onchange="applyFilters()"> Running Shoes
-              </label>
-            </div>
-            <div>
-              <label>
                 <input type="radio" name="category" value="All" 
                   <%= !query.category || query.category === 'All' ? 'checked' : '' %> 
                   onchange="applyFilters()"> All Products
               </label>
             </div>
+            <% if (categories && categories.length > 0) { %>
+              <% categories.forEach(category => { %>
+                <div>
+                  <label>
+                    <input type="radio" name="category" value="<%= category %>" 
+                      <%= query.category === category ? 'checked' : '' %> 
+                      onchange="applyFilters()"> <%= category %>
+                  </label>
+                </div>
+              <% }); %>
+            <% } %>
           </div>
       
           <!-- Price range filter -->
