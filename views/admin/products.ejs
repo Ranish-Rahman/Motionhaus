@@ -269,6 +269,37 @@
     .blocked-product:hover {
       opacity: 1;
     }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle-deleted-btn {
+      background: #2b2d31;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.3s;
+    }
+
+    .toggle-deleted-btn:hover {
+      background: #36373d;
+    }
+
+    .deleted-product {
+      opacity: 0.7;
+      background-color: rgba(220, 53, 69, 0.05);
+    }
+
+    .deleted-product:hover {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -287,10 +318,16 @@
             <input type="text" class="search-input" placeholder="Search products..." id="searchInput">
           </div>
         </div>
-        <a href="/admin/products/add" class="add-btn">
-          <i class="bi bi-plus-lg"></i>
-          Add Product
-        </a>
+        <div class="header-right">
+          <a href="/admin/products?showDeleted=<%= !showDeleted %>" class="toggle-deleted-btn">
+            <i class="fas fa-<%= showDeleted ? 'eye-slash' : 'eye' %>"></i>
+            <%= showDeleted ? 'Hide Deleted' : 'Show Deleted' %>
+          </a>
+          <a href="/admin/products/add" class="add-btn">
+            <i class="bi bi-plus-lg"></i>
+            Add Product
+          </a>
+        </div>
       </div>
 
       <% if (error) { %>
@@ -320,11 +357,11 @@
           <tbody>
             <% if (products && products.length > 0) { %>
               <% products.forEach(product => { %>
-                <tr class="<%= product.isBlocked ? 'blocked-product' : '' %>">
+                <tr class="<%= product.isBlocked ? 'blocked-product' : '' %><%= product.isDeleted ? ' deleted-product' : '' %>">
                   <td>
                     <% if (product.images && product.images.length > 0) { %>
                       <div class="product-image">
-                        <img src="<%= product.images[0] %>" 
+                        <img src="<%= product.images[0].startsWith('http') ? product.images[0] : `/uploads/${product.images[0]}` %>" 
                              alt="<%= product.name %>" 
                              onerror="this.onerror=null; this.parentElement.style.background='#2b2d31'; this.style.display='none';">
                       </div>
@@ -358,9 +395,15 @@
                           <i class="fas fa-lock"></i>
                         </button>
                       <% } %>
-                      <button class="action-btn delete delete-product" data-id="<%= product._id %>">
-                        <i class="fas fa-trash"></i>
-                      </button>
+                      <% if (product.isDeleted) { %>
+                        <button class="action-btn restore restore-product" data-id="<%= product._id %>" title="Restore Product">
+                          <i class="fas fa-undo"></i>
+                        </button>
+                      <% } else { %>
+                        <button class="action-btn delete delete-product" data-id="<%= product._id %>">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      <% } %>
                     </div>
                   </td>
                 </tr>
@@ -438,10 +481,7 @@
                     text: "Your product has been deleted.",
                     icon: "success"
                   }).then(() => {
-                    this.closest('tr').remove();
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 1000);
+                    window.location.reload();
                   });
                 } else {
                   throw new Error(data.message);
@@ -538,6 +578,55 @@
               document.querySelector('.main-content').prepend(alertDiv);
             }
           }
+        });
+      });
+
+      // Restore product functionality
+      const restoreButtons = document.querySelectorAll('.restore-product');
+      restoreButtons.forEach(button => {
+        button.addEventListener('click', async function() {
+          const productId = this.dataset.id;
+          
+          swalWithBootstrapButtons.fire({
+            title: "Restore Product",
+            text: "Are you sure you want to restore this product?",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Yes, restore it!",
+            cancelButtonText: "No, cancel!",
+            reverseButtons: true
+          }).then(async (result) => {
+            if (result.isConfirmed) {
+              try {
+                const response = await fetch(`/products/restore/${productId}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                  swalWithBootstrapButtons.fire({
+                    title: "Restored!",
+                    text: "Your product has been restored.",
+                    icon: "success"
+                  }).then(() => {
+                    window.location.reload();
+                  });
+                } else {
+                  throw new Error(data.message);
+                }
+              } catch (error) {
+                swalWithBootstrapButtons.fire({
+                  title: "Error!",
+                  text: `Error: ${error.message}`,
+                  icon: "error"
+                });
+              }
+            }
+          });
         });
       });
     });

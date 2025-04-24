@@ -9,7 +9,8 @@ import {
   getEditProduct,
   updateProduct,
   blockProduct,
-  unblockProduct
+  unblockProduct,
+  restoreProduct
 } from '../controllers/admin/productController.js';
 import { upload, processImages } from '../middleware/imageUpload.js';
 import { isAdmin } from '../middleware/authMiddleware.js';
@@ -30,6 +31,7 @@ router.post('/products/edit/:id', isAdmin, upload.array('images', 10), processIm
 router.delete('/products/:id', isAdmin, deleteProduct);
 router.post('/products/:id/block', isAdmin, blockProduct);
 router.post('/products/:id/unblock', isAdmin, unblockProduct);
+router.post('/products/restore/:id', isAdmin, restoreProduct);
 
 // User product routes
 router.get('/user/products', listProducts);

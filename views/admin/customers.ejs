@@ -294,7 +294,7 @@
               <tbody>
                 <% if (users && users.length > 0) { %>
                   <% users.forEach(user => { %>
-                    <tr>
+                    <tr data-user-id="<%= user._id %>">
                       <td>
                         <div class="user-info">
                           <img src="https://ui-avatars.com/api/?name=<%= user.name %>&background=random" alt="<%= user.name %>" />
@@ -416,34 +416,57 @@
         fetch(`/admin/users/${userId}/block`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
         })
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
         .then(data => {
           if (data.success) {
-            // Find the row and update the status and button
-            const row = document.querySelector(`button[onclick="blockUser('${userId}')"]`).closest('tr');
-            const statusBadge = row.querySelector('.badge');
-            const actionButtons = row.querySelector('.action-buttons');
+            // Find the row using the user ID
+            const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+            if (row) {
+              const statusBadge = row.querySelector('.badge');
+              const actionButtons = row.querySelector('.action-buttons');
+              
+              // Update status badge
+              statusBadge.className = 'badge badge-blocked';
+              statusBadge.textContent = 'blocked';
+              
+              // Update button
+              const blockButton = actionButtons.querySelector('.btn-block');
+              if (blockButton) {
+                blockButton.className = 'btn-unblock';
+                blockButton.innerHTML = '<i class="bi bi-unlock"></i>';
+                blockButton.onclick = () => unblockUser(userId);
+                blockButton.title = 'Unblock User';
+              }
+            }
             
-            // Update status badge
-            statusBadge.className = 'badge badge-blocked';
-            statusBadge.textContent = 'blocked';
-            
-            // Update button
-            const blockButton = actionButtons.querySelector('.btn-block');
-            blockButton.className = 'btn-unblock';
-            blockButton.innerHTML = '<i class="bi bi-unlock"></i>';
-            blockButton.onclick = () => unblockUser(userId);
-            blockButton.title = 'Unblock User';
+            // Show success message
+            Swal.fire({
+              title: 'Success!',
+              text: data.message,
+              icon: 'success',
+              timer: 2000,
+              showConfirmButton: false
+            });
           } else {
-            alert(data.message || 'Failed to block user');
+            throw new Error(data.message || 'Failed to block user');
           }
         })
         .catch(error => {
           console.error('Error:', error);
-          alert('Failed to block user');
+          Swal.fire({
+            title: 'Error!',
+            text: error.message,
+            icon: 'error'
+          });
         });
       }
     }
@@ -453,10 +476,16 @@
         fetch(`/admin/users/${userId}/unblock`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
         })
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
         .then(data => {
           if (data.success) {
             // Find the row and update the status and button
@@ -474,13 +503,26 @@
             unblockButton.innerHTML = '<i class="bi bi-lock"></i>';
             unblockButton.onclick = () => blockUser(userId);
             unblockButton.title = 'Block User';
+            
+            // Show success message
+            Swal.fire({
+              title: 'Success!',
+              text: data.message,
+              icon: 'success',
+              timer: 2000,
+              showConfirmButton: false
+            });
           } else {
-            alert(data.message || 'Failed to unblock user');
+            throw new Error(data.message || 'Failed to unblock user');
           }
         })
         .catch(error => {
           console.error('Error:', error);
-          alert('Failed to unblock user');
+          Swal.fire({
+            title: 'Error!',
+            text: error.message,
+            icon: 'error'
+          });
         });
       }
     }
@@ -531,4 +573,6 @@
   </script>
 </body>
 </html>
+
+
 

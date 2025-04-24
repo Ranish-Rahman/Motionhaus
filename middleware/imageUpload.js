@@ -48,20 +48,16 @@ export const upload = multer({
 export const processImages = async (req, res, next) => {
   try {
     if (!req.files || req.files.length === 0) {
-      console.log('No files to process');
       return next();
     }
 
-    // Validate minimum number of images
-    if (req.files.length < 3) {
-      console.log('Insufficient number of images:', req.files.length);
+    // Only validate minimum images for new products (add route)
+    if (req.originalUrl.includes('/products/add') && req.files.length < 3) {
       return res.status(400).json({
         success: false,
-        message: 'At least 3 images are required'
+        message: 'At least 3 images are required for new products'
       });
     }
-
-    console.log(`Processing ${req.files.length} images for Cloudinary upload`);
 
     // Upload each image to Cloudinary
     const uploadPromises = req.files.map((file, index) => {
@@ -79,10 +75,8 @@ export const processImages = async (req, res, next) => {
           uploadOptions,
           (error, result) => {
             if (error) {
-              console.error(`Error uploading image ${index + 1}:`, error);
               reject(error);
             } else {
-              console.log(`Successfully uploaded image ${index + 1}:`, result.secure_url);
               resolve(result.secure_url);
             }
           }
@@ -92,13 +86,12 @@ export const processImages = async (req, res, next) => {
 
     // Wait for all uploads to complete
     const uploadedImages = await Promise.all(uploadPromises);
-    console.log('All images uploaded successfully:', uploadedImages);
 
     // Attach the uploaded image URLs to the request
     req.uploadedImages = uploadedImages;
     next();
   } catch (error) {
-    console.error('Error processing images:', error);
+    console.error('Error processing images:', error.message);
     res.status(500).json({
       success: false,
       message: 'Error processing images: ' + error.message

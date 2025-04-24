@@ -27,4 +27,13 @@
 
 .restore-btn i {
   font-size: 14px;
+}
+
+.action-btn.restore {
+  background-color: #28a745;
+  color: white;
+}
+
+.action-btn.restore:hover {
+  background-color: #218838;
 } 

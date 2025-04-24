@@ -3,6 +3,8 @@ import User from '../../models/userModel.js';
 import Admin from '../../models/adminModel.js';
 import Category from '../../models/categoryModel.js';
 import path from 'path';
+import Session from '../../models/sessionModel.js';
+import mongoose from 'mongoose';
 
 export const getAdminLogin = (req, res) => {
   console.log('Admin login page requested');
@@ -191,7 +193,7 @@ export const handleLogout = (req, res) => {
 export const blockUser = async (req, res) => {
   try {
     const userId = req.params.userId;
-    const user = await User.findById(req.params.userId);
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ 
         success: false,
@@ -203,9 +205,17 @@ export const blockUser = async (req, res) => {
     user.status = 'blocked';
     await user.save();
     
+    // Destroy the session in the database
+    await mongoose.connection.collection('sessions').deleteMany({
+      'session.user.id': userId
+    });
+    
+    // Clear the session cookie
+    res.clearCookie('sessionId');
+    
     res.json({ 
       success: true,
-      message: 'User blocked successfully'
+      message: 'User blocked successfully. Their session has been terminated.'
     });
   } catch (error) {
     console.error('Block user error:', error);
@@ -220,7 +230,9 @@ export const blockUser = async (req, res) => {
 // Unblock a user
 export const unblockUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId);
+    const userId = req.params.userId;
+    const user = await User.findById(userId);
+    
     if (!user) {
       return res.status(404).json({ 
         success: false,
@@ -232,13 +244,13 @@ export const unblockUser = async (req, res) => {
     user.status = 'active';
     await user.save();
     
-    res.json({ 
+    return res.json({ 
       success: true,
-      message: 'User unblocked successfully'
+      message: 'User unblocked successfully. They can now log in again.'
     });
   } catch (error) {
     console.error('Unblock user error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false,
       message: 'Failed to unblock user',
       error: error.message

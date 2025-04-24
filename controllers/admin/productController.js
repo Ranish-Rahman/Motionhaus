@@ -14,10 +14,11 @@ export const getProducts = async (req, res) => {
       });
     }
 
-    const products = await Product.find({ isDeleted: false })
-      .sort({ createdAt: -1 });
+    const showDeleted = req.query.showDeleted === 'true';
+    const query = showDeleted ? {} : { isDeleted: false };
 
-    console.log(`Fetched ${products.length} products`);
+    const products = await Product.find(query)
+      .sort({ createdAt: -1 });
 
     // Ensure all image paths are valid
     products.forEach(product => {
@@ -34,10 +35,11 @@ export const getProducts = async (req, res) => {
       title: 'Products',
       path: '/admin/products',
       success: req.flash('success'),
-      error: req.flash('error')
+      error: req.flash('error'),
+      showDeleted
     });
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error('Error fetching products:', error.message);
     req.flash('error', 'Error fetching products');
     res.redirect('/admin/dashboard');
   }
@@ -74,14 +76,66 @@ export const addProduct = async (req, res) => {
     const sizes = req.body.sizes || [];
 
     // Validate required fields
-    if (!name || !description || !price || !category || !sizes || sizes.length === 0 || stock === undefined) {
-      req.flash('error', 'All fields are required');
-      return res.redirect('/admin/products/add');
+    const errors = [];
+
+    // Name validation
+    if (!name || !name.trim()) {
+      errors.push('Product name is required');
+    } else if (name.length < 3) {
+      errors.push('Product name must be at least 3 characters long');
     }
 
-    // Validate images
+    // Description validation
+    if (!description || !description.trim()) {
+      errors.push('Product description is required');
+    } else if (description.length < 10) {
+      errors.push('Product description must be at least 10 characters long');
+    }
+
+    // Price validation
+    if (!price) {
+      errors.push('Product price is required');
+    } else {
+      const priceNum = parseFloat(price);
+      if (isNaN(priceNum)) {
+        errors.push('Price must be a valid number');
+      } else if (priceNum <= 0) {
+        errors.push('Price must be greater than 0');
+      }
+    }
+
+    // Stock validation
+    if (stock === undefined || stock === '') {
+      errors.push('Stock quantity is required');
+    } else {
+      const stockNum = parseInt(stock);
+      if (isNaN(stockNum)) {
+        errors.push('Stock must be a valid number');
+      } else if (stockNum < 0) {
+        errors.push('Stock cannot be negative');
+      }
+    }
+
+    // Category validation
+    if (!category) {
+      errors.push('Product category is required');
+    }
+
+    // Sizes validation
+    if (!sizes || sizes.length === 0) {
+      errors.push('At least one size must be selected');
+    }
+
+    // Images validation
     if (!req.uploadedImages || req.uploadedImages.length < 3) {
-      req.flash('error', 'At least 3 images are required');
+      errors.push('At least 3 images are required');
+    } else if (req.uploadedImages.length > 10) {
+      errors.push('Maximum 10 images allowed');
+    }
+
+    // If there are any errors, redirect back with error messages
+    if (errors.length > 0) {
+      req.flash('error', errors.join(', '));
       return res.redirect('/admin/products/add');
     }
 
@@ -89,8 +143,8 @@ export const addProduct = async (req, res) => {
     const sizesArray = Array.isArray(sizes) ? sizes.map(Number) : [Number(sizes)];
 
     const product = new Product({
-      name,
-      description,
+      name: name.trim(),
+      description: description.trim(),
       price: parseFloat(price),
       category,
       sizes: sizesArray,
@@ -102,7 +156,7 @@ export const addProduct = async (req, res) => {
     req.flash('success', 'Product added successfully');
     res.redirect('/admin/products');
   } catch (error) {
-    console.error('Error adding product:', error);
+    console.error('Error adding product:', error.message);
     req.flash('error', error.message || 'Error adding product');
     res.redirect('/admin/products/add');
   }
@@ -141,11 +195,57 @@ export const updateProduct = async (req, res) => {
     const { name, description, price, category, stock } = req.body;
     const sizes = req.body.sizes || [];
     const productId = req.params.id;
+    const removedImages = req.body.removedImages || [];
 
     // Validate required fields
-    if (!name || !description || !price || !category || !sizes || sizes.length === 0 || stock === undefined) {
-      req.flash('error', 'All fields are required');
-      return res.redirect(`/admin/products/edit/${productId}`);
+    const errors = [];
+
+    // Name validation
+    if (!name || !name.trim()) {
+      errors.push('Product name is required');
+    } else if (name.length < 3) {
+      errors.push('Product name must be at least 3 characters long');
+    }
+
+    // Description validation
+    if (!description || !description.trim()) {
+      errors.push('Product description is required');
+    } else if (description.length < 10) {
+      errors.push('Product description must be at least 10 characters long');
+    }
+
+    // Price validation
+    if (!price) {
+      errors.push('Product price is required');
+    } else {
+      const priceNum = parseFloat(price);
+      if (isNaN(priceNum)) {
+        errors.push('Price must be a valid number');
+      } else if (priceNum <= 0) {
+        errors.push('Price must be greater than 0');
+      }
+    }
+
+    // Stock validation
+    if (stock === undefined || stock === '') {
+      errors.push('Stock quantity is required');
+    } else {
+      const stockNum = parseInt(stock);
+      if (isNaN(stockNum)) {
+        errors.push('Stock must be a valid number');
+      } else if (stockNum < 0) {
+        errors.push('Stock cannot be negative');
+      }
+    }
+
+    // Category validation
+    if (!category) {
+      errors.push('Product category is required');
+    }
+
+    // Sizes validation
+    if (!sizes || sizes.length === 0) {
+      errors.push('At least one size must be selected');
     }
 
     // Get existing product
@@ -155,25 +255,44 @@ export const updateProduct = async (req, res) => {
       return res.redirect('/admin/products');
     }
 
+    // Handle image updates
+    let updatedImages = [...existingProduct.images];
+    
+    // Remove images that were marked for deletion
+    if (removedImages.length > 0) {
+      updatedImages = updatedImages.filter((_, index) => !removedImages.includes(index.toString()));
+    }
+
+    // Add new images if any were uploaded
+    if (req.uploadedImages && req.uploadedImages.length > 0) {
+      updatedImages = [...updatedImages, ...req.uploadedImages];
+    }
+
+    // Images validation
+    if (updatedImages.length < 3) {
+      errors.push('Product must have at least 3 images');
+    } else if (updatedImages.length > 10) {
+      errors.push('Maximum 10 images allowed');
+    }
+
+    // If there are any errors, redirect back with error messages
+    if (errors.length > 0) {
+      req.flash('error', errors.join(', '));
+      return res.redirect(`/admin/products/edit/${productId}`);
+    }
+
     // Convert sizes to array of numbers
     const sizesArray = Array.isArray(sizes) ? sizes.map(Number) : [Number(sizes)];
 
     const updateData = {
-      name,
-      description,
+      name: name.trim(),
+      description: description.trim(),
       price: parseFloat(price),
       category,
       sizes: sizesArray,
-      stock: parseInt(stock)
+      stock: parseInt(stock),
+      images: updatedImages
     };
-
-    // Handle image updates
-    if (req.uploadedImages && req.uploadedImages.length > 0) {
-      updateData.images = req.uploadedImages;
-    } else {
-      // Keep existing images if no new ones are uploaded
-      updateData.images = existingProduct.images;
-    }
 
     // Update the product
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -190,7 +309,7 @@ export const updateProduct = async (req, res) => {
     req.flash('success', 'Product updated successfully');
     res.redirect('/admin/products');
   } catch (error) {
-    console.error('Error updating product:', error);
+    console.error('Error updating product:', error.message);
     req.flash('error', error.message || 'Error updating product');
     res.redirect(`/admin/products/edit/${req.params.id}`);
   }
@@ -340,7 +459,7 @@ export const listProducts = async (req, res) => {
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('Attempting to delete product with ID:', id);
+    console.log('Attempting to soft delete product with ID:', id);
     
     // First check if product exists
     const product = await Product.findById(id);
@@ -349,21 +468,25 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    // Perform hard delete instead of soft delete
-    const result = await Product.findByIdAndDelete(id);
+    // Perform soft delete by setting isDeleted to true
+    const result = await Product.findByIdAndUpdate(
+      id,
+      { isDeleted: true },
+      { new: true }
+    );
 
-    console.log('Delete result:', result);
+    console.log('Soft delete result:', result);
 
     if (!result) {
-      console.log('Failed to delete product');
-      return res.status(500).json({ success: false, message: 'Failed to delete product' });
+      console.log('Failed to soft delete product');
+      return res.status(500).json({ success: false, message: 'Failed to soft delete product' });
     }
 
-    console.log('Product deleted successfully');
-    res.json({ success: true, message: 'Product deleted successfully' });
+    console.log('Product soft deleted successfully');
+    res.json({ success: true, message: 'Product soft deleted successfully' });
   } catch (error) {
-    console.error('Error deleting product:', error);
-    res.status(500).json({ success: false, message: 'Error deleting product' });
+    console.error('Error soft deleting product:', error);
+    res.status(500).json({ success: false, message: 'Error soft deleting product' });
   }
 };
 
@@ -400,5 +523,39 @@ export const unblockProduct = async (req, res) => {
   } catch (error) {
     console.error('Error unblocking product:', error);
     res.status(500).json({ success: false, message: 'Error unblocking product' });
+  }
+};
+
+export const restoreProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('Attempting to restore product with ID:', id);
+    
+    // First check if product exists
+    const product = await Product.findById(id);
+    if (!product) {
+      console.log('Product not found');
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    // Restore product by setting isDeleted to false
+    const result = await Product.findByIdAndUpdate(
+      id,
+      { isDeleted: false },
+      { new: true }
+    );
+
+    console.log('Restore result:', result);
+
+    if (!result) {
+      console.log('Failed to restore product');
+      return res.status(500).json({ success: false, message: 'Failed to restore product' });
+    }
+
+    console.log('Product restored successfully');
+    res.json({ success: true, message: 'Product restored successfully' });
+  } catch (error) {
+    console.error('Error restoring product:', error);
+    res.status(500).json({ success: false, message: 'Error restoring product' });
   }
 };

@@ -7,6 +7,7 @@ import passport from './config/passport.js';
 import flash from 'connect-flash';
 import { isAuthenticated, isNotAuthenticated } from './middleware/authMiddleware.js';
 import cors from 'cors';
+import MongoStore from 'connect-mongo';
 
 // Import routes
 import userRoutes from './routes/userRoutes.js';
@@ -14,6 +15,9 @@ import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+
+// Suppress deprecation warnings
+process.removeAllListeners('warning');
 
 const app = express();
 connectDB();
@@ -32,14 +36,21 @@ app.use(cors({
 // Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secretcode',
-  resave: true,
-  saveUninitialized: true,
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60 // 24 hours
+  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-  }
+  },
+  name: 'sessionId',
+  rolling: true
 }));
 
 // Flash middleware
