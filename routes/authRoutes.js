@@ -123,22 +123,23 @@ router.post('/logout', (req, res) => {
   console.log('Logout initiated');
   console.log('Session before logout:', req.session);
   
-  req.logout((err) => {
+  // Clear any existing session data
+  req.session.destroy((err) => {
     if (err) {
-      console.error('Error during logout:', err);
+      console.error('Error destroying session:', err);
       return res.status(500).json({ success: false, message: 'Error logging out' });
     }
     
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Error destroying session:', err);
-        return res.status(500).json({ success: false, message: 'Error logging out' });
-      }
-      
-      console.log('Session destroyed successfully');
-      res.clearCookie('connect.sid');
-      res.json({ success: true });
+    // Clear the session cookie
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
     });
+    
+    console.log('Session destroyed successfully');
+    res.json({ success: true });
   });
 });
 

@@ -193,33 +193,75 @@ export const handleLogout = (req, res) => {
 export const blockUser = async (req, res) => {
   try {
     const userId = req.params.userId;
+    console.log(`Attempting to block user: ${userId}`);
+    
     const user = await User.findById(userId);
     if (!user) {
+      console.log('User not found');
       return res.status(404).json({ 
         success: false,
         message: 'User not found' 
       });
     }
     
+    // Update user status
     user.isBlocked = true;
     user.status = 'blocked';
     await user.save();
+    console.log('User status updated to blocked');
     
-    // Destroy the session in the database
-    await mongoose.connection.collection('sessions').deleteMany({
-      'session.user.id': userId
-    });
+    // Get sessions collection
+    const sessionsCollection = mongoose.connection.collection('sessions');
+    console.log('Accessing sessions collection');
     
-    // Clear the session cookie
-    res.clearCookie('sessionId');
+    // Find all sessions
+    const sessions = await sessionsCollection.find({}).toArray();
+    console.log(`Found ${sessions.length} total sessions`);
     
-    res.json({ 
+    let deletedCount = 0;
+    for (const session of sessions) {
+      try {
+        const sessionData = JSON.parse(session.session);
+        console.log('Checking session:', session._id);
+        console.log('Session data:', sessionData);
+        
+        // Check if this session belongs to the blocked user
+        const isUserSession = 
+          (sessionData.user && (sessionData.user.id === userId || sessionData.user._id === userId)) ||
+          (sessionData.passport && sessionData.passport.user === userId);
+        
+        if (isUserSession) {
+          // If it's an admin session with user data, just remove the user data
+          if (sessionData.admin) {
+            console.log('Found admin session with user data');
+            delete sessionData.user;
+            await sessionsCollection.updateOne(
+              { _id: session._id },
+              { $set: { session: JSON.stringify(sessionData) } }
+            );
+            console.log('Removed user data from admin session');
+          } else {
+            // If it's a regular user session, delete it
+            await sessionsCollection.deleteOne({ _id: session._id });
+            deletedCount++;
+            console.log(`Deleted session for user ${userId}`);
+          }
+        }
+      } catch (err) {
+        console.error('Error processing session:', err);
+        continue;
+      }
+    }
+    
+    console.log(`Processed sessions. Deleted: ${deletedCount}`);
+    
+    return res.json({ 
       success: true,
-      message: 'User blocked successfully. Their session has been terminated.'
+      message: `User blocked successfully. ${deletedCount} session(s) terminated.`
     });
   } catch (error) {
     console.error('Block user error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false,
       message: 'Failed to block user',
       error: error.message
@@ -231,22 +273,26 @@ export const blockUser = async (req, res) => {
 export const unblockUser = async (req, res) => {
   try {
     const userId = req.params.userId;
-    const user = await User.findById(userId);
+    console.log(`Attempting to unblock user: ${userId}`);
     
+    const user = await User.findById(userId);
     if (!user) {
+      console.log('User not found');
       return res.status(404).json({ 
         success: false,
         message: 'User not found' 
       });
     }
     
+    // Update user status
     user.isBlocked = false;
     user.status = 'active';
     await user.save();
+    console.log('User status updated to active');
     
     return res.json({ 
       success: true,
-      message: 'User unblocked successfully. They can now log in again.'
+      message: 'User unblocked successfully'
     });
   } catch (error) {
     console.error('Unblock user error:', error);

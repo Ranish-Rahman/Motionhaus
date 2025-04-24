@@ -142,6 +142,39 @@
       border: 1px solid rgba(25, 135, 84, 0.2);
       color: #198754;
     }
+    /* Pagination Styles */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .page-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background-color: #2d2d2d;
+      color: white;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      min-width: 40px;
+      height: 40px;
+    }
+    .page-link:hover {
+      background-color: #3d3d3d;
+      transform: translateY(-2px);
+    }
+    .page-link.active {
+      background-color: #00a3ff;
+      color: white;
+    }
+    .page-link[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -197,16 +230,16 @@
                   <td><%= category.name %></td>
                   <td class="action-buttons">
                     <% if (!category.isDeleted) { %>
-                      <a href="/admin/categories/edit/<%= category._id %>" class="edit-btn">
-                        <i class="bi bi-pencil"></i>
-                        Edit
-                      </a>
-                      <form action="/admin/categories/delete/<%= category._id %>" method="POST" style="display: inline;">
+                    <a href="/admin/categories/edit/<%= category._id %>" class="edit-btn">
+                      <i class="bi bi-pencil"></i>
+                      Edit
+                    </a>
+                    <form action="/admin/categories/delete/<%= category._id %>" method="POST" style="display: inline;">
                         <button type="submit" class="delete-btn">
-                          <i class="bi bi-trash"></i>
-                          Delete
-                        </button>
-                      </form>
+                        <i class="bi bi-trash"></i>
+                        Delete
+                      </button>
+                    </form>
                     <% } else { %>
                       <form action="/admin/categories/restore/<%= category._id %>" method="POST" style="display: inline;">
                         <button type="submit" class="restore-btn">
@@ -226,12 +259,24 @@
           </tbody>
         </table>
 
-        <% if (totalPages > 1) { %>
+        <% if (pagination.totalPages > 1) { %>
           <div class="pagination" style="margin-top: 20px; text-align: center;">
-            <% for(let i = 1; i <= totalPages; i++) { %>
+            <% if (pagination.hasPrevPage) { %>
+              <a href="/admin/categories?page=<%= pagination.prevPage %>&search=<%= search || '' %>" class="page-link">
+                Previous
+              </a>
+            <% } %>
+            
+            <% for(let i = 1; i <= pagination.totalPages; i++) { %>
               <a href="/admin/categories?page=<%= i %>&search=<%= search || '' %>" 
-                 class="page-link <%= currentPage === i ? 'active' : '' %>">
+                 class="page-link <%= pagination.currentPage === i ? 'active' : '' %>">
                 <%= i %>
+              </a>
+            <% } %>
+            
+            <% if (pagination.hasNextPage) { %>
+              <a href="/admin/categories?page=<%= pagination.nextPage %>&search=<%= search || '' %>" class="page-link">
+                Next
               </a>
             <% } %>
           </div>

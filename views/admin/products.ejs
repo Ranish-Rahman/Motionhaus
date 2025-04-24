@@ -300,6 +300,56 @@
     .deleted-product:hover {
       opacity: 1;
     }
+
+    /* Pagination Styles */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .pagination-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #2b2d31;
+      color: #a0aec0;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .pagination-item:hover {
+      background: #36373d;
+      color: white;
+    }
+
+    .pagination-item.active {
+      background: #00a3ff;
+      color: white;
+    }
+
+    .pagination-item.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pagination-item.disabled:hover {
+      background: #2b2d31;
+      color: #a0aec0;
+    }
+
+    .pagination-info {
+      color: #a0aec0;
+      font-size: 14px;
+      margin-right: 16px;
+    }
   </style>
 </head>
 <body>
@@ -415,6 +465,43 @@
             <% } %>
           </tbody>
         </table>
+
+        <% if (pagination && pagination.totalPages > 1) { %>
+          <div class="pagination">
+            <span class="pagination-info">
+              Showing <%= pagination.startIndex + 1 %> to <%= pagination.endIndex %> of <%= pagination.totalItems %> products
+            </span>
+            
+            <% if (pagination.hasPrevPage) { %>
+              <a href="?page=<%= pagination.prevPage %><%= search ? '&search=' + search : '' %><%= showDeleted ? '&showDeleted=true' : '' %>" 
+                 class="pagination-item">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            <% } else { %>
+              <span class="pagination-item disabled">
+                <i class="bi bi-chevron-left"></i>
+              </span>
+            <% } %>
+
+            <% for(let i = 1; i <= pagination.totalPages; i++) { %>
+              <a href="?page=<%= i %><%= search ? '&search=' + search : '' %><%= showDeleted ? '&showDeleted=true' : '' %>" 
+                 class="pagination-item <%= i === pagination.currentPage ? 'active' : '' %>">
+                <%= i %>
+              </a>
+            <% } %>
+
+            <% if (pagination.hasNextPage) { %>
+              <a href="?page=<%= pagination.nextPage %><%= search ? '&search=' + search : '' %><%= showDeleted ? '&showDeleted=true' : '' %>" 
+                 class="pagination-item">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            <% } else { %>
+              <span class="pagination-item disabled">
+                <i class="bi bi-chevron-right"></i>
+              </span>
+            <% } %>
+          </div>
+        <% } %>
       </div>
     </main>
   </div>

@@ -4,6 +4,12 @@ import Category from '../../models/categoryModel.js';
 // List products for users
 export const listProducts = async (req, res) => {
   try {
+    // Check if user is authenticated
+    if (!req.session.user) {
+      req.session.returnTo = req.originalUrl;
+      return res.redirect('/login');
+    }
+
     // Get query parameters
     const { search, sort, minPrice, maxPrice, category, size } = req.query;
     
@@ -38,10 +44,8 @@ export const listProducts = async (req, res) => {
 
     // Add category filter if provided
     if (category && category !== 'All') {
-      // Use exact matching for category
       query.category = category;
     } else {
-      // When no category is selected, only show products from active categories
       query.category = { $in: activeCategoryNames };
     }
 
@@ -102,32 +106,22 @@ export const listProducts = async (req, res) => {
   } catch (error) {
     console.error('Error loading products:', error);
     req.flash('error', 'Error loading products');
-    res.render('user/products', {
-      products: [],
-      categories: [],
-      selectedCategories: [],
-      search: '',
-      sort: '',
-      minPrice: '',
-      maxPrice: '',
-      query: {
-        minPrice: '',
-        maxPrice: '',
-        sort: '',
-        category: '',
-        size: ''
-      },
-      error: 'Error loading products'
-    });
+    res.redirect('/login');
   }
 };
 
 // Get product details
 export const getProductDetails = async (req, res) => {
   try {
+    // Check if user is authenticated
+    if (!req.session.user) {
+      req.session.returnTo = req.originalUrl;
+      return res.redirect('/login');
+    }
+
     const product = await Product.findById(req.params.id);
     
-    if (!product || product.isDeleted) {
+    if (!product || product.isDeleted || product.isBlocked) {
       req.flash('error', 'Product not found');
       return res.redirect('/products');
     }
@@ -136,9 +130,10 @@ export const getProductDetails = async (req, res) => {
 
     // Get recommended products from the same category
     const recommendedProducts = await Product.find({
-      _id: { $ne: product._id }, // Exclude current product
+      _id: { $ne: product._id },
       category: product.category,
-      isDeleted: false
+      isDeleted: false,
+      isBlocked: false
     }).limit(4).select('name price images');
 
     console.log('Number of recommended products found:', recommendedProducts.length);
@@ -153,6 +148,6 @@ export const getProductDetails = async (req, res) => {
   } catch (error) {
     console.error('Error loading product details:', error);
     req.flash('error', 'Error loading product details');
-    res.redirect('/products');
+    res.redirect('/login');
   }
 }; 

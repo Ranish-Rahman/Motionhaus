@@ -43,4 +43,68 @@ export const isAdmin = (req, res, next) => {
     return next();
   }
   res.redirect('/admin/login');
+};
+
+// Authentication middleware
+export const requireAuth = (req, res, next) => {
+  // Set cache control headers for all responses
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  if (!req.session.user) {
+    // Store the original URL to redirect after login
+    req.session.returnTo = req.originalUrl;
+    
+    // Clear any existing session data
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session:', err);
+      }
+    });
+    
+    // Clear session cookie
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    
+    return res.redirect('/login');
+  }
+  
+  next();
+};
+
+// Admin authentication middleware
+export const requireAdminAuth = (req, res, next) => {
+  // Set cache control headers for all responses
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  if (!req.session.admin) {
+    // Store the original URL to redirect after login
+    req.session.returnTo = req.originalUrl;
+    
+    // Clear any existing session data
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session:', err);
+      }
+    });
+    
+    // Clear session cookie
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    
+    return res.redirect('/admin/login');
+  }
+  
+  next();
 }; 

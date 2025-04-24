@@ -28,6 +28,15 @@ const isAdmin = (req, res, next) => {
   if (req.session.admin) {
     return next();
   }
+  
+  // Check if it's an API request
+  if (req.headers.accept && req.headers.accept.includes('application/json')) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Unauthorized: Admin session expired' 
+    });
+  }
+  
   res.redirect('/admin/login');
 };
 

@@ -240,7 +240,12 @@
       })
       .then(response => {
         if (response.ok) {
-          window.location.href = '/login';
+          // Clear any client-side storage
+          localStorage.clear();
+          sessionStorage.clear();
+          
+          // Force a hard redirect to login page
+          window.location.replace('/login');
         }
       })
       .catch(error => {

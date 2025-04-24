@@ -15,10 +15,39 @@ export const getProducts = async (req, res) => {
     }
 
     const showDeleted = req.query.showDeleted === 'true';
-    const query = showDeleted ? {} : { isDeleted: false };
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
 
-    const products = await Product.find(query)
-      .sort({ createdAt: -1 });
+    // Build query
+    const query = showDeleted ? {} : { isDeleted: false };
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    // Get total count and products
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments(query)
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      nextPage: page + 1,
+      prevPage: page - 1,
+      startIndex: skip,
+      endIndex: Math.min(skip + limit - 1, total - 1),
+      totalItems: total
+    };
 
     // Ensure all image paths are valid
     products.forEach(product => {
@@ -36,7 +65,9 @@ export const getProducts = async (req, res) => {
       path: '/admin/products',
       success: req.flash('success'),
       error: req.flash('error'),
-      showDeleted
+      showDeleted,
+      search,
+      pagination
     });
   } catch (error) {
     console.error('Error fetching products:', error.message);
