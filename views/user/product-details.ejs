@@ -660,22 +660,8 @@
     let currentImageIndex = 0;
     const images = JSON.parse('<%- JSON.stringify(product.images) %>');
     const maxStock = parseInt('<%- product.stock %>');
-    const isBlocked = document.getElementById('isBlocked').value === 'true';
-
-    // Check if product is blocked or unavailable
-    function checkProductAvailability() {
-      if (isBlocked || maxStock <= 0) {
-        window.location.href = '/products';
-        return false;
-      }
-      return true;
-    }
-
-    // Add event listener for page load
-    window.addEventListener('load', checkProductAvailability);
 
     function changeImage(src, thumbnail) {
-      if (!checkProductAvailability()) return;
       document.getElementById('mainImage').src = src;
       document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
       thumbnail.classList.add('active');
@@ -683,7 +669,6 @@
     }
 
     function navigateImages(direction) {
-      if (!checkProductAvailability()) return;
       currentImageIndex = (currentImageIndex + direction + images.length) % images.length;
       const newSrc = images[currentImageIndex];
       const thumbnails = document.querySelectorAll('.thumbnail');
@@ -694,7 +679,6 @@
 
     // Add zoom functionality
     document.getElementById('mainImage').addEventListener('click', function() {
-      if (!checkProductAvailability()) return;
       const zoomedContainer = document.createElement('div');
       zoomedContainer.className = 'zoomed';
       
@@ -723,14 +707,12 @@
     document.querySelector('.next-button').addEventListener('click', () => navigateImages(1));
 
     function updateQuantity(change) {
-      if (!checkProductAvailability()) return;
       const input = document.getElementById('quantity');
       const newValue = Math.max(1, Math.min(maxStock, parseInt(input.value) + change));
       input.value = newValue;
     }
 
     function toggleSection(id) {
-      if (!checkProductAvailability()) return;
       const content = document.getElementById(id);
       const header = content.previousElementSibling;
       const icon = header.querySelector('.expand-icon');
@@ -745,17 +727,11 @@
     }
 
     function addToCart() {
-      if (!checkProductAvailability()) return;
       const size = document.querySelector('.size-select').value;
       const quantity = document.getElementById('quantity').value;
       // Add your cart logic here
       alert(`Added ${quantity} pairs of size ${size} to cart`);
     }
-
-    // Add event listeners for all interactive elements
-    document.querySelectorAll('button, select, input').forEach(element => {
-      element.addEventListener('click', checkProductAvailability);
-    });
   </script>
 </body>
 </html>

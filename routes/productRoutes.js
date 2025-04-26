@@ -29,16 +29,11 @@ router.get('/', (req, res) => {
 // Admin product routes
 router.get('/admin/products', isAdmin, getProducts);
 router.get('/admin/products/add', isAdmin, getAddProduct);
-router.post('/admin/products/add', isAdmin, upload.array('images', 10), processImages, addProduct);
 router.get('/admin/products/edit/:id', isAdmin, getEditProduct);
-router.post('/admin/products/edit/:id', isAdmin, upload.array('images', 10), processImages, updateProduct);
 router.delete('/admin/products/:id', isAdmin, deleteProduct);
-router.post('/admin/products/:id/block', isAdmin, blockProduct);
-router.post('/admin/products/:id/unblock', isAdmin, unblockProduct);
-router.post('/admin/products/restore/:id', isAdmin, restoreProduct);
 
-// User product routes
+// User product routes - all protected by sessionCheck
 router.get('/products', listProducts);
-router.get('/product/:id', getProductDetails);
+router.get('/products/:id', getProductDetails);
 
 export default router;

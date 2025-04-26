@@ -12,7 +12,7 @@ import MongoStore from 'connect-mongo';
 // Import routes
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-import adminRoutes from './routes/adminRoutes.js';
+import adminRoutes from './routes/admin/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 
@@ -72,12 +72,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 app.use(passport.session());
 
-// // Public/User Routes
+// Route mounting order is important
+// 1. Auth routes (login, signup) - no session required
 app.use('/', authRoutes);
-app.use('/', userRoutes);
+
+// 2. Product routes - protected by sessionCheck
 app.use('/', productRoutes);
 
-// Admin-only routes
+// 3. User routes - protected by sessionCheck
+app.use('/', userRoutes);
+
+// 4. Admin routes - protected by admin auth
 app.use('/admin', adminRoutes);
 app.use('/admin', categoryRoutes);
 
@@ -93,7 +98,12 @@ app.post('/logout', (req, res) => {
         console.error('Error destroying session:', err);
         return res.status(500).json({ success: false, message: 'Error logging out' });
       }
-      res.clearCookie('connect.sid');
+      res.clearCookie('sessionId', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+      });
       res.json({ success: true });
     });
   });

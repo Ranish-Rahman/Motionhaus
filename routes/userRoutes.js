@@ -1,32 +1,53 @@
 import express from 'express';
-import userController from '../controllers/user/userController.js';
+import { 
+  signUpPage, 
+  getLogin, 
+  getHome, 
+  getForgotPassword, 
+  postSignup, 
+  verifyOTP, 
+  resendOTP, 
+  postLogin, 
+  postForgotPassword, 
+  resetPassword, 
+  liveSearch,
+  getCart,
+  getWishlist,
+  getProfile,
+  getOrders,
+  getOrderDetails
+} from '../controllers/user/userController.js';
 import { listProducts, getProductDetails } from '../controllers/user/productController.js';
+import { sessionCheck } from '../middleware/sessionMiddleware.js';
 
 const router = express.Router();
 
-// Render signup and login pages
-router.get('/signup', userController.signUpPage);
-router.get('/login', userController.getLogin);
-router.get('/home', userController.getHome);
-router.get('/forgot-password', userController.getForgotPassword);
+// Public routes (no session required)
+router.get('/signup', signUpPage);
+router.get('/login', getLogin);
+router.get('/forgot-password', getForgotPassword);
+
+// Handle signup and OTP (no session required)
+router.post('/signup', postSignup);
+router.post('/verify-otp', verifyOTP);
+router.post('/resend-otp', resendOTP);
+router.post('/login', postLogin);
+router.post('/forgot-password', postForgotPassword);
+router.post('/reset-password', resetPassword);
+
+// Apply session check to protected routes
+router.use(sessionCheck);
+
+// Protected routes (require session)
+router.get('/home', getHome);
+router.get('/cart', getCart);
+router.get('/wishlist', getWishlist);
+router.get('/profile', getProfile);
+router.get('/orders', getOrders);
+router.get('/orders/:id', getOrderDetails);
 router.get('/products', listProducts);
 router.get('/products/:id', getProductDetails);
-
-// Handle signup and OTP
-router.post('/signup', userController.postSignup);
-router.post('/verify-otp', userController.verifyOTP);
-router.post('/resend-otp', userController.resendOTP);
-
-// Handle login
-router.post('/login', userController.postLogin);
-
-// Handle forgot password
-router.post('/forgot-password', userController.postForgotPassword);
-router.post('/reset-password', userController.resetPassword);
-
-// Add live search route
-router.get('/search-live', userController.liveSearch);
-
+router.get('/search', liveSearch);
 
 export default router;
 

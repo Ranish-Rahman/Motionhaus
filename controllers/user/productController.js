@@ -113,41 +113,51 @@ export const listProducts = async (req, res) => {
 // Get product details
 export const getProductDetails = async (req, res) => {
   try {
-    // Check if user is authenticated
-    if (!req.session.user) {
-      req.session.returnTo = req.originalUrl;
-      return res.redirect('/login');
+    const productId = req.params.id;
+    console.log('Fetching product details for ID:', productId);
+
+    const product = await Product.findById(productId)
+      .populate('category')
+      .populate('subcategory')
+      .populate('brand');
+
+    if (!product || product.isDeleted) {
+      console.log('Product not found for ID:', productId);
+      return res.status(404).render('user/error', { 
+        message: 'Product not found',
+        error: { status: 404 }
+      });
     }
 
-    const product = await Product.findById(req.params.id);
-    
-    if (!product || product.isDeleted || product.isBlocked) {
-      req.flash('error', 'Product not found');
-      return res.redirect('/products');
-    }
-
-    console.log('Current product category:', product.category);
-
-    // Get recommended products from the same category
-    const recommendedProducts = await Product.find({
+    // Get related products (same category)
+    const relatedProducts = await Product.find({
+      category: product.category._id,
       _id: { $ne: product._id },
-      category: product.category,
       isDeleted: false,
       isBlocked: false
-    }).limit(4).select('name price images');
+    }).limit(4);
 
-    console.log('Number of recommended products found:', recommendedProducts.length);
-    console.log('Recommended products:', recommendedProducts);
+    console.log('Product found:', {
+      id: product._id,
+      name: product.name,
+      category: product.category?.name,
+      subcategory: product.subcategory?.name,
+      brand: product.brand?.name
+    });
 
     res.render('user/product-details', {
       product,
-      recommendedProducts,
+      relatedProducts,
+      title: `${product.name} - Product Details`,
+      user: req.session.user,
       success: req.flash('success'),
       error: req.flash('error')
     });
   } catch (error) {
-    console.error('Error loading product details:', error);
-    req.flash('error', 'Error loading product details');
-    res.redirect('/login');
+    console.error('Error in getProductDetails:', error);
+    res.status(500).render('user/error', {
+      message: 'Error fetching product details',
+      error: { status: 500, stack: error.stack }
+    });
   }
 }; 

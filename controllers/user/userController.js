@@ -463,17 +463,83 @@ const liveSearch = async (req, res) => {
   }
 };
 
-export default {
+// Get cart page
+const getCart = (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  res.render('user/cart', {
+    user: req.session.user,
+    success: req.flash('success'),
+    error: req.flash('error')
+  });
+};
+
+// Get wishlist page
+const getWishlist = (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  res.render('user/wishlist', {
+    user: req.session.user,
+    success: req.flash('success'),
+    error: req.flash('error')
+  });
+};
+
+// Get profile page
+const getProfile = (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  res.render('user/profile', {
+    user: req.session.user,
+    success: req.flash('success'),
+    error: req.flash('error')
+  });
+};
+
+// Get orders page
+const getOrders = (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  res.render('user/orders', {
+    user: req.session.user,
+    success: req.flash('success'),
+    error: req.flash('error')
+  });
+};
+
+// Get order details page
+const getOrderDetails = (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  res.render('user/order-details', {
+    user: req.session.user,
+    orderId: req.params.id,
+    success: req.flash('success'),
+    error: req.flash('error')
+  });
+};
+
+export {
   signUpPage,
   getLogin,
+  getHome,
+  getForgotPassword,
   postSignup,
   verifyOTP,
-  postLogin,
-  getHome,
   resendOTP,
-  getForgotPassword,
+  postLogin,
   postForgotPassword,
   resetPassword,
-  liveSearch
+  liveSearch,
+  getCart,
+  getWishlist,
+  getProfile,
+  getOrders,
+  getOrderDetails
 };
 

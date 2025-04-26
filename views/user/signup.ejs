@@ -639,6 +639,16 @@ form input {
             body: JSON.stringify({ otp: otpValue })
           });
 
+          const contentType = response.headers.get('content-type');
+  
+  if (!response.ok || !contentType.includes('application/json')) {
+    const errorText = await response.text(); // fallback to text to see what you got
+    console.error('Unexpected response:', errorText);
+    otpError.textContent = 'Server returned an unexpected response.';
+    otpError.classList.remove('hidden');
+    return;
+  }
+
           const data = await response.json();
           
           if (data.success) {

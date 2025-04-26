@@ -2,6 +2,8 @@
 import User from '../../models/userModel.js';
 import Admin from '../../models/adminModel.js';
 import Category from '../../models/categoryModel.js';
+import Product from '../../models/ProductModel.js';
+import Order from '../../models/Order.js';
 import path from 'path';
 import Session from '../../models/sessionModel.js';
 import mongoose from 'mongoose';
@@ -275,7 +277,18 @@ export const unblockUser = async (req, res) => {
     const userId = req.params.userId;
     console.log(`Attempting to unblock user: ${userId}`);
     
-    const user = await User.findById(userId);
+    // Find and update user in a single operation
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        $set: { 
+          isBlocked: false,
+          status: 'active'
+        }
+      },
+      { new: true }
+    );
+
     if (!user) {
       console.log('User not found');
       return res.status(404).json({ 
@@ -284,11 +297,11 @@ export const unblockUser = async (req, res) => {
       });
     }
     
-    // Update user status
-    user.isBlocked = false;
-    user.status = 'active';
-    await user.save();
-    console.log('User status updated to active');
+    console.log('User status updated to active:', {
+      userId: user._id,
+      isBlocked: user.isBlocked,
+      status: user.status
+    });
     
     return res.json({ 
       success: true,
@@ -380,4 +393,131 @@ export const deleteUser = async (req, res) => {
             message: 'Error deleting user' 
         });
     }
+};
+
+// Get categories page
+export const getCategories = async (req, res) => {
+  try {
+    if (!req.session.admin) {
+      return res.redirect('/admin/login');
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    let query = {};
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    const categories = await Category.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalCategories = await Category.countDocuments(query);
+    const totalPages = Math.ceil(totalCategories / limit);
+
+    res.render('admin/category', {
+      title: 'Category Management',
+      categories,
+      search,
+      path: '/admin/categories',
+      pagination: {
+        currentPage: page,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        nextPage: page + 1,
+        prevPage: page - 1
+      },
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Error in getCategories:', error);
+    res.render('error', { 
+      title: 'Error',
+      error: 'Failed to load categories'
+    });
+  }
+};
+
+// Get products page
+export const getProducts = async (req, res) => {
+  try {
+    if (!req.session.admin) {
+      return res.redirect('/admin/login');
+    }
+
+    const products = await Product.find({ isDeleted: false })
+      .populate('category')
+      .sort({ createdAt: -1 });
+
+    res.render('admin/products', {
+      title: 'Products',
+      products,
+      admin: req.session.admin,
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Products error:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load products'
+    });
+  }
+};
+
+// Get orders page
+export const getOrders = async (req, res) => {
+  try {
+    if (!req.session.admin) {
+      return res.redirect('/admin/login');
+    }
+
+    const orders = await Order.find()
+      .populate('user')
+      .populate('items.product')
+      .sort({ createdAt: -1 });
+
+    res.render('admin/orders', {
+      title: 'Orders',
+      orders,
+      admin: req.session.admin,
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Orders error:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load orders'
+    });
+  }
+};
+
+// Get settings page
+export const getSettings = async (req, res) => {
+  try {
+    if (!req.session.admin) {
+      return res.redirect('/admin/login');
+    }
+
+    res.render('admin/settings', {
+      title: 'Settings',
+      admin: req.session.admin,
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Settings error:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load settings'
+    });
+  }
 };

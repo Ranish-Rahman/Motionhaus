@@ -685,7 +685,7 @@
           }).then(async (result) => {
             if (result.isConfirmed) {
               try {
-                const response = await fetch(`/products/restore/${productId}`, {
+                const response = await fetch(`/admin/products/restore/${productId}`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json'
