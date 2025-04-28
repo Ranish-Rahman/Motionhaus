@@ -1,0 +1,30 @@
+<!-- User Profile Sidebar -->
+<div class="sidebar">
+  <a href="/" class="sidebar-logo">The Tastemaker</a>
+  <nav class="nav flex-column">
+    <a href="/profile" class="nav-link <%= currentPage === 'profile' ? 'active' : '' %>">
+      <i class="bi bi-person-circle"></i>
+      Profile 
+    </a>
+    <a href="/profile/address" class="nav-link <%= currentPage === 'address' ? 'active' : '' %>">
+      <i class="bi bi-geo-alt"></i>
+      Address
+    </a>
+    <a href="/profile/orders" class="nav-link <%= currentPage === 'orders' ? 'active' : '' %>">
+      <i class="bi bi-bag"></i>
+      Orders
+    </a>
+    <a href="/profile/edit" class="nav-link <%= currentPage === 'edit' ? 'active' : '' %>">
+      <i class="bi bi-pencil-square"></i>
+      Edit Profile
+    </a>
+    <a href="/profile/cancel-order" class="nav-link <%= currentPage === 'cancel-order' ? 'active' : '' %>">
+      <i class="bi bi-x-circle"></i>
+      Cancel Orders
+    </a>
+    <a href="/profile/change-password" class="nav-link <%= currentPage === 'change-password' ? 'active' : '' %>">
+      <i class="bi bi-key"></i>
+      Change Password
+    </a>
+  </nav>
+</div> 

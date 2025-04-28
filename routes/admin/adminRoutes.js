@@ -23,6 +23,14 @@ import {
   unblockProduct,
   restoreProduct
 } from '../../controllers/admin/productController.js';
+import { 
+  getAddCategory, 
+  addCategory,
+  getEditCategory,
+  editCategory,
+  softDeleteCategory,
+  restoreCategory
+} from '../../controllers/admin/categoryController.js';
 import { upload, processImages } from '../../middleware/imageUpload.js';
 import { requireAdminAuth } from '../../middleware/authMiddleware.js';
 
@@ -75,6 +83,14 @@ router.delete('/products/:id', isAdmin, deleteProduct);
 router.post('/products/:id/block', isAdmin, blockProduct);
 router.post('/products/:id/unblock', isAdmin, unblockProduct);
 router.post('/products/restore/:id', isAdmin, restoreProduct);
+
+// Category management routes
+router.get('/categories/add', isAdmin, getAddCategory);
+router.post('/categories/add', isAdmin, addCategory);
+router.get('/categories/edit/:id', isAdmin, getEditCategory);
+router.post('/categories/edit/:id', isAdmin, editCategory);
+router.post('/categories/delete/:id', isAdmin, softDeleteCategory);
+router.post('/categories/restore/:id', isAdmin, restoreCategory);
 
 // User management routes
 router.post('/users/:userId/block', isAdmin, blockUser);

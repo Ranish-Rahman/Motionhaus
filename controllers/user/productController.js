@@ -116,10 +116,7 @@ export const getProductDetails = async (req, res) => {
     const productId = req.params.id;
     console.log('Fetching product details for ID:', productId);
 
-    const product = await Product.findById(productId)
-      .populate('category')
-      .populate('subcategory')
-      .populate('brand');
+    const product = await Product.findById(productId);
 
     if (!product || product.isDeleted) {
       console.log('Product not found for ID:', productId);
@@ -131,7 +128,7 @@ export const getProductDetails = async (req, res) => {
 
     // Get related products (same category)
     const relatedProducts = await Product.find({
-      category: product.category._id,
+      category: product.category,
       _id: { $ne: product._id },
       isDeleted: false,
       isBlocked: false
@@ -140,9 +137,8 @@ export const getProductDetails = async (req, res) => {
     console.log('Product found:', {
       id: product._id,
       name: product.name,
-      category: product.category?.name,
-      subcategory: product.subcategory?.name,
-      brand: product.brand?.name
+      category: product.category,
+      brand: product.brand
     });
 
     res.render('user/product-details', {

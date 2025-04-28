@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import User from '../../models/userModel.js';
+import Address from '../../models/addressModel.js';
 import { sendOTPEmail, generateOTP } from '../../utils/otp.js';
 import Product from '../../models/ProductModel.js';
 
@@ -492,11 +493,338 @@ const getProfile = (req, res) => {
   if (!req.session.user) {
     return res.redirect('/login');
   }
-  res.render('user/profile', {
+  res.render('user/user-profile', {
     user: req.session.user,
     success: req.flash('success'),
-    error: req.flash('error')
+    error: req.flash('error'),
+    currentPage: 'profile'
   });
+};
+
+// Get address page
+const getAddress = async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    // Fetch user's addresses from the database
+    const addresses = await Address.find({ userId: req.session.user.id });
+    
+    res.render('user/address', {
+      user: req.session.user,
+      addresses: addresses,
+      success: req.flash('success'),
+      error: req.flash('error'),
+      currentPage: 'address'
+    });
+  } catch (error) {
+    console.error('Error fetching addresses:', error);
+    req.flash('error', 'Failed to load addresses. Please try again.');
+    res.render('user/address', {
+      user: req.session.user,
+      addresses: [],
+      success: req.flash('success'),
+      error: req.flash('error'),
+      currentPage: 'address'
+    });
+  }
+};
+
+// Add new address
+const addAddress = async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const {
+      fullName,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      zipCode,
+      country,
+      addressType,
+      defaultAddress
+    } = req.body;
+    
+    // Server-side validation
+    const validationErrors = [];
+    
+    // Validate full name (2-50 characters, letters and spaces only)
+    if (!fullName || !/^[A-Za-z\s]{2,50}$/.test(fullName)) {
+      validationErrors.push('Full name should contain only letters and spaces (2-50 characters)');
+    }
+    
+    // Validate phone number (10-15 digits, can include +, -, (, ), and spaces)
+    if (!phone || !/^[0-9+\s()-]{10,15}$/.test(phone)) {
+      validationErrors.push('Phone number should be 10-15 digits');
+    }
+    
+    // Validate address line 1 (5-100 characters)
+    if (!addressLine1 || addressLine1.length < 5 || addressLine1.length > 100) {
+      validationErrors.push('Address line 1 should be 5-100 characters');
+    }
+    
+    // Validate address line 2 (optional, max 100 characters)
+    if (addressLine2 && addressLine2.length > 100) {
+      validationErrors.push('Address line 2 should not exceed 100 characters');
+    }
+    
+    // Validate city (2-50 characters, letters and spaces only)
+    if (!city || !/^[A-Za-z\s]{2,50}$/.test(city)) {
+      validationErrors.push('City should contain only letters and spaces (2-50 characters)');
+    }
+    
+    // Validate state (2-50 characters, letters and spaces only)
+    if (!state || !/^[A-Za-z\s]{2,50}$/.test(state)) {
+      validationErrors.push('State/province should contain only letters and spaces (2-50 characters)');
+    }
+    
+    // Validate ZIP code (3-10 characters, alphanumeric, spaces, and hyphens)
+    if (!zipCode || !/^[0-9A-Za-z\s-]{3,10}$/.test(zipCode)) {
+      validationErrors.push('ZIP/postal code should be 3-10 characters');
+    }
+    
+    // Validate country (required)
+    if (!country) {
+      validationErrors.push('Country is required');
+    }
+    
+    // If there are validation errors, redirect back with error messages
+    if (validationErrors.length > 0) {
+      req.flash('error', validationErrors.join(', '));
+      return res.redirect('/profile/address');
+    }
+    
+    // Create new address
+    const newAddress = new Address({
+      userId: req.session.user.id,
+      fullName,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      zipCode,
+      country,
+      addressType,
+      isDefault: defaultAddress === 'on'
+    });
+    
+    await newAddress.save();
+    
+    req.flash('success', 'Address added successfully');
+    res.redirect('/profile/address');
+  } catch (error) {
+    console.error('Error adding address:', error);
+    req.flash('error', 'Failed to add address. Please try again.');
+    res.redirect('/profile/address');
+  }
+};
+
+// Get address for editing
+const getEditAddress = async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const addressId = req.params.id;
+    
+    // Find the address and ensure it belongs to the current user
+    const address = await Address.findOne({
+      _id: addressId,
+      userId: req.session.user.id
+    });
+    
+    if (!address) {
+      req.flash('error', 'Address not found');
+      return res.redirect('/profile/address');
+    }
+    
+    res.render('user/edit-address', {
+      user: req.session.user,
+      address: address,
+      success: req.flash('success'),
+      error: req.flash('error'),
+      currentPage: 'address'
+    });
+  } catch (error) {
+    console.error('Error fetching address for edit:', error);
+    req.flash('error', 'Failed to load address. Please try again.');
+    res.redirect('/profile/address');
+  }
+};
+
+// Update address
+const updateAddress = async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const addressId = req.params.id;
+    
+    // Find the address and ensure it belongs to the current user
+    const address = await Address.findOne({
+      _id: addressId,
+      userId: req.session.user.id
+    });
+    
+    if (!address) {
+      req.flash('error', 'Address not found');
+      return res.redirect('/profile/address');
+    }
+    
+    const {
+      fullName,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      zipCode,
+      country,
+      addressType,
+      defaultAddress
+    } = req.body;
+    
+    // Server-side validation
+    const validationErrors = [];
+    
+    // Validate full name (2-50 characters, letters and spaces only)
+    if (!fullName || !/^[A-Za-z\s]{2,50}$/.test(fullName)) {
+      validationErrors.push('Full name should contain only letters and spaces (2-50 characters)');
+    }
+    
+    // Validate phone number (10-15 digits, can include +, -, (, ), and spaces)
+    if (!phone || !/^[0-9+\s()-]{10,15}$/.test(phone)) {
+      validationErrors.push('Phone number should be 10-15 digits');
+    }
+    
+    // Validate address line 1 (5-100 characters)
+    if (!addressLine1 || addressLine1.length < 5 || addressLine1.length > 100) {
+      validationErrors.push('Address line 1 should be 5-100 characters');
+    }
+    
+    // Validate address line 2 (optional, max 100 characters)
+    if (addressLine2 && addressLine2.length > 100) {
+      validationErrors.push('Address line 2 should not exceed 100 characters');
+    }
+    
+    // Validate city (2-50 characters, letters and spaces only)
+    if (!city || !/^[A-Za-z\s]{2,50}$/.test(city)) {
+      validationErrors.push('City should contain only letters and spaces (2-50 characters)');
+    }
+    
+    // Validate state (2-50 characters, letters and spaces only)
+    if (!state || !/^[A-Za-z\s]{2,50}$/.test(state)) {
+      validationErrors.push('State/province should contain only letters and spaces (2-50 characters)');
+    }
+    
+    // Validate ZIP code (3-10 characters, alphanumeric, spaces, and hyphens)
+    if (!zipCode || !/^[0-9A-Za-z\s-]{3,10}$/.test(zipCode)) {
+      validationErrors.push('ZIP/postal code should be 3-10 characters');
+    }
+    
+    // Validate country (required)
+    if (!country) {
+      validationErrors.push('Country is required');
+    }
+    
+    // If there are validation errors, redirect back with error messages
+    if (validationErrors.length > 0) {
+      req.flash('error', validationErrors.join(', '));
+      return res.redirect(`/profile/address/edit/${addressId}`);
+    }
+    
+    // Update address fields
+    address.fullName = fullName;
+    address.phone = phone;
+    address.addressLine1 = addressLine1;
+    address.addressLine2 = addressLine2;
+    address.city = city;
+    address.state = state;
+    address.zipCode = zipCode;
+    address.country = country;
+    address.addressType = addressType;
+    address.isDefault = defaultAddress === 'on';
+    
+    await address.save();
+    
+    req.flash('success', 'Address updated successfully');
+    res.redirect('/profile/address');
+  } catch (error) {
+    console.error('Error updating address:', error);
+    req.flash('error', 'Failed to update address. Please try again.');
+    res.redirect('/profile/address');
+  }
+};
+
+// Delete address
+const deleteAddress = async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const addressId = req.params.id;
+    
+    // Find and delete the address, ensuring it belongs to the current user
+    const result = await Address.findOneAndDelete({
+      _id: addressId,
+      userId: req.session.user.id
+    });
+    
+    if (!result) {
+      req.flash('error', 'Address not found');
+      return res.redirect('/profile/address');
+    }
+    
+    req.flash('success', 'Address deleted successfully');
+    res.redirect('/profile/address');
+  } catch (error) {
+    console.error('Error deleting address:', error);
+    req.flash('error', 'Failed to delete address. Please try again.');
+    res.redirect('/profile/address');
+  }
+};
+
+// Set address as default
+const setDefaultAddress = async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const addressId = req.params.id;
+    
+    // Find the address and ensure it belongs to the current user
+    const address = await Address.findOne({
+      _id: addressId,
+      userId: req.session.user.id
+    });
+    
+    if (!address) {
+      req.flash('error', 'Address not found');
+      return res.redirect('/profile/address');
+    }
+    
+    // Set this address as default (the pre-save hook will handle unsetting others)
+    address.isDefault = true;
+    await address.save();
+    
+    req.flash('success', 'Default address updated successfully');
+    res.redirect('/profile/address');
+  } catch (error) {
+    console.error('Error setting default address:', error);
+    req.flash('error', 'Failed to update default address. Please try again.');
+    res.redirect('/profile/address');
+  }
 };
 
 // Get orders page
@@ -507,7 +835,8 @@ const getOrders = (req, res) => {
   res.render('user/orders', {
     user: req.session.user,
     success: req.flash('success'),
-    error: req.flash('error')
+    error: req.flash('error'),
+    currentPage: 'orders'
   });
 };
 
@@ -520,8 +849,64 @@ const getOrderDetails = (req, res) => {
     user: req.session.user,
     orderId: req.params.id,
     success: req.flash('success'),
-    error: req.flash('error')
+    error: req.flash('error'),
+    currentPage: 'orders'
   });
+};
+
+// Get change password page
+const getChangePassword = (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  res.render('user/change-password', {
+    user: req.session.user,
+    success: req.flash('success'),
+    error: req.flash('error'),
+    currentPage: 'change-password'
+  });
+};
+
+// Handle change password
+const postChangePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      req.flash('error', 'All fields are required');
+      return res.redirect('/profile/change-password');
+    }
+
+    if (newPassword !== confirmPassword) {
+      req.flash('error', 'New passwords do not match');
+      return res.redirect('/profile/change-password');
+    }
+
+    // Verify current password
+    const user = await User.findById(req.session.user._id);
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      req.flash('error', 'Current password is incorrect');
+      return res.redirect('/profile/change-password');
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    req.flash('success', 'Password updated successfully');
+    res.redirect('/profile/change-password');
+  } catch (error) {
+    console.error('Error changing password:', error);
+    req.flash('error', 'An error occurred while changing password');
+    res.redirect('/profile/change-password');
+  }
 };
 
 export {
@@ -540,6 +925,14 @@ export {
   getWishlist,
   getProfile,
   getOrders,
-  getOrderDetails
+  getOrderDetails,
+  getAddress,
+  addAddress,
+  getEditAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
+  getChangePassword,
+  postChangePassword
 };
 

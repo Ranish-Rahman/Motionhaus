@@ -8,6 +8,7 @@ import flash from 'connect-flash';
 import { isAuthenticated, isNotAuthenticated } from './middleware/authMiddleware.js';
 import cors from 'cors';
 import MongoStore from 'connect-mongo';
+import { errorHandler } from './middleware/errorHandler.js';
 
 // Import routes
 import userRoutes from './routes/userRoutes.js';
@@ -19,19 +20,18 @@ import productRoutes from './routes/productRoutes.js';
 // Suppress deprecation warnings
 process.removeAllListeners('warning');
 
+// Create Express app
 const app = express();
+
+// Connect to MongoDB
 connectDB();
 
-// View engine and static setup
-app.set('view engine', 'ejs');
-app.use(express.static('public'));
-
 // Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
 app.use(nocache());
-app.use(cors({
-  origin: 'http://localhost:2002',
-  credentials: true
-}));
+app.use(flash());
 
 // Session configuration
 app.use(session({
@@ -53,83 +53,47 @@ app.use(session({
   rolling: true
 }));
 
-// Flash middleware
-app.use(flash());
-
-// Global variables for flash messages
-app.use((req, res, next) => {
-  res.locals.user = req.user;
-  res.locals.success = req.flash('success');
-  res.locals.error = req.flash('error');
-  next();
-});
-
-// Parse JSON and URL-encoded bodies
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 // Initialize passport
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Set view engine
+app.set('view engine', 'ejs');
+app.set('views', './views');
+
+// Static files
+app.use(express.static('public'));
 
 // Route mounting order is important
 // 1. Auth routes (login, signup) - no session required
 app.use('/', authRoutes);
 
-// 2. Product routes - protected by sessionCheck
-app.use('/', productRoutes);
-
-// 3. User routes - protected by sessionCheck
+// 2. User routes
 app.use('/', userRoutes);
 
-// 4. Admin routes - protected by admin auth
+// 3. Admin routes
 app.use('/admin', adminRoutes);
-app.use('/admin', categoryRoutes);
 
-// Logout route
-app.post('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) {
-      console.error('Error during logout:', err);
-      return res.status(500).json({ success: false, message: 'Error logging out' });
-    }
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Error destroying session:', err);
-        return res.status(500).json({ success: false, message: 'Error logging out' });
-      }
-      res.clearCookie('sessionId', {
-        path: '/',
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-      });
-      res.json({ success: true });
-    });
+// 4. Category routes
+app.use('/categories', categoryRoutes);
+
+// 5. Product routes
+app.use('/products', productRoutes);
+
+// 404 handler
+app.use((req, res, next) => {
+  res.status(404).render('error', {
+    title: '404 Not Found',
+    message: 'The page you are looking for does not exist.',
+    statusCode: 404
   });
 });
 
-// Google OAuth callback error handling
-app.use((err, req, res, next) => {
-  if (err.name === 'AuthenticationError') {
-    console.error('Authentication Error:', err);
-    return res.redirect('/login');
-  }
-  next(err);
-});
+// Global error handler
+app.use(errorHandler);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
-// Server start
+// Start server
 const PORT = process.env.PORT || 2002;
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });

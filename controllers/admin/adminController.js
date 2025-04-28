@@ -452,14 +452,50 @@ export const getProducts = async (req, res) => {
       return res.redirect('/admin/login');
     }
 
-    const products = await Product.find({ isDeleted: false })
-      .populate('category')
-      .sort({ createdAt: -1 });
+    const showDeleted = req.query.showDeleted === 'true';
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    // Build query
+    const query = showDeleted ? {} : { isDeleted: false };
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    // Get total count and products
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .populate('category')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments(query)
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      nextPage: page + 1,
+      prevPage: page - 1,
+      startIndex: skip,
+      endIndex: Math.min(skip + limit - 1, total - 1),
+      totalItems: total
+    };
 
     res.render('admin/products', {
       title: 'Products',
       products,
       admin: req.session.admin,
+      path: '/admin/products',
+      showDeleted,
+      search,
+      pagination,
       success: req.flash('success'),
       error: req.flash('error')
     });

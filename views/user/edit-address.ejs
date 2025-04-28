@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Tastemaker - Edit Address</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary-purple: #090909f5;
+      --sidebar-width: 250px;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #f8f9fa;
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--primary-purple);
+      padding: 2rem 1.5rem;
+      color: white;
+      position: fixed;
+      height: 100vh;
+      left: 0;
+      top: 0;
+      z-index: 10;
+      border-right: 1px solid #232326;
+    }
+
+    .sidebar-logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 3rem;
+      color: white;
+      text-decoration: none;
+      display: block;
+    }
+
+    .nav-link {
+      color: rgba(255, 255, 255, 0.8);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border-radius: 8px;
+    }
+
+    .nav-link:hover,
+    .nav-link.active {
+      color: white;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-link i {
+      font-size: 1.2rem;
+    }
+
+    .main-content {
+      margin-left: var(--sidebar-width);
+      flex-grow: 1;
+      padding: 2rem;
+      background-color: #131314;
+    }
+
+    .content-wrapper {
+      background-image: url("/image/grain-gradient-shapes-collection-2.jpg");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-radius: 20px;
+      padding: 3rem;
+      height: calc(100vh - 4rem);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+    }
+
+    .content-header {
+      color: white;
+      margin-bottom: 4rem;
+      text-align: center;
+    }
+
+    .content-header h1 {
+      font-size: 3.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .content-header p {
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+
+    .content-body {
+      margin-top: 2rem;
+    }
+
+    .profile-section {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 2rem;
+      color: white;
+      margin-bottom: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .profile-nav {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .profile-nav-item {
+      padding: 0.75rem 1.5rem;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .profile-nav-item:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .profile-nav-item.active {
+      background: white;
+      color: #ff7675;
+    }
+
+    .info-label {
+      opacity: 0.8;
+      margin-bottom: 0.5rem;
+    }
+
+    .info-value {
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Custom scrollbar for the content wrapper */
+    .content-wrapper::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .content-wrapper::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .content-wrapper::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .content-wrapper::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .form-control {
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+
+    .form-control:focus {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: white;
+      box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.1);
+    }
+
+    .form-control::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn-primary {
+      background-color: #ff7675;
+      border-color: #ff7675;
+    }
+
+    .btn-primary:hover {
+      background-color: #e66767;
+      border-color: #e66767;
+    }
+
+    .btn-outline-light {
+      color: white;
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn-outline-light:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .btn-outline-danger {
+      color: #ff7675;
+      border-color: #ff7675;
+    }
+
+    .btn-outline-danger:hover {
+      background-color: #ff7675;
+      color: white;
+    }
+
+    .alert {
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+
+    .alert-success {
+      border-left: 4px solid #00b894;
+    }
+
+    .alert-danger {
+      border-left: 4px solid #ff7675;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Include the common sidebar -->
+    <%- include('../partials/user-profile-sidebar', { currentPage: 'address' }) %>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="content-wrapper">
+        <div class="content-header">
+          <h1>Edit Address</h1>
+          <p>Update your delivery address</p>
+        </div>
+
+        <div class="content-body">
+          <% if (success && success.length > 0) { %>
+            <div class="alert alert-success mb-4" role="alert">
+              <%= success %>
+            </div>
+          <% } %>
+          
+          <% if (error && error.length > 0) { %>
+            <div class="alert alert-danger mb-4" role="alert">
+              <%= error %>
+            </div>
+          <% } %>
+
+          <div class="profile-section">
+            <div class="profile-nav">
+              <div class="profile-nav-item active">Edit Address</div>
+            </div>
+            <form action="/profile/address/edit/<%= address._id %>" method="POST" class="row g-4" id="editAddressForm" novalidate>
+              <div class="col-md-6">
+                <label for="fullName" class="form-label text-white">Full Name</label>
+                <input type="text" class="form-control" id="fullName" name="fullName" value="<%= address.fullName %>" 
+                  pattern="[A-Za-z\s]{2,50}" 
+                  title="Name should contain only letters and spaces (2-50 characters)"
+                  minlength="2" maxlength="50" required>
+                <div class="invalid-feedback text-white">Please enter a valid name (2-50 characters, letters only)</div>
+              </div>
+              <div class="col-md-6">
+                <label for="phone" class="form-label text-white">Phone Number</label>
+                <input type="tel" class="form-control" id="phone" name="phone" value="<%= address.phone %>" 
+                  pattern="[0-9+\s()-]{10,15}" 
+                  title="Phone number should be 10-15 digits"
+                  minlength="10" maxlength="15" required>
+                <div class="invalid-feedback text-white">Please enter a valid phone number (10-15 digits)</div>
+              </div>
+              <div class="col-12">
+                <label for="addressLine1" class="form-label text-white">Address Line 1</label>
+                <input type="text" class="form-control" id="addressLine1" name="addressLine1" placeholder="Street address, P.O. box, company name" value="<%= address.addressLine1 %>" 
+                  minlength="5" maxlength="100" required>
+                <div class="invalid-feedback text-white">Please enter a valid address (5-100 characters)</div>
+              </div>
+              <div class="col-12">
+                <label for="addressLine2" class="form-label text-white">Address Line 2</label>
+                <input type="text" class="form-control" id="addressLine2" name="addressLine2" placeholder="Apartment, suite, unit, building, floor, etc." value="<%= address.addressLine2 || '' %>"
+                  maxlength="100">
+              </div>
+              <div class="col-md-4">
+                <label for="city" class="form-label text-white">City</label>
+                <input type="text" class="form-control" id="city" name="city" value="<%= address.city %>" 
+                  pattern="[A-Za-z\s]{2,50}" 
+                  title="City should contain only letters and spaces (2-50 characters)"
+                  minlength="2" maxlength="50" required>
+                <div class="invalid-feedback text-white">Please enter a valid city name (2-50 characters)</div>
+              </div>
+              <div class="col-md-4">
+                <label for="state" class="form-label text-white">State/Province</label>
+                <input type="text" class="form-control" id="state" name="state" value="<%= address.state %>" 
+                  pattern="[A-Za-z\s]{2,50}" 
+                  title="State should contain only letters and spaces (2-50 characters)"
+                  minlength="2" maxlength="50" required>
+                <div class="invalid-feedback text-white">Please enter a valid state/province (2-50 characters)</div>
+              </div>
+              <div class="col-md-4">
+                <label for="zipCode" class="form-label text-white">ZIP/Postal Code</label>
+                <input type="text" class="form-control" id="zipCode" name="zipCode" value="<%= address.zipCode %>" 
+                  pattern="[0-9A-Za-z\s-]{3,10}" 
+                  title="ZIP code should be 3-10 characters"
+                  minlength="3" maxlength="10" required>
+                <div class="invalid-feedback text-white">Please enter a valid ZIP/postal code (3-10 characters)</div>
+              </div>
+              <div class="col-md-6">
+                <label for="country" class="form-label text-white">Country</label>
+                <select class="form-select" id="country" name="country" required>
+                  <option value="" disabled>Select a country</option>
+                  <option value="US" <%= address.country === 'US' ? 'selected' : '' %>>United States</option>
+                  <option value="CA" <%= address.country === 'CA' ? 'selected' : '' %>>Canada</option>
+                  <option value="UK" <%= address.country === 'UK' ? 'selected' : '' %>>United Kingdom</option>
+                  <option value="AU" <%= address.country === 'AU' ? 'selected' : '' %>>Australia</option>
+                  <!-- Add more countries as needed -->
+                </select>
+                <div class="invalid-feedback text-white">Please select a country</div>
+              </div>
+              <div class="col-md-6">
+                <label for="addressType" class="form-label text-white">Address Type</label>
+                <select class="form-select" id="addressType" name="addressType">
+                  <option value="home" <%= address.addressType === 'home' ? 'selected' : '' %>>Home</option>
+                  <option value="work" <%= address.addressType === 'work' ? 'selected' : '' %>>Work</option>
+                  <option value="other" <%= address.addressType === 'other' ? 'selected' : '' %>>Other</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="defaultAddress" name="defaultAddress" <%= address.isDefault ? 'checked' : '' %>>
+                  <label class="form-check-label text-white" for="defaultAddress">
+                    Set as default address
+                  </label>
+                </div>
+              </div>
+              <div class="col-12 d-flex gap-3">
+                <button type="submit" class="btn btn-primary">Update Address</button>
+                <a href="/profile/address" class="btn btn-outline-light">Cancel</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Form validation script
+    document.addEventListener('DOMContentLoaded', function() {
+      const editAddressForm = document.getElementById('editAddressForm');
+      
+      if (editAddressForm) {
+        editAddressForm.addEventListener('submit', function(event) {
+          if (!editAddressForm.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          
+          editAddressForm.classList.add('was-validated');
+        });
+      }
+    });
+  </script>
+</body>
+</html> 
