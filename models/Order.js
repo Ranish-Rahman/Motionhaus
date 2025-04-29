@@ -1,29 +1,45 @@
 import mongoose from 'mongoose';
 
+const orderItemSchema = new mongoose.Schema({
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  size: {
+    type: String,
+    required: true
+  },
+  price: {
+    type: Number,
+    required: true
+  }
+});
+
 const orderSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  items: [{
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true
-    },
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1
-    },
-    price: {
-      type: Number,
-      required: true
-    }
-  }],
+  address: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Address',
+    required: true
+  },
+  items: [orderItemSchema],
   totalAmount: {
     type: Number,
+    required: true
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['cod', 'card', 'paypal'],
     required: true
   },
   status: {
@@ -31,25 +47,26 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
     default: 'pending'
   },
-  shippingAddress: {
-    street: String,
-    city: String,
-    state: String,
-    country: String,
-    zipCode: String
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['credit_card', 'debit_card', 'paypal', 'cash_on_delivery'],
-    required: true
-  },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'completed', 'failed', 'refunded'],
+    enum: ['pending', 'paid', 'failed', 'refunded', 'not_paid'],
     default: 'pending'
   },
-  trackingNumber: String,
-  notes: String,
+  trackingNumber: {
+    type: String
+  },
+  deliveredAt: {
+    type: Date
+  },
+  cancelledAt: {
+    type: Date
+  },
+  cancelReason: {
+    type: String
+  },
+  notes: {
+    type: String
+  },
   isDeleted: {
     type: Boolean,
     default: false
@@ -79,7 +96,7 @@ orderSchema.methods.calculateTotal = function() {
 
 // Pre-save middleware to update total amount
 orderSchema.pre('save', function(next) {
-  if (this.isModified('items')) {
+  if (this.isNew || this.isModified('items')) {
     this.totalAmount = this.calculateTotal();
   }
   next();

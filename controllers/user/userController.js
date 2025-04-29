@@ -471,6 +471,7 @@ const getCart = (req, res) => {
   }
   res.render('user/cart', {
     user: req.session.user,
+    cart: req.session.cart || { items: [], subtotal: 0 },
     success: req.flash('success'),
     error: req.flash('error')
   });

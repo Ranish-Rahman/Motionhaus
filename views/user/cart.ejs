@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopping Cart - MotionHaus</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #000000;
+      --border: #e5e5e5;
+      --card-bg: #f8f8f8;
+      --footer-text: #666666;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 25px 50px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+    }
+  
+    nav a {
+      margin: 0 15px;
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 600;
+    }
+  
+    .icons .icon {
+      margin-left: 20px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .cart-header {
+      margin-bottom: 40px;
+    }
+
+    .cart-header h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .cart-empty {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .cart-empty h2 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .cart-empty p {
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .continue-shopping {
+      display: inline-block;
+      padding: 15px 30px;
+      background: #000;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .cart-items {
+      margin-bottom: 40px;
+    }
+
+    .cart-item {
+      display: grid;
+      grid-template-columns: 120px 1fr auto;
+      gap: 20px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .item-image {
+      width: 120px;
+      height: 120px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .item-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .item-details {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .item-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .item-size {
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .item-price {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .item-quantity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .quantity-btn {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border);
+      background: none;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .quantity-input {
+      width: 50px;
+      height: 30px;
+      border: 1px solid var(--border);
+      text-align: center;
+      border-radius: 4px;
+    }
+
+    .remove-item {
+      color: #dc3545;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 10px;
+    }
+
+    .cart-summary {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 8px;
+    }
+
+    .summary-header {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 15px;
+      color: #666;
+    }
+
+    .summary-row.total {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      border-top: 1px solid var(--border);
+      padding-top: 15px;
+      margin-top: 15px;
+    }
+
+    .checkout-btn {
+      width: 100%;
+      padding: 15px;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    .checkout-btn:hover {
+      background: #333;
+    }
+
+    .footer {
+      background: var(--card-bg);
+      padding: 60px 80px 30px;
+      font-size: 14px;
+    }
+  
+    .footer-main {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-top: 60px;
+      gap: 40px;
+    }
+  
+    .footer-about {
+      max-width: 300px;
+    }
+  
+    .footer-about p {
+      margin: 20px 0;
+      line-height: 1.5;
+      color: var(--footer-text);
+    }
+  
+    .social-icons {
+      display: flex;
+      gap: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">MotionHaus</div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/products">Shop</a>
+      <a href="#">Contact us</a>
+      <a href="#">About</a>
+    </nav>
+    <div class="icons">
+      <i class="icon">♡</i>
+      <i class="icon">👤</i>
+      <i class="icon">🛒</i>
+    </div>
+  </header>
+
+  <div class="container" style="display: flex; gap: 40px; align-items: flex-start;">
+    <% if (!cart || cart.items.length === 0) { %>
+      <div class="cart-empty" style="flex: 1;">
+        <h2>Your cart is empty</h2>
+        <p>Looks like you haven't added any items to your cart yet.</p>
+        <a href="/products" class="continue-shopping">Continue Shopping</a>
+      </div>
+    <% } else { %>
+      <div style="flex: 2;">
+        <h1 style="font-size: 2.2rem; font-weight: 700; margin-bottom: 32px;">YOUR CART</h1>
+        <% cart.items.forEach(item => { %>
+          <div class="cart-item" style="display: flex; align-items: center; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); padding: 24px; margin-bottom: 20px; border: 1px solid #eee;">
+            <div style="width: 110px; height: 110px; border-radius: 12px; overflow: hidden; background: #f5f5f5; margin-right: 24px;">
+              <img src="<%= item.product.images[0] %>" alt="<%= item.product.name %>" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 6px;"><%= item.product.name %></div>
+              <div style="font-size: 14px; color: #888; margin-bottom: 2px;">Size: <%= item.size %></div>
+              <div style="font-size: 14px; color: #888; margin-bottom: 2px;">Color: <%= item.product.color || 'N/A' %></div>
+              <div style="font-size: 20px; font-weight: 700; margin-top: 10px;">$<%= item.product.price.toFixed(2) %></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <button class="quantity-btn" onclick="updateQuantity('<%= item.product._id %>', -1)" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #eee; background: #fafafa; font-size: 20px;">−</button>
+              <input type="number" class="quantity-input" value="<%= item.quantity %>" min="1" max="<%= item.product.stock %>" data-item-id="<%= item.product._id %>" data-current-quantity="<%= item.quantity %>" onchange="handleQuantityChange(this)" style="width: 48px; height: 36px; text-align: center; border-radius: 8px; border: 1px solid #eee;">
+              <button class="quantity-btn" onclick="updateQuantity('<%= item.product._id %>', 1)" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #eee; background: #fafafa; font-size: 20px;">+</button>
+            </div>
+            <button class="remove-item" onclick="removeItem('<%= item.product._id %>')" style="margin-left: 24px; background: none; border: none; cursor: pointer; color: #e74c3c; font-size: 22px;">
+              <span title="Remove">&#128465;</span>
+            </button>
+          </div>
+        <% }) %>
+      </div>
+      <div style="flex: 1; position: sticky; top: 40px; align-self: flex-start;">
+        <div style="background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); padding: 32px 28px; border: 1px solid #eee; min-width: 320px;">
+          <div style="font-size: 20px; font-weight: 700; margin-bottom: 28px;">Order Summary</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 16px; color: #222; font-size: 16px;">
+            <span>Subtotal</span>
+            <span>$<%= cart.subtotal.toFixed(2) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 16px; color: #222; font-size: 16px;">
+            <span>Delivery Fee</span>
+            <span style="color: #2ecc71; font-weight: 600;">Free</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 700; margin: 24px 0 28px;">
+            <span>Total</span>
+            <span>$<%= cart.subtotal.toFixed(2) %></span>
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 18px;">
+            <input type="text" placeholder="Add promo code" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #eee; font-size: 15px;">
+            <button style="padding: 12px 22px; border-radius: 8px; background: #eee; border: none; font-weight: 600; cursor: pointer;">Apply</button>
+          </div>
+          <button class="checkout-btn" onclick="proceedToCheckout()" style="width: 100%; padding: 16px; background: #000; color: #fff; border: none; border-radius: 8px; font-size: 17px; font-weight: 700; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">Go to Checkout <span style="font-size: 20px;">→</span></button>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-main">
+      <div class="footer-about">
+        <h3>MotionHaus</h3>
+        <p>Your one-stop destination for premium sneakers and streetwear.</p>
+        <div class="social-icons">
+          <a href="#">Instagram</a>
+          <a href="#">Facebook</a>
+          <a href="#">Twitter</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function handleQuantityChange(input) {
+      const itemId = input.getAttribute('data-item-id');
+      const currentQuantity = parseInt(input.getAttribute('data-current-quantity'));
+      const newValue = parseInt(input.value);
+      const change = newValue - currentQuantity;
+      updateQuantity(itemId, change);
+    }
+
+    function updateQuantity(itemId, change) {
+      const input = event.target.parentElement.querySelector('.quantity-input');
+      const currentValue = parseInt(input.value);
+      const newValue = Math.max(1, currentValue + change);
+      
+      if (newValue !== currentValue) {
+        fetch(`/cart/update/${itemId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ quantity: newValue })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            input.value = newValue;
+            updateCartSummary(data.cart);
+          } else {
+            alert(data.message || 'Failed to update quantity');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Failed to update quantity');
+        });
+      }
+    }
+
+    function removeItem(itemId) {
+      if (confirm('Are you sure you want to remove this item?')) {
+        fetch(`/cart/remove/${itemId}`, {
+          method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const item = document.querySelector(`[data-id="${itemId}"]`);
+            item.remove();
+            if (data.cart.items.length === 0) {
+              location.reload();
+            } else {
+              updateCartSummary(data.cart);
+            }
+          } else {
+            alert(data.message || 'Failed to remove item');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Failed to remove item');
+        });
+      }
+    }
+
+    function updateCartSummary(cart) {
+      const subtotalElement = document.querySelector('.summary-row:first-child span:last-child');
+      const totalElement = document.querySelector('.summary-row.total span:last-child');
+      
+      subtotalElement.textContent = `Rs. ${cart.subtotal.toFixed(2)}`;
+      totalElement.textContent = `Rs. ${cart.subtotal.toFixed(2)}`;
+    }
+
+    function proceedToCheckout() {
+      window.location.href = '/checkout';
+    }
+  </script>
+</body>
+</html> 

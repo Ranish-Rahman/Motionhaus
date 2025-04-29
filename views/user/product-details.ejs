@@ -729,8 +729,31 @@
     function addToCart() {
       const size = document.querySelector('.size-select').value;
       const quantity = document.getElementById('quantity').value;
-      // Add your cart logic here
-      alert(`Added ${quantity} pairs of size ${size} to cart`);
+      const productId = '<%= product._id %>';
+      
+      fetch('/cart/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          productId,
+          size,
+          quantity
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          window.location.href = '/cart';
+        } else {
+          alert(data.message || 'Failed to add item to cart');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to add item to cart');
+      });
     }
   </script>
 </body>

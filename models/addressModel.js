@@ -52,13 +52,26 @@ const addressSchema = new mongoose.Schema({
 
 // If this address is set as default, unset any other default addresses for this user
 addressSchema.pre('save', async function(next) {
-  if (this.isDefault) {
-    await this.constructor.updateMany(
-      { userId: this.userId, _id: { $ne: this._id } },
-      { isDefault: false }
-    );
+  try {
+    // Only run this if isDefault is being modified
+    if (this.isModified('isDefault') && this.isDefault) {
+      // First, find if there's any existing default address
+      const existingDefault = await this.constructor.findOne({
+        userId: this.userId,
+        _id: { $ne: this._id },
+        isDefault: true
+      });
+
+      if (existingDefault) {
+        // Update the existing default address
+        existingDefault.isDefault = false;
+        await existingDefault.save();
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 const Address = mongoose.model('Address', addressSchema);

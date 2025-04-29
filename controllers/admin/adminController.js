@@ -467,7 +467,7 @@ export const getProducts = async (req, res) => {
     // Get total count and products
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category')
+      .populate('category')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
