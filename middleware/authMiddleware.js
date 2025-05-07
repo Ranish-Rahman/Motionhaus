@@ -107,4 +107,27 @@ export const requireAdminAuth = (req, res, next) => {
   }
   
   next();
-}; 
+};
+
+function noCache(req, res, next) {
+  res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  res.header('Expires', '-1');
+  res.header('Pragma', 'no-cache');
+  next();
+}
+
+function sessionCheck(req, res, next) {
+  if (req.session && req.session.user) {
+    return next();
+  }
+  res.redirect('/login');
+}
+
+function redirectIfLoggedIn(req, res, next) {
+  if (req.session && req.session.user) {
+    return res.redirect('/home');
+  }
+  next();
+}
+
+export { sessionCheck, noCache, redirectIfLoggedIn }; 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Tastemaker - User Profile</title>
+  <title>User Profile</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -350,52 +350,6 @@
                 <div class="stat-value">3</div>
                 <div class="stat-label">Addresses</div>
               </div>
-            </div>
-          </div>
-
-          <!-- Quick Actions Card -->
-          <div class="profile-card">
-            <div class="profile-card-header">
-              <i class="bi bi-lightning-charge"></i>
-              <h3>Quick Actions</h3>
-            </div>
-            <div class="d-grid gap-3">
-              <a href="/profile/edit" class="btn btn-primary">
-                <i class="bi bi-pencil-square me-2"></i>
-                Edit Profile
-              </a>
-              <a href="/profile/address" class="btn btn-primary">
-                <i class="bi bi-geo-alt me-2"></i>
-                Manage Addresses
-              </a>
-              <a href="/profile/orders" class="btn btn-primary">
-                <i class="bi bi-bag me-2"></i>
-                View Orders
-              </a>
-              <a href="/profile/change-password" class="btn btn-primary">
-                <i class="bi bi-key me-2"></i>
-                Change Password
-              </a>
-            </div>
-          </div>
-
-          <!-- Recent Activity Card -->
-          <div class="profile-card">
-            <div class="profile-card-header">
-              <i class="bi bi-clock-history"></i>
-              <h3>Recent Activity</h3>
-            </div>
-            <div class="profile-info">
-              <div class="info-label">Last Login</div>
-              <div class="info-value"><%= new Date().toLocaleString() %></div>
-            </div>
-            <div class="profile-info">
-              <div class="info-label">Account Created</div>
-              <div class="info-value"><%= new Date(user.createdAt).toLocaleDateString() %></div>
-            </div>
-            <div class="profile-info">
-              <div class="info-label">Last Order</div>
-              <div class="info-value">2 days ago</div>
             </div>
           </div>
         </div>

@@ -563,22 +563,24 @@
             <% } %>
           </div>
 
-          <div class="form-group">
-            <label for="sizes">Available Sizes</label>
-            <div class="size-options">
-              <% const sizes = [5, 6, 7, 8, 9, 10, 11, 12]; %>
-              <% sizes.forEach(size => { %>
-                <label class="size-checkbox">
-                  <input type="checkbox" name="sizes" value="<%= size %>">
-                  <span><%= size %></span>
-                </label>
-              <% }) %>
-            </div>
-            <div class="error-message" id="sizesError"></div>
-            <small class="text-muted" style="display: block; margin-top: 8px; color: #a0aec0;">
-              Select the sizes that will be available for this product. At least one size must be selected.
-            </small>
-          </div>
+          <!-- NEW: Sizes with Quantity Input -->
+<div class="form-group">
+  <label>Size and Stock Quantity</label>
+  <div class="size-quantity-grid">
+    <% const sizes = [5, 6, 7, 8, 9, 10, 11, 12]; %>
+    <% sizes.forEach(size => { %>
+      <div class="size-quantity-pair">
+        <label>UK<%= size %></label>
+        <input type="number" name="sizeQuantity[<%= size %>]" min="0" value="0" class="form-control size-input">
+      </div>
+    <% }) %>
+  </div>
+  <div class="error-message" id="sizeQuantityError"></div>
+  <small class="text-muted" style="display: block; margin-top: 8px; color: #a0aec0;">
+    Enter stock quantity for each available size. Leave 0 if not available.
+  </small>
+</div>
+
 
           <div class="form-group">
             <label>Product Images (Minimum 3)</label>
@@ -748,24 +750,33 @@
         return true;
       }
 
-      function validateSizes() {
-        const selectedSizes = Array.from(sizeInputs).filter(input => input.checked);
-        sizesError.textContent = '';
-        sizeInputs.forEach(input => input.parentElement.classList.remove('error', 'valid'));
+      function validateSizesWithQuantities() {
+  const inputs = document.querySelectorAll('.size-input');
+  const sizeQuantityError = document.getElementById('sizeQuantityError');
+  let atLeastOneValid = false;
+  sizeQuantityError.textContent = '';
 
-        if (selectedSizes.length === 0) {
-          sizesError.textContent = 'At least one size must be selected';
-          sizeInputs.forEach(input => input.parentElement.classList.add('error'));
-          return false;
-        }
+  inputs.forEach(input => {
+    const qty = parseInt(input.value);
+    if (!isNaN(qty) && qty > 0) {
+      atLeastOneValid = true;
+    }
+    input.classList.remove('error', 'valid');
+    if (qty < 0 || isNaN(qty)) {
+      input.classList.add('error');
+    } else if (qty > 0) {
+      input.classList.add('valid');
+    }
+  });
 
-        sizeInputs.forEach(input => {
-          if (input.checked) {
-            input.parentElement.classList.add('valid');
-          }
-        });
-        return true;
-      }
+  if (!atLeastOneValid) {
+    sizeQuantityError.textContent = 'Enter quantity for at least one size.';
+    return false;
+  }
+
+  return true;
+}
+
 
       function validateImages() {
         imagesError.textContent = '';
@@ -949,7 +960,7 @@
         const isPriceValid = validatePrice();
         const isStockValid = validateStock();
         const isCategoryValid = validateCategory();
-        const isSizesValid = validateSizes();
+        const isSizesValid = validateSizesWithQuantities();
         const isImagesValid = validateImages();
 
         if (isNameValid && isDescriptionValid && isPriceValid && 
@@ -1007,7 +1018,7 @@
       validatePrice();
       validateStock();
       validateCategory();
-      validateSizes();
+      validateSizesWithQuantities();
       validateImages();
     });
   </script>

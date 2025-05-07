@@ -727,6 +727,13 @@
     }
 
     function addToCart() {
+      // Check if product is blocked
+      const isBlocked = document.getElementById('isBlocked').value === 'true';
+      if (isBlocked) {
+        alert('This product is currently unavailable and cannot be added to your cart.');
+        return;
+      }
+      
       const size = document.querySelector('.size-select').value;
       const quantity = document.getElementById('quantity').value;
       const productId = '<%= product._id %>';

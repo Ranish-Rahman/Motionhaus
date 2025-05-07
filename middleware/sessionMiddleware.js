@@ -179,4 +179,11 @@ export const redirectIfLoggedIn = (req, res, next) => {
     return res.redirect('/home');
   }
   next();
+};
+
+export const isAuthenticated = (req, res, next) => {
+  if (req.session && req.session.user) {
+    return next();
+  }
+  res.redirect('/login');
 }; 

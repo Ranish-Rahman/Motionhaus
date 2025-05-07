@@ -2,11 +2,11 @@
 import User from '../../models/userModel.js';
 import Admin from '../../models/adminModel.js';
 import Category from '../../models/categoryModel.js';
-import Product from '../../models/ProductModel.js';
-import Order from '../../models/Order.js';
+import Product from '../../models/ProductModel.js'; 
 import path from 'path';
 import Session from '../../models/sessionModel.js';
 import mongoose from 'mongoose';
+import Order from '../../models/orderModel.js';
 
 export const getAdminLogin = (req, res) => {
   console.log('Admin login page requested');
@@ -508,30 +508,218 @@ export const getProducts = async (req, res) => {
   }
 };
 
-// Get orders page
+//  orders page with pagination, search, and filtering
 export const getOrders = async (req, res) => {
   try {
     if (!req.session.admin) {
       return res.redirect('/admin/login');
     }
 
-    const orders = await Order.find()
-      .populate('user')
-      .populate('items.product')
-      .sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+    const status = req.query.status || '';
+    const sortBy = req.query.sortBy || 'newest';
 
-    res.render('admin/orders', {
+    // Build query
+    let query = {};
+    if (search) {
+      query.$or = [
+        { _id: { $regex: search, $options: 'i' } },
+        { 'user.name': { $regex: search, $options: 'i' } },
+        { 'user.email': { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (status) {
+      query.status = status;
+    }
+
+    // Build sort
+    let sort = {};
+    switch(sortBy) {
+      case 'newest':
+        sort = { createdAt: -1 };
+        break;
+      case 'oldest':
+        sort = { createdAt: 1 };
+        break;
+      case 'amount_high':
+        sort = { totalAmount: -1 };
+        break;
+      case 'amount_low':
+        sort = { totalAmount: 1 };
+        break;
+      default:
+        sort = { createdAt: -1 };
+    }
+
+    // Get total count and orders
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name')
+        .select('+returnRequest')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit),
+      Order.countDocuments(query)
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      nextPage: page + 1,
+      prevPage: page - 1
+    };
+
+    // Format order dates
+    orders.forEach(order => {
+      order.formattedDate = new Date(order.createdAt).toLocaleDateString();
+    });
+
+    res.render('admin/adminOrders', {
       title: 'Orders',
-      orders,
       admin: req.session.admin,
+      orders,
+      pagination,
+      search,
+      status,
+      sortBy,
+      path: '/admin/orders',
       success: req.flash('success'),
-      error: req.flash('error')
+      error: req.flash('error'),
+      layout: 'layouts/admin'
     });
   } catch (error) {
     console.error('Orders error:', error);
     res.status(500).render('error', {
       title: 'Error',
-      message: 'Failed to load orders'
+      message: 'Failed to load orders',
+      statusCode: 500
+    });
+  }
+};
+
+// Get single order details
+export const getOrderDetails = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = await Order.findById(orderId)
+      .populate('user', 'name email phone')
+      .populate('address')
+      .populate('items.product', 'name price')
+      .select('+returnRequest');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      order
+    });
+  } catch (error) {
+    console.error('Order details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch order details'
+    });
+  }
+};
+
+// Update order status
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { status } = req.body;
+
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Order status updated successfully'
+    });
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update order status'
+    });
+  }
+};
+
+// Process return request
+export const processReturn = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { returnReason, returnAmount, refundMethod } = req.body;
+
+    const order = await Order.findById(orderId)
+      .populate('user');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Validate return amount
+    if (returnAmount > order.totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Return amount cannot exceed order total'
+      });
+    }
+
+    // Update order status and payment status
+    order.status = 'cancelled';
+    order.paymentStatus = 'refunded';
+    order.cancelReason = returnReason;
+    order.cancelledAt = new Date();
+    await order.save();
+
+    // Process refund based on method
+    if (refundMethod === 'wallet') {
+      // Add amount to user's wallet
+      const user = await User.findById(order.user._id);
+      user.walletBalance = (user.walletBalance || 0) + returnAmount;
+      await user.save();
+    } else {
+      // Process refund through original payment method
+      // This would typically involve calling a payment gateway API
+      // For now, we'll just log it
+      console.log(`Processing refund of $${returnAmount} through original payment method`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Return processed successfully'
+    });
+  } catch (error) {
+    console.error('Process return error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process return'
     });
   }
 };
@@ -555,5 +743,74 @@ export const getSettings = async (req, res) => {
       title: 'Error',
       message: 'Failed to load settings'
     });
+  }
+};
+
+export const getReturnRequests = async (req, res) => {
+    try {
+        const orders = await Order.find({
+            'returnRequest.status': { $ne: null }
+        })
+        .populate('user', 'name email')
+        .sort({ 'returnRequest.requestedAt': -1 });
+
+        res.render('admin/return-requests', { orders });
+    } catch (error) {
+        console.error('Error fetching return requests:', error);
+        res.status(500).json({ success: false, message: 'Error fetching return requests' });
+    }
+};
+
+export const updateReturnRequest = async (req, res) => {
+    try {
+        const { orderId, action } = req.params;
+        const { response } = req.body;
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        if (!order.returnRequest || order.returnRequest.status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Return request has already been processed' });
+        }
+
+        order.returnRequest.status = action;
+        order.returnRequest.adminResponse = response || '';
+        order.returnRequest.processedAt = new Date();
+
+        await order.save();
+
+        res.status(200).json({ success: true, message: `Return request ${action} successfully` });
+    } catch (error) {
+        console.error('Error updating return request:', error);
+        res.status(500).json({ success: false, message: 'Error updating return request' });
+    }
+};
+
+export const processReturnRequest = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status, adminResponse } = req.body;
+    const order = await Order.findById(orderId).populate('user');
+    if (!order || !order.returnRequest) {
+      return res.status(404).json({ success: false, message: 'Order or return request not found' });
+    }
+
+    order.returnRequest.status = status;
+    order.returnRequest.adminResponse = adminResponse;
+    order.returnRequest.processedAt = new Date();
+
+    if (status === 'approved') {
+      // Refund to wallet
+      const user = await User.findById(order.user._id);
+      user.wallet = (user.wallet || 0) + order.totalAmount;
+      await user.save();
+    }
+
+    await order.save();
+    return res.json({ success: true, message: 'Return request processed' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

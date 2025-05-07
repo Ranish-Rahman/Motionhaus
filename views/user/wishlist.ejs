@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Wishlist - MotionHaus</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #000000;
+      --border: #e5e5e5;
+      --card-bg: #f8f8f8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .wishlist-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .wishlist-header h1 {
+      font-size: 32px;
+      font-weight: 600;
+    }
+
+    .wishlist-header .edit-icon {
+      margin-left: 10px;
+      font-size: 20px;
+      color: #666;
+    }
+
+    .wishlist-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .wishlist-table th {
+      text-align: left;
+      padding: 15px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+      color: #666;
+    }
+
+    .wishlist-table td {
+      padding: 20px 15px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .product-cell {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .product-image {
+      width: 100px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+
+    .product-name {
+      font-weight: 500;
+    }
+
+    .price {
+      font-weight: 500;
+    }
+
+    .original-price {
+      text-decoration: line-through;
+      color: #666;
+      margin-right: 10px;
+    }
+
+    .discounted-price {
+      color: #000;
+    }
+
+    .stock-status {
+      color: #2ecc71;
+    }
+
+    .add-to-cart {
+      padding: 10px 20px;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .add-to-cart:hover {
+      background: #333;
+    }
+
+    .remove-item {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 5px;
+      font-size: 18px;
+    }
+
+    .empty-wishlist {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .empty-wishlist h2 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+
+    .empty-wishlist p {
+      color: #666;
+      margin-bottom: 30px;
+    }
+  </style>
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+
+  <div class="container">
+    <div class="wishlist-header">
+      <h1>My Wishlist</h1>
+      <span class="edit-icon">✎</span>
+    </div>
+
+    <% if (!wishlist || wishlist.items.length === 0) { %>
+      <div class="empty-wishlist">
+        <h2>Your wishlist is empty</h2>
+        <p>Add items to your wishlist to keep track of products you're interested in.</p>
+        <a href="/products" class="add-to-cart">Continue Shopping</a>
+      </div>
+    <% } else { %>
+      <table class="wishlist-table">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>Unit Price</th>
+            <th>Stock Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% wishlist.items.forEach(item => { %>
+            <tr>
+              <td>
+                <div class="product-cell">
+                  <img src="<%= item.product.images[0] %>" alt="<%= item.product.name %>" class="product-image">
+                  <span class="product-name"><%= item.product.name %></span>
+                </div>
+              </td>
+              <td class="price">
+                <% if (item.product.originalPrice) { %>
+                  <span class="original-price">$<%= item.product.originalPrice.toFixed(2) %></span>
+                <% } %>
+                <span class="discounted-price">$<%= item.product.price.toFixed(2) %></span>
+              </td>
+              <td>
+                <span class="stock-status">
+                  <%= item.product.stock > 0 ? 'In Stock' : 'Out of Stock' %>
+                </span>
+              </td>
+              <td>
+                <button class="add-to-cart" onclick="addToCart('<%= item.product._id %>')" 
+                  <%= item.product.stock === 0 ? 'disabled' : '' %>>
+                  ADD TO CART
+                </button>
+                <button class="remove-item" onclick="removeFromWishlist('<%= item.product._id %>')" title="Remove">×</button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+
+  <script>
+    function addToCart(productId) {
+      // First add to cart
+      fetch('/cart/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          productId: productId,
+          quantity: 1
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // If successfully added to cart, remove from wishlist
+          return fetch(`/wishlist/remove/${productId}`, {
+            method: 'POST'
+          }).then(response => response.json());
+        } else {
+          throw new Error(data.message || 'Failed to add product to cart');
+        }
+      })
+      .then(data => {
+        if (data.success) {
+          // Show success message and reload page to update wishlist
+          alert('Product added to cart and removed from wishlist!');
+          location.reload();
+        } else {
+          alert(data.message || 'Failed to remove from wishlist');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert(error.message || 'An error occurred');
+      });
+    }
+
+    function removeFromWishlist(productId) {
+      if (confirm('Are you sure you want to remove this item from your wishlist?')) {
+        fetch(`/wishlist/remove/${productId}`, {
+          method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            location.reload();
+          } else {
+            alert(data.message || 'Failed to remove item from wishlist');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Failed to remove item from wishlist');
+        });
+      }
+    }
+  </script>
+</body>
+</html>

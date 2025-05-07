@@ -11,7 +11,13 @@ import {
   getProducts,
   getCategories,
   getOrders,
-  getSettings
+  getSettings,
+  getOrderDetails,
+  updateOrderStatus,
+  processReturn,
+  processReturnRequest,
+  getReturnRequests,
+  updateReturnRequest
 } from '../../controllers/admin/adminController.js';
 import { 
   getAddProduct, 
@@ -96,5 +102,14 @@ router.post('/categories/restore/:id', isAdmin, restoreCategory);
 router.post('/users/:userId/block', isAdmin, blockUser);
 router.post('/users/:userId/unblock', isAdmin, unblockUser);
 router.delete('/users/:userId', isAdmin, deleteUser);
+
+// Order management routes
+router.get('/orders/:id', isAdmin, getOrderDetails);
+router.post('/orders/:id/status', isAdmin, updateOrderStatus);
+router.post('/orders/:id/return', isAdmin, processReturn);
+
+// Return request routes
+router.get('/return-requests', isAdmin, getReturnRequests);
+router.post('/return-requests/:requestId/:action', isAdmin, updateReturnRequest);
 
 export default router; 

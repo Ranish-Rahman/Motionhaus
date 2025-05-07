@@ -21,14 +21,13 @@ const productSchema = new mongoose.Schema({
     required: true
   },
   sizes: {
-    type: [Number], // <-- numerical shoe sizes
+    type: [
+      {
+        size: { type: Number, required: true },        // e.g., 6, 7, 8
+        quantity: { type: Number, required: true, min: 0 } // e.g., 3, 5, 2
+      }
+    ],
     required: true
-  },
-  stock: {
-    type: Number,
-    required: true,
-    min: 0,
-    default: 0
   },
   images: {
     type: [String],

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('../partials/navbar.ejs') %>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <style>
+        body { 
+            background: #f8f9fa;
+            padding-top: 80px;
+        }
+        .status-badge {
+            padding: 0.25em 0.75em;
+            border-radius: 1em;
+            font-size: 0.95em;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-processing { background: #d1ecf1; color: #0c5460; }
+        .status-shipped { background: #cce5ff; color: #004085; }
+        .status-delivered { background: #c3e6cb; color: #155724; }
+        .status-cancelled { background: #f8d7da; color: #721c24; }
+        .status-return-approved { background: #d4edda; color: #155724; }
+        .table th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .table td {
+            vertical-align: middle;
+            color: #1a1a1a;
+            padding: 1rem;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.875rem;
+        }
+        .btn-view {
+            background-color: #e7f1ff;
+            border: none;
+            color: #0d6efd;
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.875rem;
+        }
+        .btn-view:hover {
+            background-color: #d0e2ff;
+            color: #0d6efd;
+        }
+        .table-responsive {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h2 class="mb-4">My Orders</h2>
+
+        <% if (!orders || orders.length === 0) { %>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                You haven't placed any orders yet.
+                <a href="/products" class="alert-link ms-2">Start Shopping</a>
+            </div>
+        <% } else { %>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% orders.forEach(function(order) { 
+                            const orderId = order.orderID || 'N/A';
+                            const dateObj = order.orderDate ? new Date(order.orderDate) : null;
+                            const day = dateObj ? String(dateObj.getDate()).padStart(2, '0') : '??';
+                            const month = dateObj ? dateObj.toLocaleString('default', { month: 'short' }) : '???';
+                            const year = dateObj ? dateObj.getFullYear() : '????';
+                            const formattedDate = dateObj ? day + ' ' + month + ' ' + year : 'N/A';
+                            const status = order.status || 'N/A';
+                            let statusClass = 'status-badge';
+
+                            if (status === 'pending') statusClass += ' status-pending';
+                            else if (status === 'processing') statusClass += ' status-processing';
+                            else if (status === 'shipped') statusClass += ' status-shipped';
+                            else if (status === 'delivered') statusClass += ' status-delivered';
+                            else if (status === 'cancelled') statusClass += ' status-cancelled';
+                            else if (status === 'return approved') statusClass += ' status-return-approved';
+                        %>
+                        <tr>
+                            <td>#<%= orderId %></td>
+                            <td><%= formattedDate %></td>
+                            <td><span class="<%= statusClass %>"><%= status %></span></td>
+                            <td><%= order.items && order.items.length ? order.items.length : 0 %> items</td>
+                            <td>₹<%= (order.totalAmount || 0).toFixed(2) %></td>
+                            <td>
+                                <a href="/orders/<%= order._id %>" class="btn-view">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

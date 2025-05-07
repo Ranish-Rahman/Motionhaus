@@ -1,12 +1,14 @@
+import Cart from '../../models/cartModel.js';
 import Product from '../../models/ProductModel.js';
 
-// Add to cart
+// Add to cart (DB version)
 export const addToCart = async (req, res) => {
   try {
-    // Check if user is logged in
     if (!req.session.user) {
       return res.status(401).json({ success: false, message: 'Please login to add items to cart' });
     }
+
+    const userId = req.session.user._id || req.session.user.id;
 
     const { productId, size, quantity } = req.body;
 
@@ -19,6 +21,11 @@ export const addToCart = async (req, res) => {
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    // Check if product is blocked
+    if (product.isBlocked) {
+      return res.status(400).json({ success: false, message: 'This product is currently unavailable and cannot be added to your cart.' });
     }
 
     // Validate size
@@ -35,50 +42,44 @@ export const addToCart = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Not enough stock available' });
     }
 
-    // Initialize cart if it doesn't exist
-    if (!req.session.cart) {
-      req.session.cart = {
-        items: [],
-        subtotal: 0
-      };
+    // Find or create cart for the user
+    let cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      cart = new Cart({ user: userId, items: [] });
     }
 
     // Check if item already exists in cart
-    const existingItemIndex = req.session.cart.items.findIndex(
-      item => item.product._id.toString() === productId && item.size === parseInt(size)
+    const existingItemIndex = cart.items.findIndex(
+      item => item.product.toString() === productId && item.size === size
     );
 
     if (existingItemIndex > -1) {
       // Update existing item
-      const newQuantity = req.session.cart.items[existingItemIndex].quantity + qty;
+      const newQuantity = cart.items[existingItemIndex].quantity + qty;
       if (newQuantity > product.stock) {
         return res.status(400).json({ success: false, message: 'Not enough stock available' });
       }
-      req.session.cart.items[existingItemIndex].quantity = newQuantity;
+      cart.items[existingItemIndex].quantity = newQuantity;
     } else {
       // Add new item
-      req.session.cart.items.push({
-        product: {
-          _id: product._id,
-          name: product.name,
-          price: product.price,
-          images: product.images
-        },
-        size: parseInt(size),
-        quantity: qty
+      cart.items.push({
+        product: product._id,
+        size,
+        quantity: qty,
+        price: product.price
       });
     }
 
-    // Calculate subtotal
-    req.session.cart.subtotal = req.session.cart.items.reduce(
-      (total, item) => total + (item.product.price * item.quantity),
-      0
-    );
+    // Save cart (pre-save hook will calculate subtotal)
+    await cart.save();
+
+    // Populate product details for response
+    await cart.populate('items.product');
 
     res.json({
       success: true,
       message: 'Item added to cart',
-      cart: req.session.cart
+      cart
     });
   } catch (error) {
     console.error('Error adding to cart:', error);
@@ -93,6 +94,7 @@ export const updateCartItem = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Please login to update cart' });
     }
 
+    const userId = req.session.user._id || req.session.user.id;
     const { itemId } = req.params;
     const { quantity } = req.body;
 
@@ -102,8 +104,14 @@ export const updateCartItem = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid quantity' });
     }
 
+    // Find cart
+    const cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
     // Find item in cart
-    const itemIndex = req.session.cart.items.findIndex(item => item.product._id.toString() === itemId);
+    const itemIndex = cart.items.findIndex(item => item.product.toString() === itemId);
     if (itemIndex === -1) {
       return res.status(404).json({ success: false, message: 'Item not found in cart' });
     }
@@ -113,23 +121,40 @@ export const updateCartItem = async (req, res) => {
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+    
+    // Check if product is blocked
+    if (product.isBlocked) {
+      // Remove the blocked item from cart
+      cart.items = cart.items.filter(item => item.product.toString() !== itemId);
+      await cart.save();
+      
+      // Populate product details for response
+      await cart.populate('items.product');
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This product is no longer available and has been removed from your cart.',
+        cart
+      });
+    }
+    
     if (qty > product.stock) {
       return res.status(400).json({ success: false, message: 'Not enough stock available' });
     }
 
     // Update quantity
-    req.session.cart.items[itemIndex].quantity = qty;
+    cart.items[itemIndex].quantity = qty;
 
-    // Recalculate subtotal
-    req.session.cart.subtotal = req.session.cart.items.reduce(
-      (total, item) => total + (item.product.price * item.quantity),
-      0
-    );
+    // Save cart (pre-save hook will calculate subtotal)
+    await cart.save();
+
+    // Populate product details for response
+    await cart.populate('items.product');
 
     res.json({
       success: true,
       message: 'Cart updated',
-      cart: req.session.cart
+      cart
     });
   } catch (error) {
     console.error('Error updating cart:', error);
@@ -144,23 +169,28 @@ export const removeFromCart = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Please login to remove items' });
     }
 
+    const userId = req.session.user._id || req.session.user.id;
     const { itemId } = req.params;
 
-    // Remove item from cart
-    req.session.cart.items = req.session.cart.items.filter(
-      item => item.product._id.toString() !== itemId
-    );
+    // Find cart
+    const cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
 
-    // Recalculate subtotal
-    req.session.cart.subtotal = req.session.cart.items.reduce(
-      (total, item) => total + (item.product.price * item.quantity),
-      0
-    );
+    // Remove item from cart
+    cart.items = cart.items.filter(item => item.product.toString() !== itemId);
+
+    // Save cart (pre-save hook will calculate subtotal)
+    await cart.save();
+
+    // Populate product details for response
+    await cart.populate('items.product');
 
     res.json({
       success: true,
       message: 'Item removed from cart',
-      cart: req.session.cart
+      cart
     });
   } catch (error) {
     console.error('Error removing from cart:', error);

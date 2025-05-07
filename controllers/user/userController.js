@@ -3,6 +3,9 @@ import User from '../../models/userModel.js';
 import Address from '../../models/addressModel.js';
 import { sendOTPEmail, generateOTP } from '../../utils/otp.js';
 import Product from '../../models/ProductModel.js';
+import Wishlist from '../../models/wishlistModel.js';
+import Cart from '../../models/cartModel.js';
+import Order from '../../models/orderModel.js';
 
 // Simple password validator
 const validatePassword = (password) => {
@@ -465,28 +468,50 @@ const liveSearch = async (req, res) => {
 };
 
 // Get cart page
-const getCart = (req, res) => {
+const getCart = async (req, res) => {
   if (!req.session.user) {
     return res.redirect('/login');
   }
+  const userId = req.session.user._id || req.session.user.id;
+  // Fetch cart from DB and populate product details
+  const cart = await Cart.findOne({ user: userId }).populate('items.product');
   res.render('user/cart', {
     user: req.session.user,
-    cart: req.session.cart || { items: [], subtotal: 0 },
+    cart: cart || { items: [], subtotal: 0 },
     success: req.flash('success'),
     error: req.flash('error')
   });
 };
 
 // Get wishlist page
-const getWishlist = (req, res) => {
+const getWishlist = async (req, res) => {
   if (!req.session.user) {
     return res.redirect('/login');
   }
-  res.render('user/wishlist', {
-    user: req.session.user,
-    success: req.flash('success'),
-    error: req.flash('error')
-  });
+  
+  try {
+    // Find the user's wishlist
+    const wishlist = await Wishlist.findOne({ user: req.session.user.id })
+      .populate({
+        path: 'items.product',
+        select: 'name images price originalPrice stock'
+      });
+    
+    res.render('user/wishlist', {
+      user: req.session.user,
+      wishlist: wishlist || { items: [] },
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Error fetching wishlist:', error);
+    res.render('user/wishlist', {
+      user: req.session.user,
+      wishlist: { items: [] },
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  }
 };
 
 // Get profile page
@@ -829,30 +854,61 @@ const setDefaultAddress = async (req, res) => {
 };
 
 // Get orders page
-const getOrders = (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
+const getOrders = async (req, res) => {
+  if (!req.session.user) return res.redirect('/login');
+  const userId = req.session.user._id || req.session.user.id;
+  const orders = await Order.find({ user: userId })
+    .select('_id orderID orderDate totalAmount status returnRequest')
+    .sort({ orderDate: -1 });
+  
   res.render('user/orders', {
     user: req.session.user,
+    orders,
     success: req.flash('success'),
-    error: req.flash('error'),
-    currentPage: 'orders'
+    error: req.flash('error')
   });
 };
 
 // Get order details page
-const getOrderDetails = (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
+const getOrderDetails = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.redirect('/login');
+    }
+
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name email phone')
+      .populate('items.product', 'name price images');
+
+    if (!order) {
+      req.flash('error', 'Order not found');
+      return res.redirect('/profile/orders');
+    }
+
+    // Check if the order belongs to the current user
+    if (!order.user || !order.user._id) {
+      req.flash('error', 'Order user not found');
+      return res.redirect('/profile/orders');
+    }
+
+    const userId = req.session.user._id || req.session.user.id;
+    if (order.user._id.toString() !== userId.toString()) {
+      req.flash('error', 'You are not authorized to view this order');
+      return res.redirect('/profile/orders');
+    }
+
+    res.render('user/order-details', {
+      user: req.session.user,
+      order,
+      success: req.flash('success'),
+      error: req.flash('error'),
+      currentPage: 'orders'
+    });
+  } catch (error) {
+    console.error('Order details error:', error);
+    req.flash('error', 'Failed to fetch order details');
+    res.redirect('/profile/orders');
   }
-  res.render('user/order-details', {
-    user: req.session.user,
-    orderId: req.params.id,
-    success: req.flash('success'),
-    error: req.flash('error'),
-    currentPage: 'orders'
-  });
 };
 
 // Get change password page
@@ -910,6 +966,187 @@ const postChangePassword = async (req, res) => {
   }
 };
 
+const getCheckout = async (req, res) => {
+  try {
+    const userId = req.session.user._id || req.session.user.id;
+    // Fetch user's addresses from the database
+    const addresses = await Address.find({ userId });
+    // Fetch cart from DB and populate product details
+    const cart = await Cart.findOne({ user: userId }).populate('items.product');
+    res.render('user/checkout', { 
+      cart: cart || { items: [], subtotal: 0 },
+      addresses: addresses
+    });
+  } catch (error) {
+    console.error('Error fetching addresses for checkout:', error);
+    res.render('user/checkout', { 
+      cart: { items: [], subtotal: 0 },
+      addresses: []
+    });
+  }
+};
+
+const createOrder = async (req, res) => {
+  try {
+    const { addressId, paymentMethod } = req.body;
+    if (!addressId || !paymentMethod) {
+      return res.status(400).json({ message: 'Address and payment method are required' });
+    }
+
+    const userId = req.session.user._id || req.session.user.id;
+    const cart = await Cart.findOne({ user: userId }).populate('items.product');
+    if (!cart || !cart.items || !cart.items.length) {
+      return res.status(400).json({ message: 'Your cart is empty' });
+    }
+
+    // Check for blocked products and remove them
+    const blockedProducts = [];
+    const validItems = [];
+    for (const item of cart.items) {
+      if (item.product && !item.product.isBlocked) {
+        validItems.push(item);
+      } else if (item.product) {
+        blockedProducts.push(item.product.name);
+      }
+    }
+    cart.items = validItems;
+    cart.subtotal = cart.items.reduce(
+      (total, item) => total + (item.product.price * item.quantity),
+      0
+    );
+
+    if (cart.items.length === 0) {
+      return res.status(400).json({ 
+        message: 'All items in your cart are no longer available',
+        cart: cart
+      });
+    }
+    if (blockedProducts.length > 0) {
+      return res.status(400).json({ 
+        message: `Some items in your cart are no longer available: ${blockedProducts.join(', ')}`,
+        cart: cart
+      });
+    }
+
+    // Generate orderID
+    const orderID = `ORD-${Date.now().toString().slice(-8)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+    const order = new Order({
+      orderID,
+      user: userId,
+      address: addressId,
+      items: cart.items.map(item => ({
+        product: item.product._id,
+        quantity: item.quantity,
+        price: item.product.price,
+        size: item.size
+      })),
+      totalAmount: cart.subtotal,
+      paymentMethod,
+      status: 'Pending', // Changed to match enum case
+      paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Not Paid'
+    });
+
+    await order.save();
+
+    // Clear the user's cart in the database
+    cart.items = [];
+    cart.subtotal = 0;
+    await cart.save();
+
+    // Render the order success page
+    res.render('user/order-success', {
+      user: req.session.user,
+      order: {
+        _id: order._id,
+        orderID: order.orderID,
+        createdAt: order.createdAt,
+        total: order.totalAmount,
+        paymentMethod: order.paymentMethod,
+        status: order.status,
+        paymentStatus: order.paymentStatus
+      }
+    });
+  } catch (error) {
+    console.error('Order creation error:', error);
+    res.status(500).json({ message: 'Failed to create order' });
+  }
+};
+
+const requestReturn = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'Please provide a reason for return' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ success: false, message: 'Return can only be requested for delivered orders' });
+    }
+
+    // Check if return request already exists
+    if (order.returnRequest && order.returnRequest.status) {
+      return res.status(400).json({ success: false, message: 'Return request already exists for this order' });
+    }
+
+    // Update order with return request
+    order.returnRequest = {
+      status: 'pending',
+      reason,
+      requestedAt: new Date()
+    };
+
+    // Save the updated order
+    await order.save();
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Return request submitted successfully' 
+    });
+  } catch (error) {
+    console.error('Error requesting return:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error processing return request' 
+    });
+  }
+};
+
+export const cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const order = await Order.findById(orderId).populate('items.product');
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    if (order.status === 'pending' || order.status === 'processing') {
+      order.status = 'cancelled';
+      order.cancelReason = reason;
+      order.cancelledAt = new Date();
+      // Increment stock for each product
+      for (const item of order.items) {
+        if (item.product) {
+          item.product.stock += item.quantity;
+          await item.product.save();
+        }
+      }
+      await order.save();
+      return res.json({ success: true, message: 'Order cancelled and stock updated' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Order cannot be cancelled' });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 export {
   signUpPage,
   getLogin,
@@ -934,6 +1171,9 @@ export {
   deleteAddress,
   setDefaultAddress,
   getChangePassword,
-  postChangePassword
+  postChangePassword,
+  getCheckout,
+  createOrder,
+  requestReturn
 };
 

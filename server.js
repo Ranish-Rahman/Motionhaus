@@ -16,6 +16,7 @@ import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/admin/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js';
 
 // Suppress deprecation warnings
 process.removeAllListeners('warning');
@@ -79,6 +80,9 @@ app.use('/categories', categoryRoutes);
 
 // 5. Product routes
 app.use('/products', productRoutes);
+
+// 6. Wishlist routes
+app.use('/wishlist', wishlistRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
