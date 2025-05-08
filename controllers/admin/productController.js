@@ -103,8 +103,8 @@ export const getAddProduct = async (req, res) => {
 // Add new product
 export const addProduct = async (req, res) => {
   try {
-    const { name, description, price, category, stock } = req.body;
-    const sizes = req.body.sizes || [];
+    const { name, description, price, category } = req.body;
+    const sizeQuantities = req.body.sizes || {};
 
     // Validate required fields
     const errors = [];
@@ -135,26 +135,36 @@ export const addProduct = async (req, res) => {
       }
     }
 
-    // Stock validation
-    if (stock === undefined || stock === '') {
-      errors.push('Stock quantity is required');
-    } else {
-      const stockNum = parseInt(stock);
-      if (isNaN(stockNum)) {
-        errors.push('Stock must be a valid number');
-      } else if (stockNum < 0) {
-        errors.push('Stock cannot be negative');
-      }
-    }
-
     // Category validation
     if (!category) {
       errors.push('Product category is required');
     }
 
     // Sizes validation
-    if (!sizes || sizes.length === 0) {
-      errors.push('At least one size must be selected');
+    const sizes = [];
+    let hasValidSize = false;
+    
+    // Log the size quantities for debugging
+    console.log('Size quantities received:', sizeQuantities);
+    
+    for (const [size, quantity] of Object.entries(sizeQuantities)) {
+      console.log(`Processing size ${size} with quantity ${quantity}`);
+      const qty = parseInt(quantity);
+      if (!isNaN(qty) && qty > 0) {
+        sizes.push({
+          size: parseInt(size),
+          quantity: qty
+        });
+        hasValidSize = true;
+        console.log(`Added size ${size} with quantity ${qty}`);
+      }
+    }
+
+    console.log('Final sizes array:', sizes);
+    console.log('Has valid size:', hasValidSize);
+
+    if (!hasValidSize) {
+      errors.push('At least one size with quantity greater than 0 is required');
     }
 
     // Images validation
@@ -164,32 +174,37 @@ export const addProduct = async (req, res) => {
       errors.push('Maximum 10 images allowed');
     }
 
-    // If there are any errors, redirect back with error messages
+    // If there are any errors, return error response
     if (errors.length > 0) {
-      req.flash('error', errors.join(', '));
-      return res.redirect('/admin/products/add');
+      console.log('Validation errors:', errors);
+      return res.status(400).json({
+        success: false,
+        message: errors.join(', ')
+      });
     }
-
-    // Convert sizes to array of numbers
-    const sizesArray = Array.isArray(sizes) ? sizes.map(Number) : [Number(sizes)];
 
     const product = new Product({
       name: name.trim(),
       description: description.trim(),
       price: parseFloat(price),
       category,
-      sizes: sizesArray,
-      stock: parseInt(stock),
+      sizes,
       images: req.uploadedImages
     });
 
     await product.save();
-    req.flash('success', 'Product added successfully');
-    res.redirect('/admin/products');
+    
+    return res.json({
+      success: true,
+      message: 'Product added successfully',
+      product
+    });
   } catch (error) {
     console.error('Error adding product:', error.message);
-    req.flash('error', error.message || 'Error adding product');
-    res.redirect('/admin/products/add');
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error adding product'
+    });
   }
 };
 
@@ -223,8 +238,8 @@ export const getEditProduct = async (req, res) => {
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, category, stock } = req.body;
-    const sizes = req.body.sizes || [];
+    const { name, description, price, category } = req.body;
+    const sizeQuantities = req.body.sizes || {};
     const productId = req.params.id;
     const removedImages = req.body.removedImages || [];
 
@@ -257,26 +272,9 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Stock validation
-    if (stock === undefined || stock === '') {
-      errors.push('Stock quantity is required');
-    } else {
-      const stockNum = parseInt(stock);
-      if (isNaN(stockNum)) {
-        errors.push('Stock must be a valid number');
-      } else if (stockNum < 0) {
-        errors.push('Stock cannot be negative');
-      }
-    }
-
     // Category validation
     if (!category) {
       errors.push('Product category is required');
-    }
-
-    // Sizes validation
-    if (!sizes || sizes.length === 0) {
-      errors.push('At least one size must be selected');
     }
 
     // Get existing product
@@ -306,22 +304,45 @@ export const updateProduct = async (req, res) => {
       errors.push('Maximum 10 images allowed');
     }
 
+    // Process sizes
+    const sizes = [];
+    let hasValidSize = false;
+    
+    // Log the size quantities for debugging
+    console.log('Size quantities received:', sizeQuantities);
+    
+    for (const [size, quantity] of Object.entries(sizeQuantities)) {
+      console.log(`Processing size ${size} with quantity ${quantity}`);
+      const qty = parseInt(quantity);
+      if (!isNaN(qty) && qty > 0) {
+        sizes.push({
+          size: parseInt(size),
+          quantity: qty
+        });
+        hasValidSize = true;
+        console.log(`Added size ${size} with quantity ${qty}`);
+      }
+    }
+
+    console.log('Final sizes array:', sizes);
+    console.log('Has valid size:', hasValidSize);
+
+    if (!hasValidSize) {
+      errors.push('At least one size with quantity greater than 0 is required');
+    }
+
     // If there are any errors, redirect back with error messages
     if (errors.length > 0) {
       req.flash('error', errors.join(', '));
       return res.redirect(`/admin/products/edit/${productId}`);
     }
 
-    // Convert sizes to array of numbers
-    const sizesArray = Array.isArray(sizes) ? sizes.map(Number) : [Number(sizes)];
-
     const updateData = {
       name: name.trim(),
       description: description.trim(),
       price: parseFloat(price),
       category,
-      sizes: sizesArray,
-      stock: parseInt(stock),
+      sizes,
       images: updatedImages
     };
 

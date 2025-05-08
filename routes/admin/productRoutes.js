@@ -1,8 +1,12 @@
 import express from 'express';
+import { upload, processImages } from '../../middleware/imageUpload.js';
 import * as productController from '../../controllers/admin/productController.js';
-import { upload } from '../../middleware/upload.js';
+import { isAdmin } from '../../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Apply admin middleware to all routes
+router.use(isAdmin);
 
 // Get all products
 router.get('/', productController.getProducts);
@@ -11,22 +15,24 @@ router.get('/', productController.getProducts);
 router.get('/add', productController.getAddProduct);
 
 // Add new product
-router.post('/add', upload.array('images', 10), productController.addProduct);
+router.post('/add', upload.array('images', 10), processImages, productController.addProduct);
 
 // Get edit product page
 router.get('/edit/:id', productController.getEditProduct);
 
 // Update product
-router.post('/edit/:id', upload.array('images', 10), productController.updateProduct);
+router.post('/edit/:id', upload.array('images', 10), processImages, productController.updateProduct);
 
 // Delete product
-router.post('/delete/:id', productController.deleteProduct);
+router.delete('/:id', productController.deleteProduct);
 
-// Block/Unblock routes
+// Block product
 router.post('/:id/block', productController.blockProduct);
+
+// Unblock product
 router.post('/:id/unblock', productController.unblockProduct);
 
 // Restore product
-router.post('/restore/:id', productController.restoreProduct);
+router.post('/:id/restore', productController.restoreProduct);
 
 export default router; 

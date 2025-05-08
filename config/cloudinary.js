@@ -1,16 +1,18 @@
 import cloudinary from 'cloudinary';
+import dotenv from 'dotenv';
 
-// Hardcoded values for testing
-const cloudName = 'dgsbaufcs';
-const apiKey = '636771691486395';
-const apiSecret = 'FIiz9NnksQqPzpopxgNRXs_uJTA';
+dotenv.config();
 
-// Log the values for debugging
-console.log('Cloudinary Config:', {
-  cloud_name: cloudName,
-  api_key: apiKey,
-  api_secret: apiSecret
-});
+// Get credentials from environment variables
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+const apiKey = process.env.CLOUDINARY_API_KEY;
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+// Validate required environment variables
+if (!cloudName || !apiKey || !apiSecret) {
+  console.error('Missing required Cloudinary environment variables');
+  process.exit(1);
+}
 
 // Configure Cloudinary
 cloudinary.v2.config({

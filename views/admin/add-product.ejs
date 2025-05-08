@@ -535,12 +535,6 @@
           </div>
 
           <div class="form-group">
-            <label for="stock">Stock Quantity</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="0">
-            <div class="error-message" id="stockError"></div>
-          </div>
-
-          <div class="form-group">
             <label for="category">Category</label>
             <select id="category" name="category" class="form-control">
               <% if (categories && categories.length > 0) { %>
@@ -564,23 +558,22 @@
           </div>
 
           <!-- NEW: Sizes with Quantity Input -->
-<div class="form-group">
-  <label>Size and Stock Quantity</label>
-  <div class="size-quantity-grid">
-    <% const sizes = [5, 6, 7, 8, 9, 10, 11, 12]; %>
-    <% sizes.forEach(size => { %>
-      <div class="size-quantity-pair">
-        <label>UK<%= size %></label>
-        <input type="number" name="sizeQuantity[<%= size %>]" min="0" value="0" class="form-control size-input">
-      </div>
-    <% }) %>
-  </div>
-  <div class="error-message" id="sizeQuantityError"></div>
-  <small class="text-muted" style="display: block; margin-top: 8px; color: #a0aec0;">
-    Enter stock quantity for each available size. Leave 0 if not available.
-  </small>
-</div>
-
+          <div class="form-group">
+            <label>Size and Stock Quantity</label>
+            <div class="size-quantity-grid">
+              <% const sizes = [5, 6, 7, 8, 9, 10, 11, 12]; %>
+              <% sizes.forEach(size => { %>
+                <div class="size-quantity-pair">
+                  <label>UK<%= size %></label>
+                  <input type="number" name="sizes[<%= size %>]" min="0" value="0" class="form-control size-input">
+                </div>
+              <% }) %>
+            </div>
+            <div class="error-message" id="sizeQuantityError"></div>
+            <small class="text-muted" style="display: block; margin-top: 8px; color: #a0aec0;">
+              Enter stock quantity for each available size. Leave 0 if not available.
+            </small>
+          </div>
 
           <div class="form-group">
             <label>Product Images (Minimum 3)</label>
@@ -600,7 +593,7 @@
           </div>
 
           <button type="submit" class="submit-btn">Add Product</button>
-  </form>
+        </form>
       </div>
     </main>
   </div>
@@ -611,7 +604,6 @@
       const nameInput = document.getElementById('name');
       const descriptionInput = document.getElementById('description');
       const priceInput = document.getElementById('price');
-      const stockInput = document.getElementById('stock');
       const categoryInput = document.getElementById('category');
       const sizeInputs = document.querySelectorAll('input[name="sizes"]');
       const imageInput = document.getElementById('imageInput');
@@ -624,7 +616,6 @@
       const nameError = document.getElementById('nameError');
       const descriptionError = document.getElementById('descriptionError');
       const priceError = document.getElementById('priceError');
-      const stockError = document.getElementById('stockError');
       const categoryError = document.getElementById('categoryError');
       const sizesError = document.getElementById('sizesError');
       const imagesError = document.getElementById('imagesError');
@@ -633,7 +624,6 @@
       nameInput.addEventListener('input', validateName);
       descriptionInput.addEventListener('input', validateDescription);
       priceInput.addEventListener('input', validatePrice);
-      stockInput.addEventListener('input', validateStock);
       categoryInput.addEventListener('change', validateCategory);
       sizeInputs.forEach(input => input.addEventListener('change', validateSizes));
 
@@ -707,34 +697,6 @@
         return true;
       }
 
-      function validateStock() {
-        const stock = stockInput.value;
-        stockError.textContent = '';
-        stockInput.classList.remove('error', 'valid');
-
-        if (stock === undefined || stock === '') {
-          stockError.textContent = 'Stock quantity is required';
-          stockInput.classList.add('error');
-          return false;
-        }
-
-        const stockNum = parseInt(stock);
-        if (isNaN(stockNum)) {
-          stockError.textContent = 'Stock must be a valid number';
-          stockInput.classList.add('error');
-          return false;
-        }
-
-        if (stockNum < 0) {
-          stockError.textContent = 'Stock cannot be negative';
-          stockInput.classList.add('error');
-          return false;
-        }
-
-        stockInput.classList.add('valid');
-        return true;
-      }
-
       function validateCategory() {
         const category = categoryInput.value;
         categoryError.textContent = '';
@@ -751,32 +713,31 @@
       }
 
       function validateSizesWithQuantities() {
-  const inputs = document.querySelectorAll('.size-input');
-  const sizeQuantityError = document.getElementById('sizeQuantityError');
-  let atLeastOneValid = false;
-  sizeQuantityError.textContent = '';
+        const inputs = document.querySelectorAll('.size-input');
+        const sizeQuantityError = document.getElementById('sizeQuantityError');
+        let atLeastOneValid = false;
+        sizeQuantityError.textContent = '';
 
-  inputs.forEach(input => {
-    const qty = parseInt(input.value);
-    if (!isNaN(qty) && qty > 0) {
-      atLeastOneValid = true;
-    }
-    input.classList.remove('error', 'valid');
-    if (qty < 0 || isNaN(qty)) {
-      input.classList.add('error');
-    } else if (qty > 0) {
-      input.classList.add('valid');
-    }
-  });
+        inputs.forEach(input => {
+          const qty = parseInt(input.value);
+          if (!isNaN(qty) && qty > 0) {
+            atLeastOneValid = true;
+          }
+          input.classList.remove('error', 'valid');
+          if (qty < 0 || isNaN(qty)) {
+            input.classList.add('error');
+          } else if (qty > 0) {
+            input.classList.add('valid');
+          }
+        });
 
-  if (!atLeastOneValid) {
-    sizeQuantityError.textContent = 'Enter quantity for at least one size.';
-    return false;
-  }
+        if (!atLeastOneValid) {
+          sizeQuantityError.textContent = 'Enter quantity for at least one size.';
+          return false;
+        }
 
-  return true;
-}
-
+        return true;
+      }
 
       function validateImages() {
         imagesError.textContent = '';
@@ -954,69 +915,141 @@
       // Handle form submission
       form.addEventListener('submit', function(e) {
         e.preventDefault();
-        
-        const isNameValid = validateName();
-        const isDescriptionValid = validateDescription();
-        const isPriceValid = validatePrice();
-        const isStockValid = validateStock();
-        const isCategoryValid = validateCategory();
-        const isSizesValid = validateSizesWithQuantities();
-        const isImagesValid = validateImages();
 
-        if (isNameValid && isDescriptionValid && isPriceValid && 
-            isStockValid && isCategoryValid && isSizesValid && isImagesValid) {
-        // Create FormData object
-          const formData = new FormData(form);
-        
-          // Add images to FormData
-          uploadedImages.forEach((file, index) => {
-            formData.append('images', file);
+        // Validate form
+        let isValid = true;
+        const errors = [];
+
+        // Name validation
+        if (!nameInput.value.trim()) {
+          errors.push('Product name is required');
+          nameInput.classList.add('error');
+          isValid = false;
+        } else {
+          nameInput.classList.remove('error');
+        }
+
+        // Description validation
+        if (!descriptionInput.value.trim()) {
+          errors.push('Product description is required');
+          descriptionInput.classList.add('error');
+          isValid = false;
+        } else {
+          descriptionInput.classList.remove('error');
+        }
+
+        // Price validation
+        if (!priceInput.value || isNaN(priceInput.value) || parseFloat(priceInput.value) <= 0) {
+          errors.push('Valid price is required');
+          priceInput.classList.add('error');
+          isValid = false;
+        } else {
+          priceInput.classList.remove('error');
+        }
+
+        // Category validation
+        if (!categoryInput.value) {
+          errors.push('Category is required');
+          categoryInput.classList.add('error');
+          isValid = false;
+        } else {
+          categoryInput.classList.remove('error');
+        }
+
+        // Size validation
+        let hasValidSize = false;
+        const sizeInputs = document.querySelectorAll('input[name^="sizes["]');
+        sizeInputs.forEach(input => {
+          const quantity = parseInt(input.value);
+          if (!isNaN(quantity) && quantity > 0) {
+            hasValidSize = true;
+          }
         });
 
-          // Submit the form with FormData
-          fetch(form.action, {
-              method: 'POST',
-              body: formData
-          }).then(response => {
-              if (response.ok) {
-                Swal.fire({
-                  title: 'Success!',
-                  text: 'Product added successfully',
-                  icon: 'success',
-                  confirmButtonText: 'OK',
-                  confirmButtonColor: '#00a3ff',
-                  timer: 3000,
-                  timerProgressBar: true
-                }).then(() => {
-                window.location.href = '/admin/products';
-                });
-              } else {
-                throw new Error('Failed to add product');
-              }
-          }).catch(error => {
-            console.error('Error:', error);
-              Swal.fire({
-              title: 'Error!',
-                text: 'Failed to add product. Please try again.',
-                icon: 'error',
-                confirmButtonText: 'OK',
-              confirmButtonColor: '#dc3545'
-              });
-            });
-      } else {
-          // Scroll to the first error
-          const firstError = document.querySelector('.error');
-          if (firstError) {
-            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!hasValidSize) {
+          errors.push('At least one size with quantity greater than 0 is required');
+          sizeInputs.forEach(input => input.classList.add('error'));
+          isValid = false;
+        } else {
+          sizeInputs.forEach(input => input.classList.remove('error'));
+        }
+
+        // Image validation
+        if (uploadedImages.length < 3) {
+          errors.push('At least 3 images are required');
+          document.getElementById('imagePreviewGrid').classList.add('error');
+          isValid = false;
+        } else {
+          document.getElementById('imagePreviewGrid').classList.remove('error');
+        }
+
+        if (!isValid) {
+          Swal.fire({
+            title: 'Validation Error',
+            html: errors.join('<br>'),
+            icon: 'error',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#00a3ff'
+          });
+          return;
+        }
+
+        // Create FormData object
+        const formData = new FormData(form);
+        
+        // Add images to FormData
+        uploadedImages.forEach((file, index) => {
+          formData.append('images', file);
+        });
+
+        // Show loading state
+        Swal.fire({
+          title: 'Adding Product',
+          text: 'Please wait...',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
           }
-      }
-    });
+        });
+
+        // Submit the form
+        fetch(form.action, {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            Swal.fire({
+              title: 'Success!',
+              text: data.message,
+              icon: 'success',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#00a3ff',
+              timer: 3000,
+              timerProgressBar: true
+            }).then(() => {
+              window.location.href = '/admin/products';
+            });
+          } else {
+            throw new Error(data.message || 'Failed to add product');
+          }
+        })
+        .catch(error => {
+          Swal.fire({
+            title: 'Error',
+            text: error.message,
+            icon: 'error',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#00a3ff'
+          });
+        });
+      });
 
       // Initial validation
       validateName();
       validateDescription();
       validatePrice();
-      validateStock();
       validateCategory();
       validateSizesWithQuantities();
       validateImages();

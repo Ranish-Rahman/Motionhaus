@@ -503,22 +503,23 @@
 
         <div class="size-selector">
           <label class="size-label">SIZE</label>
-          <select class="size-select">
+          <select class="size-select" id="sizeSelect" onchange="updateStockInfo()">
+            <option value="">Select Size</option>
             <% product.sizes.forEach(size => { %>
-              <option value="<%= size %>"><%= size %></option>
+              <option value="<%= size.size %>" data-stock="<%= size.quantity %>" <%= size.quantity <= 0 ? 'disabled' : '' %>>
+                UK <%= size.size %> <%= size.quantity <= 0 ? '(Out of Stock)' : `(${size.quantity} available)` %>
+              </option>
             <% }) %>
           </select>
           <div class="stock-info">
             <span class="stock-label">Available Stock:</span>
-            <span class="stock-count <%= product.stock > 0 ? 'in-stock' : 'out-of-stock' %>">
-              <%= product.stock %> units
-            </span>
+            <span class="stock-count" id="stockCount">Select a size</span>
           </div>
         </div>
 
         <div class="quantity-selector">
           <button class="quantity-button" onclick="updateQuantity(-1)">−</button>
-          <input type="number" class="quantity-input" value="1" min="1" max="<%= product.stock %>" id="quantity">
+          <input type="number" class="quantity-input" value="1" min="1" id="quantity">
           <button class="quantity-button" onclick="updateQuantity(1)">+</button>
         </div>
 
@@ -706,11 +707,45 @@
     document.querySelector('.prev-button').addEventListener('click', () => navigateImages(-1));
     document.querySelector('.next-button').addEventListener('click', () => navigateImages(1));
 
+    function updateStockInfo() {
+      const sizeSelect = document.getElementById('sizeSelect');
+      const stockCount = document.getElementById('stockCount');
+      const quantityInput = document.getElementById('quantity');
+      const selectedOption = sizeSelect.options[sizeSelect.selectedIndex];
+      
+      if (sizeSelect.value === '') {
+        stockCount.textContent = 'Select a size';
+        stockCount.className = 'stock-count';
+        quantityInput.max = 1;
+        quantityInput.value = 1;
+        return;
+      }
+
+      const stock = parseInt(selectedOption.dataset.stock);
+      stockCount.textContent = `${stock} units`;
+      stockCount.className = `stock-count ${stock > 0 ? 'in-stock' : 'out-of-stock'}`;
+      
+      // Update quantity input max value
+      quantityInput.max = stock;
+      if (parseInt(quantityInput.value) > stock) {
+        quantityInput.value = stock;
+      }
+    }
+
     function updateQuantity(change) {
       const input = document.getElementById('quantity');
+      const sizeSelect = document.getElementById('sizeSelect');
+      const selectedOption = sizeSelect.options[sizeSelect.selectedIndex];
+      const maxStock = selectedOption ? parseInt(selectedOption.dataset.stock) : 1;
+      
       const newValue = Math.max(1, Math.min(maxStock, parseInt(input.value) + change));
       input.value = newValue;
     }
+
+    // Initialize stock info when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      updateStockInfo();
+    });
 
     function toggleSection(id) {
       const content = document.getElementById(id);
