@@ -127,7 +127,11 @@
                                   <i class="bi bi-eye"></i> View
                                 </a>
                               
-                                <% if (order.status === 'Delivered') { %>
+                                <% if (['Pending', 'Confirmed', 'Processing'].includes(order.status)) { %>
+                                    <button class="btn btn-danger btn-sm ms-2 cancel-order" data-order-id="<%= order._id %>">
+                                      <i class="bi bi-x-circle"></i> Cancel
+                                    </button>
+                                <% } else if (order.status === 'Delivered') { %>
                                  <% if (!order.returnRequest || !order.returnRequest.status) { %>
                                     <button class="btn btn-danger btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#returnRequestModal" data-order-id="<%= order._id %>">
                                       <i class="bi bi-arrow-return-left"></i> Return
@@ -187,6 +191,36 @@
                 document.getElementById('orderId').value = orderId;
             });
         }
+
+        // Handle order cancellation
+        document.querySelectorAll('.cancel-order').forEach(button => {
+            button.addEventListener('click', async () => {
+                const orderId = button.getAttribute('data-order-id');
+                
+                if (!confirm('Are you sure you want to cancel this order?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/order/${orderId}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Failed to cancel order');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to cancel order');
+                }
+            });
+        });
 
         // Handle return request submission
         document.getElementById('submitReturnRequest').addEventListener('click', async () => {

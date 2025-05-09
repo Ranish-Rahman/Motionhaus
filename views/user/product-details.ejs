@@ -452,23 +452,7 @@
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo">MotionHaus</div>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/products">Shop</a>
-      <a href="#">Contact us</a>
-      <a href="#">About</a>
-    </nav>
-    <div class="icons">
-      <i class="icon">♡</i>
-      <i class="icon">👤</i>
-      <i class="icon">🛒</i>
-    </div>
-  
-    
-  </header>
-
+  <%- include('../partials/navbar') %>
 
   <div class="container">
     <input type="hidden" id="isBlocked" value="<%= product.isBlocked || false %>">

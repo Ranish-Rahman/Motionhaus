@@ -5,13 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Products | MotionHaus</title>
   <style>
+    /* ===== CSS VARIABLES FOR THEMES ===== */
+    :root {
+      --bg: #fff;
+      --text: #000;
+      --border: #eee;
+      --card-bg: #ddd;
+      --caption: white;
+      --caption-shadow: rgba(0,0,0,0.5);
+      --feature-icon-bg: #000;
+      --feature-icon-color: #fff;
+      --footer-text: #333;
+      --footer-link: #444;
+      --footer-border: #ddd;
+      --social-icon-bg: #fff;
+      --social-icon-border: #ccc;
+    }
+    
+    body.dark-mode {
+      --bg: #111;
+      --text: #fff;
+      --border: #333;
+      --card-bg: #1a1a1a;
+      --caption: white;
+      --caption-shadow: rgba(0,0,0,0.7);
+      --feature-icon-bg: #fff;
+      --feature-icon-color: #000;
+      --footer-text: #bbb;
+      --footer-link: #ccc;
+      --footer-border: #444;
+      --social-icon-bg: #222;
+      --social-icon-border: #444;
+    }
    
     body {
       font-family: 'Inter', sans-serif;
       margin: 0;
-      background: #fff;
-      color: #000;
-      --card-bg: #ddd;
+      background: var(--bg);
+      color: var(--text);
     }
 
     header, .filters, .product-grid, .search-sort {

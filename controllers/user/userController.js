@@ -862,7 +862,8 @@ const getOrders = async (req, res) => {
   if (!req.session.user) return res.redirect('/login');
   const userId = req.session.user._id || req.session.user.id;
   const orders = await Order.find({ user: userId })
-    .select('_id orderID orderDate totalAmount status returnRequest')
+    .select('_id orderID orderDate totalAmount status returnRequest items')
+    .populate('items.product', 'name price images')
     .sort({ orderDate: -1 });
   
   res.render('user/orders', {
@@ -1153,27 +1154,60 @@ export const cancelOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { reason } = req.body;
+    
+    console.log('Cancelling order:', { orderId, reason });
+    
     const order = await Order.findById(orderId).populate('items.product');
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-
-    if (order.status === 'pending' || order.status === 'processing') {
-      order.status = 'cancelled';
-      order.cancelReason = reason;
-      order.cancelledAt = new Date();
-      // Increment stock for each product
-      for (const item of order.items) {
-        if (item.product) {
-          item.product.stock += item.quantity;
-          await item.product.save();
-        }
-      }
-      await order.save();
-      return res.json({ success: true, message: 'Order cancelled and stock updated' });
-    } else {
-      return res.status(400).json({ success: false, message: 'Order cannot be cancelled' });
+    if (!order) {
+      console.log('Order not found:', orderId);
+      return res.status(404).json({ success: false, message: 'Order not found' });
     }
+
+    console.log('Current order status:', order.status);
+
+    // Check if order can be cancelled (case-insensitive)
+    const allowedStatuses = ['pending', 'confirmed', 'processing'];
+    if (!allowedStatuses.includes(order.status.toLowerCase())) {
+      console.log('Order cannot be cancelled. Current status:', order.status);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Order cannot be cancelled in its current state (${order.status})` 
+      });
+    }
+
+    // Update order status
+    order.status = 'Cancelled';
+    order.cancelReason = reason;
+    order.cancelledAt = new Date();
+
+    // Increment stock for each product
+    for (const item of order.items) {
+      if (item.product) {
+        item.product.stock += item.quantity;
+        await item.product.save();
+        console.log(`Updated stock for product ${item.product._id}: +${item.quantity}`);
+      }
+    }
+
+    // Save the updated order
+    await order.save();
+    console.log('Order cancelled successfully:', orderId);
+
+    return res.json({ 
+      success: true, 
+      message: 'Order cancelled successfully',
+      order: {
+        status: order.status,
+        cancelledAt: order.cancelledAt
+      }
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error cancelling order:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to cancel order',
+      error: error.message 
+    });
   }
 };
 

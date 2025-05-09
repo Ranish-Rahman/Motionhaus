@@ -46,6 +46,11 @@ router.post('/login', postLogin);
 router.post('/forgot-password', postForgotPassword);
 router.post('/reset-password', resetPassword);
 
+// Root route - redirect to home
+router.get('/', (req, res) => {
+  res.redirect('/home');
+});
+
 // Apply session check to protected routes
 router.use(sessionCheck);
 
