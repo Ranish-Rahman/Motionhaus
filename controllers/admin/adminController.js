@@ -566,6 +566,18 @@ export const getOrders = async (req, res) => {
       Order.countDocuments(query)
     ]);
 
+    // Log orders with return requests
+    console.log('Orders with return requests:', orders.map(order => ({
+      orderId: order._id,
+      status: order.status,
+      returnRequest: order.returnRequest ? {
+        status: order.returnRequest.status,
+        reason: order.returnRequest.reason,
+        requestedAt: order.returnRequest.requestedAt,
+        processedAt: order.returnRequest.processedAt
+      } : null
+    })));
+
     // Calculate pagination info
     const totalPages = Math.ceil(total / limit);
     const pagination = {
@@ -579,7 +591,7 @@ export const getOrders = async (req, res) => {
 
     // Format order dates
     orders.forEach(order => {
-      order.formattedDate = new Date(order.createdAt).toLocaleDateString();
+      order.formattedDate = new Date(order.orderDate).toLocaleDateString();
     });
 
     res.render('admin/adminOrders', {
@@ -673,6 +685,8 @@ export const processReturn = async (req, res) => {
     const orderId = req.params.id;
     const { returnReason, returnAmount, refundMethod } = req.body;
 
+    console.log('Processing return request:', { orderId, returnReason, returnAmount, refundMethod });
+
     const order = await Order.findById(orderId)
       .populate('user');
 
@@ -683,8 +697,18 @@ export const processReturn = async (req, res) => {
       });
     }
 
+    console.log('Order details:', {
+      orderId: order._id,
+      totalAmount: order.totalAmount,
+      status: order.status,
+      returnRequest: order.returnRequest
+    });
+
+    // Use order.totalAmount if returnAmount is not provided
+    const refundAmount = returnAmount || order.totalAmount || 0;
+
     // Validate return amount
-    if (returnAmount > order.totalAmount) {
+    if (refundAmount > order.totalAmount) {
       return res.status(400).json({
         success: false,
         message: 'Return amount cannot exceed order total'
@@ -692,7 +716,7 @@ export const processReturn = async (req, res) => {
     }
 
     // Update order status and payment status
-    order.status = 'cancelled';
+    order.status = 'Returned';
     order.paymentStatus = 'refunded';
     order.cancelReason = returnReason;
     order.cancelledAt = new Date();
@@ -702,18 +726,18 @@ export const processReturn = async (req, res) => {
     if (refundMethod === 'wallet') {
       // Add amount to user's wallet
       const user = await User.findById(order.user._id);
-      user.walletBalance = (user.walletBalance || 0) + returnAmount;
+      user.walletBalance = (user.walletBalance || 0) + refundAmount;
       await user.save();
+      console.log(`Added ${refundAmount} to user's wallet`);
     } else {
       // Process refund through original payment method
-      // This would typically involve calling a payment gateway API
-      // For now, we'll just log it
-      console.log(`Processing refund of $${returnAmount} through original payment method`);
+      console.log(`Processing refund of ₹${refundAmount} through original payment method`);
     }
 
     res.json({
       success: true,
-      message: 'Return processed successfully'
+      message: 'Return processed successfully',
+      refundAmount
     });
   } catch (error) {
     console.error('Process return error:', error);
@@ -763,25 +787,68 @@ export const getReturnRequests = async (req, res) => {
 
 export const updateReturnRequest = async (req, res) => {
     try {
-        const { orderId, action } = req.params;
+        const { requestId, action } = req.params;
         const { response } = req.body;
 
-        const order = await Order.findById(orderId);
+        console.log('Updating return request:', { requestId, action, response });
+
+        const order = await Order.findById(requestId);
         if (!order) {
+            console.log('Order not found:', requestId);
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
 
+        console.log('Current order state:', {
+            orderId: order._id,
+            status: order.status,
+            returnRequest: order.returnRequest
+        });
+
         if (!order.returnRequest || order.returnRequest.status !== 'pending') {
+            console.log('Invalid return request state:', order.returnRequest);
             return res.status(400).json({ success: false, message: 'Return request has already been processed' });
         }
 
+        // Update return request
         order.returnRequest.status = action;
         order.returnRequest.adminResponse = response || '';
         order.returnRequest.processedAt = new Date();
 
+        // Update order status based on return request action
+        if (action === 'approved') {
+            order.status = 'Returned';
+            order.paymentStatus = 'refunded';
+        } else if (action === 'denied') {
+            order.status = 'Delivered';
+        }
+
+        // Save the updated order
         await order.save();
 
-        res.status(200).json({ success: true, message: `Return request ${action} successfully` });
+        console.log('Updated order state:', {
+            orderId: order._id,
+            status: order.status,
+            returnRequest: order.returnRequest
+        });
+
+        // If approved, update user's wallet
+        if (action === 'approved') {
+            const user = await User.findById(order.user);
+            if (user) {
+                user.wallet = (user.wallet || 0) + order.totalAmount;
+                await user.save();
+                console.log(`Updated user wallet: Added ₹${order.totalAmount}`);
+            }
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: `Return request ${action} successfully`,
+            order: {
+                status: order.status,
+                returnRequest: order.returnRequest
+            }
+        });
     } catch (error) {
         console.error('Error updating return request:', error);
         res.status(500).json({ success: false, message: 'Error updating return request' });
@@ -792,25 +859,75 @@ export const processReturnRequest = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status, adminResponse } = req.body;
-    const order = await Order.findById(orderId).populate('user');
-    if (!order || !order.returnRequest) {
-      return res.status(404).json({ success: false, message: 'Order or return request not found' });
+    
+    console.log('Processing return request:', { orderId, status, adminResponse });
+    
+    // First find the order to check its current state
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    if (!order.returnRequest) {
+      return res.status(400).json({ success: false, message: 'No return request found for this order' });
+    }
+
+    // Log the order before update
+    console.log('Order before update:', {
+      orderId: order._id,
+      status: order.status,
+      returnRequest: order.returnRequest
+    });
+
+    // Update the order with the new return request status
     order.returnRequest.status = status;
-    order.returnRequest.adminResponse = adminResponse;
+    order.returnRequest.adminResponse = adminResponse || '';
     order.returnRequest.processedAt = new Date();
 
+    // If approved, update order status to Returned
     if (status === 'approved') {
-      // Refund to wallet
-      const user = await User.findById(order.user._id);
-      user.wallet = (user.wallet || 0) + order.totalAmount;
-      await user.save();
+      order.status = 'Returned';
+      order.paymentStatus = 'refunded';
+    } else if (status === 'denied') {
+      // For denied returns, keep the order as Delivered
+      order.status = 'Delivered';
     }
 
+    // Save the updated order
     await order.save();
-    return res.json({ success: true, message: 'Return request processed' });
+
+    // Log the updated order
+    console.log('Order after update:', {
+      orderId: order._id,
+      status: order.status,
+      returnRequest: {
+        status: order.returnRequest.status,
+        adminResponse: order.returnRequest.adminResponse,
+        processedAt: order.returnRequest.processedAt
+      }
+    });
+
+    // If approved, update user's wallet
+    if (status === 'approved') {
+      const user = await User.findById(order.user);
+      if (user) {
+        user.wallet = (user.wallet || 0) + order.totalAmount;
+        await user.save();
+        console.log(`Updated user wallet: Added ₹${order.totalAmount}`);
+      }
+    }
+    
+    return res.json({ 
+      success: true, 
+      message: 'Return request processed successfully',
+      order: {
+        _id: order._id,
+        status: order.status,
+        returnRequest: order.returnRequest
+      }
+    });
   } catch (error) {
+    console.error('Error processing return request:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

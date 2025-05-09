@@ -769,7 +769,12 @@
         return;
       }
       
-      const size = document.querySelector('.size-select').value;
+      const size = document.getElementById('sizeSelect').value;
+      if (!size) {
+        alert('Please select a size');
+        return;
+      }
+      
       const quantity = document.getElementById('quantity').value;
       const productId = '<%= product._id %>';
       

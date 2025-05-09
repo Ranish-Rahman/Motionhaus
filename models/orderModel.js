@@ -44,8 +44,27 @@ const orderSchema = new mongoose.Schema({
   orderDate: {
     type: Date,
     default: Date.now,
+  },
+  returnRequest: {
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'denied'],
+      required: false
+    },
+    reason: String,
+    requestedAt: {
+      type: Date,
+      default: Date.now
+    },
+    adminResponse: String,
+    processedAt: Date
   }
+}, {
+  timestamps: true
 });
+
+// Add index for return requests
+orderSchema.index({ 'returnRequest.status': 1 });
 
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

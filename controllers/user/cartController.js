@@ -29,7 +29,8 @@ export const addToCart = async (req, res) => {
     }
 
     // Validate size
-    if (!product.sizes.includes(parseInt(size))) {
+    const sizeObj = product.sizes.find(s => s.size === parseInt(size));
+    if (!sizeObj) {
       return res.status(400).json({ success: false, message: 'Invalid size selected' });
     }
 
@@ -38,7 +39,7 @@ export const addToCart = async (req, res) => {
     if (isNaN(qty) || qty < 1) {
       return res.status(400).json({ success: false, message: 'Invalid quantity' });
     }
-    if (qty > product.stock) {
+    if (qty > sizeObj.quantity) {
       return res.status(400).json({ success: false, message: 'Not enough stock available' });
     }
 
@@ -56,7 +57,7 @@ export const addToCart = async (req, res) => {
     if (existingItemIndex > -1) {
       // Update existing item
       const newQuantity = cart.items[existingItemIndex].quantity + qty;
-      if (newQuantity > product.stock) {
+      if (newQuantity > sizeObj.quantity) {
         return res.status(400).json({ success: false, message: 'Not enough stock available' });
       }
       cart.items[existingItemIndex].quantity = newQuantity;

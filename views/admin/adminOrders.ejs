@@ -332,11 +332,13 @@
             </div>
             <select class="form-select" id="statusFilter">
               <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
-              <option value="shipped">Shipped</option>
-              <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Shipped">Shipped</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Returned">Returned</option>
+              <option value="Return Denied">Return Denied</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
             <select class="form-select" id="sortBy">
               <option value="newest">Newest First</option>
@@ -373,24 +375,30 @@
                       <td>₹<%= order.totalAmount.toFixed(2) %></td>
                       <td>
                         <select class="form-select form-select-sm status-select" data-order-id="<%= order._id %>">
-                          <option value="pending" <%= order.status === 'pending' ? 'selected' : '' %>>Pending</option>
-                          <option value="processing" <%= order.status === 'processing' ? 'selected' : '' %>>Processing</option>
-                          <option value="shipped" <%= order.status === 'shipped' ? 'selected' : '' %>>Shipped</option>
-                          <option value="delivered" <%= order.status === 'delivered' ? 'selected' : '' %>>Delivered</option>
-                          <option value="return approved" <%= order.status === 'return approved' ? 'selected' : '' %>>Return Approved</option>
-                          <option value="cancelled" <%= order.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                          <option value="Pending" <%= order.status === 'Pending' ? 'selected' : '' %>>Pending</option>
+                          <option value="Confirmed" <%= order.status === 'Confirmed' ? 'selected' : '' %>>Confirmed</option>
+                          <option value="Shipped" <%= order.status === 'Shipped' ? 'selected' : '' %>>Shipped</option>
+                          <option value="Delivered" <%= order.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
+                          <option value="Returned" <%= order.status === 'Returned' ? 'selected' : '' %>>Returned</option>
+                          <option value="Cancelled" <%= order.status === 'Cancelled' ? 'selected' : '' %>>Cancelled</option>
                         </select>
-                        <% if (order.returnRequest) { %>
+                        <% if (order.returnRequest && order.returnRequest.status) { %>
                           <div class="mt-1">
                             <small class="text-<%= 
-                              order.returnRequest.status === 'pending' ? 'warning' : 
-                              order.returnRequest.status === 'approved' ? 'success' : 'danger' 
+                              order.returnRequest.status.toLowerCase() === 'pending' ? 'warning' : 
+                              order.returnRequest.status.toLowerCase() === 'approved' ? 'success' : 'danger' 
                             %>">
                               <i class="bi bi-<%= 
-                                order.returnRequest.status === 'pending' ? 'clock' : 
-                                order.returnRequest.status === 'approved' ? 'check-circle' : 'x-circle' 
+                                order.returnRequest.status.toLowerCase() === 'pending' ? 'clock' : 
+                                order.returnRequest.status.toLowerCase() === 'approved' ? 'check-circle' : 'x-circle' 
                               %>"></i>
-                              Return <%= order.returnRequest.status %>
+                              Return Request: <%= order.returnRequest.status.charAt(0).toUpperCase() + order.returnRequest.status.slice(1) %>
+                              <% if (order.returnRequest.adminResponse) { %>
+                                <br><small class="text-muted">Response: <%= order.returnRequest.adminResponse %></small>
+                              <% } %>
+                              <% if (order.returnRequest.processedAt) { %>
+                                <br><small class="text-muted">Processed: <%= new Date(order.returnRequest.processedAt).toLocaleString() %></small>
+                              <% } %>
                             </small>
                           </div>
                         <% } %>
@@ -406,22 +414,15 @@
                             <i class="bi bi-eye"></i>
                             View
                           </button>
-                          <% if (order.status === 'delivered') { %>
-                            <% if (order.returnRequest && order.returnRequest.status === 'pending') { %>
-                              <button class="btn btn-success accept-return" data-order-id="<%= order._id %>">
-                                <i class="bi bi-check-circle"></i>
-                                Accept Return
-                              </button>
-                              <button class="btn btn-danger deny-return" data-order-id="<%= order._id %>">
-                                <i class="bi bi-x-circle"></i>
-                                Deny Return
-                              </button>
-                            <% } else if (!order.returnRequest || !order.returnRequest.status) { %>
-                            <button class="btn btn-warning process-return" data-order-id="<%= order._id %>">
-                              <i class="bi bi-arrow-return-left"></i>
-                              Return
+                          <% if (order.status === 'Delivered' && order.returnRequest && order.returnRequest.status === 'pending') { %>
+                            <button class="btn btn-success accept-return" data-order-id="<%= order._id %>">
+                              <i class="bi bi-check-circle"></i>
+                              Accept Return
                             </button>
-                            <% } %>
+                            <button class="btn btn-danger deny-return" data-order-id="<%= order._id %>">
+                              <i class="bi bi-x-circle"></i>
+                              Deny Return
+                            </button>
                           <% } %>
                         </div>
                       </td>
@@ -662,7 +663,7 @@
       try {
         const result = await Swal.fire({
           title: 'Confirm Return',
-          text: 'Are you sure you want to process this return?',
+          text: `Are you sure you want to process this return for ₹${amount}?`,
           icon: 'question',
           showCancelButton: true,
           confirmButtonText: 'Yes, process return',
@@ -670,30 +671,31 @@
         });
 
         if (result.isConfirmed) {
-        const response = await fetch(`/admin/orders/${orderId}/return`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            amount,
-              method,
+          const response = await fetch(`/admin/orders/${orderId}/return`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              returnAmount: parseFloat(amount),
+              refundMethod: method,
               adminResponse: response,
               status: 'approved'
-          })
-        });
-        
-        if (response.ok) {
+            })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
             Swal.fire({
               icon: 'success',
               title: 'Success',
-              text: 'Return request processed successfully',
+              text: `Return request processed successfully. Refunded ₹${data.refundAmount}`,
               showConfirmButton: false,
               timer: 1500
             }).then(() => {
-          location.reload();
+              location.reload();
             });
-        } else {
+          } else {
             throw new Error('Failed to process return request');
           }
         }
@@ -754,18 +756,20 @@
           });
 
           if (result.isConfirmed) {
-            const response = await fetch(`/admin/orders/${orderId}/return`, {
+            const response = await fetch(`/admin/return-requests/${orderId}/approved`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                status: 'approved',
-                adminResponse: 'Return request approved'
+                response: 'Return request approved'
               })
             });
             
             if (response.ok) {
+              const data = await response.json();
+              console.log('Return request processed:', data);
+              
               Swal.fire({
                 icon: 'success',
                 title: 'Success',
@@ -776,7 +780,8 @@
                 location.reload();
               });
             } else {
-              throw new Error('Failed to accept return request');
+              const error = await response.json();
+              throw new Error(error.message || 'Failed to accept return request');
             }
           }
         } catch (error) {
@@ -784,7 +789,7 @@
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Failed to accept return request'
+            text: error.message || 'Failed to accept return request'
           });
         }
       });
@@ -810,18 +815,20 @@
           });
 
           if (reason) {
-            const response = await fetch(`/admin/orders/${orderId}/return`, {
+            const response = await fetch(`/admin/return-requests/${orderId}/denied`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                status: 'denied',
-                adminResponse: reason
+                response: reason
               })
             });
             
             if (response.ok) {
+              const data = await response.json();
+              console.log('Return request processed:', data);
+              
               Swal.fire({
                 icon: 'success',
                 title: 'Success',
@@ -832,7 +839,8 @@
                 location.reload();
               });
             } else {
-              throw new Error('Failed to deny return request');
+              const error = await response.json();
+              throw new Error(error.message || 'Failed to deny return request');
             }
           }
         } catch (error) {
@@ -840,7 +848,7 @@
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Failed to deny return request'
+            text: error.message || 'Failed to deny return request'
           });
         }
       });

@@ -26,15 +26,19 @@ const getLogin = (req, res) => {
 };
 
 // Render home page
-const getHome = (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
+export const getHome = async (req, res) => {
+  try {
+    res.render('user/home', {
+      title: 'Home',
+      user: req.session.user || null
+    });
+  } catch (error) {
+    console.error('Error in getHome:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load home page'
+    });
   }
-  res.render("user/home", { 
-    user: req.session.user,
-    success: req.flash('success'),
-    error: req.flash('error')
-  });
 };
 
 // Render forgot password page
@@ -897,9 +901,35 @@ const getOrderDetails = async (req, res) => {
       return res.redirect('/profile/orders');
     }
 
+    // Set status class based on order status
+    let statusClass = 'status-badge';
+    switch (order.status.toLowerCase()) {
+      case 'pending':
+        statusClass += ' status-pending';
+        break;
+      case 'processing':
+        statusClass += ' status-processing';
+        break;
+      case 'shipped':
+        statusClass += ' status-shipped';
+        break;
+      case 'delivered':
+        statusClass += ' status-delivered';
+        break;
+      case 'cancelled':
+        statusClass += ' status-cancelled';
+        break;
+      case 'return approved':
+        statusClass += ' status-return-approved';
+        break;
+      default:
+        statusClass += ' status-pending';
+    }
+
     res.render('user/order-details', {
       user: req.session.user,
       order,
+      statusClass,
       success: req.flash('success'),
       error: req.flash('error'),
       currentPage: 'orders'
@@ -1150,7 +1180,6 @@ export const cancelOrder = async (req, res) => {
 export {
   signUpPage,
   getLogin,
-  getHome,
   getForgotPassword,
   postSignup,
   verifyOTP,

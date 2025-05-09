@@ -1,12 +1,13 @@
 import Order from '../../models/orderModel.js';
-import { nanoid } from 'nanoid';
+import Product from '../../models/ProductModel.js';  // Ensure Product model is imported if used for stock updates
 
-const placeOrder = async (req, res) => {
+// Place Order function
+export const placeOrder = async (req, res) => {
   try {
-    const cartItems = req.body.items; // from user cart/session
+    const cartItems = req.body.items;
     const userId = req.session.user._id;
     
-    // Generate custom orderID using nanoid
+    // Generate custom orderID
     const orderID = `ORD-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${nanoid(8).toUpperCase()}`;
 
     const order = new Order({
@@ -24,7 +25,7 @@ const placeOrder = async (req, res) => {
 
     await order.save();
 
-    // Decrease stock
+    // Decrease stock for each item
     for (const item of cartItems) {
       await Product.findByIdAndUpdate(item.productId, {
         $inc: { stock: -item.quantity }
@@ -38,6 +39,7 @@ const placeOrder = async (req, res) => {
   }
 };
 
+// Request Return function
 export const requestReturn = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -52,16 +54,23 @@ export const requestReturn = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    if (order.status !== 'delivered') {
-      return res.status(400).json({ success: false, message: 'Return can only be requested for delivered orders' });
+    // Check if order is delivered
+    if (order.status !== 'Delivered') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Return can only be requested for delivered orders' 
+      });
     }
 
     // Check if return request already exists
     if (order.returnRequest && order.returnRequest.status) {
-      return res.status(400).json({ success: false, message: 'Return request already exists for this order' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Return request already exists for this order' 
+      });
     }
 
-    // Update order with return request
+    // Create a new return request
     order.returnRequest = {
       status: 'pending',
       reason,
@@ -81,5 +90,35 @@ export const requestReturn = async (req, res) => {
       success: false, 
       message: 'Error processing return request' 
     });
+  }
+};
+
+// Deny Return Request function
+export const denyReturnRequest = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Find the order by ID
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Check if the return request exists and is pending
+    if (order.returnRequest && order.returnRequest.status === 'pending') {
+      // Deny the return request
+      order.returnRequest.status = 'denied';
+      order.returnRequest.processedAt = new Date(); // Track when the request was denied
+
+      // Save the updated order
+      await order.save();
+
+      return res.status(200).json({ success: true, message: 'Return request denied successfully' });
+    } else {
+      return res.status(400).json({ success: false, message: 'Return request is not in pending state' });
+    }
+  } catch (error) {
+    console.error('Error denying return request:', error);
+    return res.status(500).json({ success: false, message: 'Error processing denial of return request' });
   }
 };
