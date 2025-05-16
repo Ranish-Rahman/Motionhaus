@@ -26,12 +26,14 @@ import {
   getCheckout,
   createOrder,
   cancelOrder,
-  getHome
+  getHome,
+  updateProfile
 } from '../controllers/user/userController.js';
 import { requestReturn, placeOrder } from '../controllers/user/orderController.js';
 import { listProducts, getProductDetails } from '../controllers/user/productController.js';
 import { addToCart, updateCartItem, removeFromCart } from '../controllers/user/cartController.js';
 import { sessionCheck } from '../middleware/sessionMiddleware.js';
+import { getPasswordRules } from '../utils/passwordValidation.js';
 
 const router = express.Router();
 
@@ -62,6 +64,7 @@ router.post('/cart/update/:itemId', updateCartItem);
 router.post('/cart/remove/:itemId', removeFromCart);
 router.get('/wishlist', getWishlist);
 router.get('/profile', getProfile);
+router.post('/profile/update', updateProfile);
 
 // Address management routes
 router.get('/profile/address', getAddress);
@@ -103,5 +106,10 @@ router.post('/test-return', (req, res) => {
 
 // New routes
 router.post('/orders', placeOrder);
+
+// Add password rules endpoint
+router.get('/api/password-rules', (req, res) => {
+  res.json(getPasswordRules());
+});
 
 export default router;

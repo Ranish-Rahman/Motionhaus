@@ -55,7 +55,14 @@ const productSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Check if model exists before creating it
-const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
+// Ensure consistent model registration
+let Product;
+try {
+    // Try to get existing model
+    Product = mongoose.model('Product');
+} catch (error) {
+    // Model doesn't exist, create it
+    Product = mongoose.model('Product', productSchema);
+}
 
 export default Product;

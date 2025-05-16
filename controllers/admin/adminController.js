@@ -892,7 +892,7 @@ export const processReturnRequest = async (req, res) => {
       // For denied returns, keep the order as Delivered
       order.status = 'Delivered';
     }
-
+    
     // Save the updated order
     await order.save();
 

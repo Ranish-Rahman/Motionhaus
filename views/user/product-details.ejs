@@ -508,6 +508,7 @@
         </div>
 
         <button class="add-to-cart" onclick="addToCart()">ADD TO CART</button>
+        <button class="add-to-cart" style="background: #fff; color: #000; border: 1px solid #000; margin-bottom: 10px;" onclick="addToWishlist()">ADD TO WISHLIST</button>
         <button class="shop-pay-button">
           <svg width="20" height="20" fill="#fff" viewBox="0 0 24 24">
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22.5c-5.799 0-10.5-4.701-10.5-10.5S6.201 1.5 12 1.5 22.5 6.201 22.5 12 17.799 22.5 12 22.5z"/>
@@ -784,6 +785,38 @@
       .catch(error => {
         console.error('Error:', error);
         alert('Failed to add item to cart');
+      });
+    }
+
+    function addToWishlist() {
+      const productId = '<%= product._id %>';
+      const sizeSelect = document.getElementById('sizeSelect');
+      
+      if (!sizeSelect.value) {
+        alert('Please select a size before adding to wishlist');
+        return;
+      }
+
+      fetch(`/wishlist/add/${productId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          size: sizeSelect.value
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          window.location.href = '/wishlist';
+        } else {
+          alert(data.message || 'Failed to add to wishlist');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to add to wishlist');
       });
     }
   </script>

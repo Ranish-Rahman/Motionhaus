@@ -6,14 +6,7 @@ import Product from '../../models/ProductModel.js';
 import Wishlist from '../../models/wishlistModel.js';
 import Cart from '../../models/cartModel.js';
 import Order from '../../models/orderModel.js';
-
-// Simple password validator
-const validatePassword = (password) => {
-  if (!password || password.length < 6) {
-    return { isValid: false, message: "Password must be at least 6 characters" };
-  }
-  return { isValid: true };
-};
+import { validatePassword } from '../../utils/passwordValidation.js';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -250,7 +243,7 @@ const postLogin = async (req, res) => {
 
     // Login successful
     req.session.user = {
-      id: user._id,
+      _id: user._id,
       username: user.username,
       email: user.email,
     };
@@ -489,33 +482,104 @@ const getCart = async (req, res) => {
 
 // Get wishlist page
 const getWishlist = async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    // Find the user's wishlist
-    const wishlist = await Wishlist.findOne({ user: req.session.user.id })
-      .populate({
-        path: 'items.product',
-        select: 'name images price originalPrice stock'
-      });
-    
-    res.render('user/wishlist', {
-      user: req.session.user,
-      wishlist: wishlist || { items: [] },
-      success: req.flash('success'),
-      error: req.flash('error')
-    });
-  } catch (error) {
-    console.error('Error fetching wishlist:', error);
-    res.render('user/wishlist', {
-      user: req.session.user,
-      wishlist: { items: [] },
-      success: req.flash('success'),
-      error: req.flash('error')
-    });
-  }
+    try {
+        console.log('==================== START WISHLIST ====================');
+        
+        if (!req.session.user || !req.session.user._id) {
+            return res.redirect('/login');
+        }
+
+        console.log('User ID:', req.session.user._id);
+
+        // Get wishlist
+        let wishlist = await Wishlist.findOne({ user: req.session.user._id });
+        
+        if (!wishlist) {
+            console.log('No wishlist found, creating new one');
+            wishlist = new Wishlist({ user: req.session.user._id, items: [] });
+            await wishlist.save();
+        } else {
+            console.log('Found existing wishlist with', wishlist.items.length, 'items');
+            console.log('Wishlist items before population:', JSON.stringify(wishlist.items, null, 2));
+        }
+
+        // Populate product data
+        await wishlist.populate({
+            path: 'items.product',
+            model: 'Product',
+            select: 'name price images sizes isDeleted isBlocked brand description category'
+        });
+
+        console.log('Wishlist after population:', JSON.stringify(
+            wishlist.items.map(item => ({
+                productName: item.product.name,
+                size: item.size,
+                productSizes: item.product.sizes
+            })), null, 2)
+        );
+
+        // Convert to plain object
+        const wishlistObj = wishlist.toObject();
+
+        // Process items
+        if (wishlistObj.items && Array.isArray(wishlistObj.items)) {
+            wishlistObj.items = wishlistObj.items
+                .filter(item => item && item.product && !item.product.isDeleted && !item.product.isBlocked)
+                .map(item => {
+                    try {
+                        const product = item.product;
+                        const itemSize = Number(item.size);
+
+                        console.log('\nProcessing product:', product.name);
+                        console.log('Looking for size:', itemSize);
+                        console.log('Available sizes:', JSON.stringify(product.sizes, null, 2));
+
+                        // Find the selected size
+                        const selectedSizeObj = product.sizes.find(s => Number(s.size) === itemSize);
+                        
+                        console.log('Found size object:', selectedSizeObj);
+
+                        // Calculate stock status
+                        const selectedSizeStock = selectedSizeObj ? selectedSizeObj.quantity : 0;
+                        const hasStock = selectedSizeStock > 0;
+
+                        console.log('Stock calculation:', {
+                            size: itemSize,
+                            quantity: selectedSizeStock,
+                            hasStock: hasStock
+                        });
+
+                        return {
+                            ...item,
+                            product: {
+                                ...product,
+                                hasStock,
+                                selectedSizeStock
+                            }
+                        };
+                    } catch (error) {
+                        console.error('Error processing item:', error);
+                        return null;
+                    }
+                })
+                .filter(Boolean);
+        }
+
+        console.log('==================== END WISHLIST ====================');
+
+        return res.render('user/wishlist', {
+            title: 'My Wishlist',
+            user: req.session.user,
+            wishlist: wishlistObj
+        });
+
+    } catch (error) {
+        console.error('Error in getWishlist:', error);
+        return res.render('error', {
+            message: 'Error loading wishlist',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
 };
 
 // Get profile page
@@ -539,7 +603,7 @@ const getAddress = async (req, res) => {
   
   try {
     // Fetch user's addresses from the database
-    const addresses = await Address.find({ userId: req.session.user.id });
+    const addresses = await Address.find({ userId: req.session.user._id });
     
     res.render('user/address', {
       user: req.session.user,
@@ -632,7 +696,7 @@ const addAddress = async (req, res) => {
     
     // Create new address
     const newAddress = new Address({
-      userId: req.session.user.id,
+      userId: req.session.user._id,
       fullName,
       phone,
       addressLine1,
@@ -668,7 +732,7 @@ const getEditAddress = async (req, res) => {
     // Find the address and ensure it belongs to the current user
     const address = await Address.findOne({
       _id: addressId,
-      userId: req.session.user.id
+      userId: req.session.user._id
     });
     
     if (!address) {
@@ -702,7 +766,7 @@ const updateAddress = async (req, res) => {
     // Find the address and ensure it belongs to the current user
     const address = await Address.findOne({
       _id: addressId,
-      userId: req.session.user.id
+      userId: req.session.user._id
     });
     
     if (!address) {
@@ -807,7 +871,7 @@ const deleteAddress = async (req, res) => {
     // Find and delete the address, ensuring it belongs to the current user
     const result = await Address.findOneAndDelete({
       _id: addressId,
-      userId: req.session.user.id
+      userId: req.session.user._id
     });
     
     if (!result) {
@@ -836,7 +900,7 @@ const setDefaultAddress = async (req, res) => {
     // Find the address and ensure it belongs to the current user
     const address = await Address.findOne({
       _id: addressId,
-      userId: req.session.user.id
+      userId: req.session.user._id
     });
     
     if (!address) {
@@ -955,10 +1019,32 @@ const getChangePassword = (req, res) => {
   });
 };
 
+// Rate limiting for password changes
+const passwordChangeAttempts = new Map();
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+
 // Handle change password
 const postChangePassword = async (req, res) => {
   try {
+    const userId = req.session.user._id;
     const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Check rate limiting
+    const attempts = passwordChangeAttempts.get(userId) || { count: 0, timestamp: Date.now() };
+    
+    // Reset attempts if lockout period has passed
+    if (Date.now() - attempts.timestamp > LOCKOUT_TIME) {
+      attempts.count = 0;
+      attempts.timestamp = Date.now();
+    }
+    
+    // Check if user is locked out
+    if (attempts.count >= MAX_ATTEMPTS) {
+      const remainingTime = Math.ceil((LOCKOUT_TIME - (Date.now() - attempts.timestamp)) / 60000);
+      req.flash('error', `Too many attempts. Please try again in ${remainingTime} minutes.`);
+      return res.redirect('/profile/change-password');
+    }
 
     // Validate input
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -971,22 +1057,36 @@ const postChangePassword = async (req, res) => {
       return res.redirect('/profile/change-password');
     }
 
+    // Validate password requirements
+    const validation = validatePassword(newPassword);
+    if (!validation.isValid) {
+      req.flash('error', validation.message);
+      return res.redirect('/profile/change-password');
+    }
+
     // Verify current password
-    const user = await User.findById(req.session.user._id);
+    const user = await User.findById(userId);
     const isMatch = await bcrypt.compare(currentPassword, user.password);
 
     if (!isMatch) {
+      // Increment failed attempts
+      attempts.count++;
+      passwordChangeAttempts.set(userId, attempts);
+      
       req.flash('error', 'Current password is incorrect');
       return res.redirect('/profile/change-password');
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    // Hash new password with environment variable for salt rounds
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
     // Update password
     user.password = hashedPassword;
     await user.save();
+
+    // Reset attempts on successful password change
+    passwordChangeAttempts.delete(userId);
 
     req.flash('success', 'Password updated successfully');
     res.redirect('/profile/change-password');
@@ -1003,7 +1103,21 @@ const getCheckout = async (req, res) => {
     // Fetch user's addresses from the database
     const addresses = await Address.find({ userId });
     // Fetch cart from DB and populate product details
-    const cart = await Cart.findOne({ user: userId }).populate('items.product');
+    let cart = await Cart.findOne({ user: userId }).populate('items.product');
+    
+    if (cart && cart.items.length > 0) {
+      // Filter out items with null products or blocked products
+      cart.items = cart.items.filter(item => item.product && !item.product.isBlocked);
+      
+      // Recalculate subtotal
+      cart.subtotal = cart.items.reduce((total, item) => {
+        return total + (item.product.price * item.quantity);
+      }, 0);
+      
+      // Save the filtered cart
+      await cart.save();
+    }
+
     res.render('user/checkout', { 
       cart: cart || { items: [], subtotal: 0 },
       addresses: addresses
@@ -1020,8 +1134,17 @@ const getCheckout = async (req, res) => {
 const createOrder = async (req, res) => {
   try {
     const { addressId, paymentMethod } = req.body;
-    if (!addressId || !paymentMethod) {
-      return res.status(400).json({ message: 'Address and payment method are required' });
+    
+    // Validate required fields
+    if (!addressId) {
+      return res.status(400).json({ message: 'Delivery address is required' });
+    }
+
+    // Only allow COD payment method
+    if (paymentMethod !== 'cod') {
+      return res.status(400).json({ 
+        message: 'Only Cash on Delivery (COD) payment method is currently available' 
+      });
     }
 
     const userId = req.session.user._id || req.session.user.id;
@@ -1073,9 +1196,9 @@ const createOrder = async (req, res) => {
         size: item.size
       })),
       totalAmount: cart.subtotal,
-      paymentMethod,
-      status: 'Pending', // Changed to match enum case
-      paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Not Paid'
+      paymentMethod: 'cod', // Force COD as payment method
+      status: 'Pending',
+      paymentStatus: 'Pending' // For COD, payment status is always pending until delivery
     });
 
     await order.save();
@@ -1177,20 +1300,20 @@ export const cancelOrder = async (req, res) => {
 
     // Update order status
     order.status = 'Cancelled';
-    order.cancelReason = reason;
-    order.cancelledAt = new Date();
+      order.cancelReason = reason;
+      order.cancelledAt = new Date();
 
-    // Increment stock for each product
-    for (const item of order.items) {
-      if (item.product) {
-        item.product.stock += item.quantity;
-        await item.product.save();
+      // Increment stock for each product
+      for (const item of order.items) {
+        if (item.product) {
+          item.product.stock += item.quantity;
+          await item.product.save();
         console.log(`Updated stock for product ${item.product._id}: +${item.quantity}`);
+        }
       }
-    }
 
     // Save the updated order
-    await order.save();
+      await order.save();
     console.log('Order cancelled successfully:', orderId);
 
     return res.json({ 
@@ -1207,6 +1330,85 @@ export const cancelOrder = async (req, res) => {
       success: false, 
       message: 'Failed to cancel order',
       error: error.message 
+    });
+  }
+};
+
+// Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const { username, email, phone } = req.body;
+    const userId = req.session.user._id;
+
+    // Validate input
+    if (!username || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username and email are required'
+      });
+    }
+
+    // Email validation
+    if (!/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
+
+    // Phone validation (optional)
+    if (phone && !/^[0-9]{10,15}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number must be between 10 and 15 digits'
+      });
+    }
+
+    // Check if email is already taken by another user
+    const existingUser = await User.findOne({ 
+      email: email, 
+      _id: { $ne: userId } 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already in use'
+      });
+    }
+
+    // Update user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    user.username = username;
+    user.email = email;
+    user.phone = phone || '';  // Set empty string if phone is not provided
+    await user.save();
+
+    // Update session
+    req.session.user = {
+      ...req.session.user,
+      username: user.username,
+      email: user.email,
+      phone: user.phone
+    };
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update profile'
     });
   }
 };
@@ -1237,6 +1439,7 @@ export {
   postChangePassword,
   getCheckout,
   createOrder,
-  requestReturn
+  requestReturn,
+  updateProfile
 };
 
