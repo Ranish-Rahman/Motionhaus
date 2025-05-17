@@ -4,13 +4,9 @@ import Category from '../../models/categoryModel.js';
 // List products for users
 export const listProducts = async (req, res) => {
   try {
-    // Check if user is authenticated
-    if (!req.session.user) {
-      req.session.returnTo = req.originalUrl;
-      return res.redirect('/login');
-    }
-
-    // Get query parameters
+    // Get query parameters with defaults
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
     const { search, sort, minPrice, maxPrice, category, size } = req.query;
     
     // Build query
@@ -52,7 +48,12 @@ export const listProducts = async (req, res) => {
     // Add size filter if provided
     if (size) {
       const sizes = Array.isArray(size) ? size : [size];
-      query.sizes = { $in: sizes.map(Number) };
+      query['sizes'] = {
+        $elemMatch: {
+          size: { $in: sizes.map(Number) },
+          quantity: { $gt: 0 }
+        }
+      };
     }
 
     // Build sort options
@@ -74,16 +75,34 @@ export const listProducts = async (req, res) => {
       }
     }
 
-    // Fetch products
-    const products = await Product.find(query)
-      .sort(sortOptions);
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+    
+    // Get total count of matching products
+    const totalProducts = await Product.countDocuments(query);
+    const totalPages = Math.ceil(totalProducts / limit);
 
-    console.log('Category filter:', category);
-    console.log('Active categories:', activeCategoryNames);
-    console.log('Found products:', products.length);
-    if (products.length > 0) {
-      console.log('Sample product categories:', products.map(p => p.category));
-    }
+    // Fetch products with pagination
+    const products = await Product.find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit);
+
+    // Calculate pagination info
+    const pagination = {
+      currentPage: page,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      nextPage: page + 1,
+      prevPage: page - 1,
+      totalItems: totalProducts,
+      limit,
+      pages: Array.from({ length: totalPages }, (_, i) => i + 1)
+    };
+
+    // Debug pagination
+    console.log('Pagination data:', pagination);
 
     res.render('user/products', {
       products,
@@ -100,13 +119,15 @@ export const listProducts = async (req, res) => {
         category: category || '',
         size: size || ''
       },
+      pagination,
+      currentPage: page,
       success: req.flash('success'),
       error: req.flash('error')
     });
   } catch (error) {
     console.error('Error loading products:', error);
     req.flash('error', 'Error loading products');
-    res.redirect('/login');
+    res.redirect('/');
   }
 };
 

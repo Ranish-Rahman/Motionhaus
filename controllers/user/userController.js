@@ -438,29 +438,60 @@ const resetPassword = async (req, res) => {
 // Handle live search
 const liveSearch = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, page = 1, limit = 12 } = req.query;
     
     if (!q) {
-      return res.json([]);
+      return res.json({ products: [], pagination: null });
     }
 
+    // Calculate skip value for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get total count of matching products
+    const totalProducts = await Product.countDocuments({
+      name: { $regex: q, $options: 'i' },
+      isDeleted: false,
+      isBlocked: false
+    });
+
+    // Get paginated products
     const products = await Product.find({
       name: { $regex: q, $options: 'i' },
-      isDeleted: false
-    }).select('name price images brand').limit(10);
+      isDeleted: false,
+      isBlocked: false
+    })
+    .select('name price images brand')
+    .skip(skip)
+    .limit(parseInt(limit));
 
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalProducts / parseInt(limit));
+    const pagination = {
+      currentPage: parseInt(page),
+      totalPages,
+      hasNextPage: parseInt(page) < totalPages,
+      hasPrevPage: parseInt(page) > 1,
+      nextPage: parseInt(page) + 1,
+      prevPage: parseInt(page) - 1,
+      totalItems: totalProducts
+    };
+
+    // Format products
     const formattedProducts = products.map(product => ({
-      id: product._id,
+      _id: product._id,
       name: product.name,
       price: product.price,
-      imageUrl: product.images[0],
+      images: product.images,
       brand: product.brand || 'MotionHaus'
     }));
 
-    res.json(formattedProducts);
+    res.json({
+      products: formattedProducts,
+      pagination
+    });
   } catch (error) {
     console.error('Live search error:', error);
-    res.status(500).json([]);
+    res.status(500).json({ products: [], pagination: null });
   }
 };
 
@@ -1334,33 +1365,37 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
-// Update user profile
-const updateProfile = async (req, res) => {
+// Send OTP for email verification
+const sendProfileOTP = async (req, res) => {
   try {
-    const { username, email, phone } = req.body;
+    const { email } = req.body;
     const userId = req.session.user._id;
 
-    // Validate input
-    if (!username || !email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username and email are required'
-      });
-    }
-
-    // Email validation
-    if (!/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
+    // Enhanced email validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!email || !emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
         message: 'Please enter a valid email address'
       });
     }
 
-    // Phone validation (optional)
-    if (phone && !/^[0-9]{10,15}$/.test(phone)) {
+    // Additional validation for common email domains
+    const [localPart, domain] = email.split('@');
+    
+    // Check local part length (before @)
+    if (localPart.length > 64) {
       return res.status(400).json({
         success: false,
-        message: 'Phone number must be between 10 and 15 digits'
+        message: 'Email address is too long before the @ symbol'
+      });
+    }
+
+    // Check domain length
+    if (domain.length > 255) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email domain is too long'
       });
     }
 
@@ -1377,19 +1412,190 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    // Update user
+    // Generate OTP
+    const otp = generateOTP();
+
+    // Store OTP in session
+    req.session.profileOTP = {
+      email,
+      otp,
+      expiresAt: Date.now() + 3 * 60 * 1000, // 3 minutes
+      attempts: 0
+    };
+
+    // Send OTP email
+    await sendOTPEmail(email, otp);
+
+    return res.json({
+      success: true,
+      message: 'Verification code sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Send profile OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send verification code'
+    });
+  }
+};
+
+// Verify OTP for email change
+const verifyProfileOTP = async (req, res) => {
+  try {
+    const { otp, email } = req.body;
+    const otpData = req.session.profileOTP;
+
+    console.log('Verifying OTP:', { otp, email });
+    console.log('Session OTP Data:', otpData);
+
+    if (!otpData) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification session expired. Please try again.'
+      });
+    }
+
+    if (Date.now() > otpData.expiresAt) {
+      delete req.session.profileOTP;
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code expired. Please request a new one.'
+      });
+    }
+
+    if (otpData.attempts >= 3) {
+      delete req.session.profileOTP;
+      return res.status(400).json({
+        success: false,
+        message: 'Too many attempts. Please try again.'
+      });
+    }
+
+    if (otp !== otpData.otp || email !== otpData.email) {
+      otpData.attempts++;
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code'
+      });
+    }
+
+    // Mark email as verified in session instead of deleting OTP data
+    req.session.profileOTP = {
+      ...otpData,
+      verified: true
+    };
+
+    console.log('OTP verification successful. Updated session:', req.session.profileOTP);
+
+    return res.json({
+      success: true,
+      message: 'Email verified successfully'
+    });
+
+  } catch (error) {
+    console.error('Verify profile OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify code'
+    });
+  }
+};
+
+// Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const { username, email, phone } = req.body;
+    const userId = req.session.user._id;
+
+    console.log('Update Profile Request:', { username, email, phone, userId });
+
+    // Validate input
+    if (!username || !email) {
+      console.log('Validation failed: Missing username or email');
+      return res.status(400).json({
+        success: false,
+        message: 'Username and email are required'
+      });
+    }
+
+    // Email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      console.log('Validation failed: Invalid email format');
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
+
+    // Phone validation (optional)
+    if (phone && !/^[0-9]{10,15}$/.test(phone)) {
+      console.log('Validation failed: Invalid phone format');
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number must be between 10 and 15 digits'
+      });
+    }
+
+    // Get current user
     const user = await User.findById(userId);
     if (!user) {
+      console.log('User not found with ID:', userId);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
 
+    console.log('Current user data:', {
+      currentUsername: user.username,
+      currentEmail: user.email,
+      currentPhone: user.phone
+    });
+
+    // If email is being changed, verify OTP session exists and is verified
+    if (email !== user.email) {
+      console.log('Email change detected. Checking OTP verification...');
+      const otpData = req.session.profileOTP;
+      console.log('OTP Data:', otpData);
+      
+      if (!otpData || !otpData.verified || otpData.email !== email) {
+        console.log('OTP verification failed or missing');
+        return res.status(400).json({
+          success: false,
+          message: 'Email change requires verification'
+        });
+      }
+      console.log('OTP verification confirmed');
+      // Only delete OTP data after confirming verification
+      delete req.session.profileOTP;
+    }
+
+    // Check if email is already in use by another user
+    const existingUser = await User.findOne({ 
+      email: email,
+      _id: { $ne: userId }
+    });
+
+    if (existingUser) {
+      console.log('Email already in use by another user');
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already in use by another account'
+      });
+    }
+
+    // Update user
     user.username = username;
     user.email = email;
     user.phone = phone || '';  // Set empty string if phone is not provided
     await user.save();
+
+    console.log('User updated successfully:', {
+      newUsername: user.username,
+      newEmail: user.email,
+      newPhone: user.phone
+    });
 
     // Update session
     req.session.user = {
@@ -1398,6 +1604,16 @@ const updateProfile = async (req, res) => {
       email: user.email,
       phone: user.phone
     };
+
+    // Save session explicitly to ensure it's updated
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log('Session updated:', req.session.user);
 
     return res.json({
       success: true,
@@ -1440,6 +1656,8 @@ export {
   getCheckout,
   createOrder,
   requestReturn,
-  updateProfile
+  updateProfile,
+  sendProfileOTP,
+  verifyProfileOTP
 };
 

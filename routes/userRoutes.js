@@ -27,7 +27,9 @@ import {
   createOrder,
   cancelOrder,
   getHome,
-  updateProfile
+  updateProfile,
+  sendProfileOTP,
+  verifyProfileOTP
 } from '../controllers/user/userController.js';
 import { requestReturn, placeOrder } from '../controllers/user/orderController.js';
 import { listProducts, getProductDetails } from '../controllers/user/productController.js';
@@ -111,5 +113,11 @@ router.post('/orders', placeOrder);
 router.get('/api/password-rules', (req, res) => {
   res.json(getPasswordRules());
 });
+
+// Profile routes
+router.get('/profile', sessionCheck, getProfile);
+router.post('/profile/update', sessionCheck, updateProfile);
+router.post('/profile/send-otp', sessionCheck, sendProfileOTP);
+router.post('/profile/verify-otp', sessionCheck, verifyProfileOTP);
 
 export default router;

@@ -21,6 +21,10 @@
       --footer-border: #ddd;
       --social-icon-bg: #fff;
       --social-icon-border: #ccc;
+      --search-bg: #f8f8f8;
+      --search-border: #e0e0e0;
+      --search-text: #333;
+      --search-placeholder: #999;
     }
     
     body.dark-mode {
@@ -37,6 +41,10 @@
       --footer-border: #444;
       --social-icon-bg: #222;
       --social-icon-border: #444;
+      --search-bg: #222;
+      --search-border: #444;
+      --search-text: #fff;
+      --search-placeholder: #888;
     }
    
     body {
@@ -80,6 +88,7 @@
 
     .container {
       display: flex;
+      margin-top: 20px;
     }
 
     .filters {
@@ -107,35 +116,83 @@
 
     .search-sort {
       flex: 1;
+      padding-top: 40px;
     }
 
     .search-bar {
       display: flex;
-      margin-bottom: 30px;
+      margin: 20px auto 30px;
+      width: 100%;
+      max-width: 1200px;
+      position: relative;
+      z-index: 1;
+      padding: 0 20px;
     }
 
     .search-container {
       display: flex;
       align-items: center;
-      border: 1px solid #ccc;
-      background: #f6f6f6;
-      padding: 8px 12px;
-      width: 250px;
-      border-radius: 2px;
+      background: #F7F7F7;
+      padding: 16px 24px;
+      width: 100%;
+      border-radius: 14px;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-container:hover,
+    .search-container:focus-within {
+      background: #F0F0F0;
+    }
+
+    .search-icon {
+      color: #999;
+      font-size: 18px;
+      margin-right: 16px;
+      display: flex;
+      align-items: center;
     }
 
     .search-container input {
       border: none;
       outline: none;
       background: transparent;
-      font-size: 14px;
-      flex: 1;
-
+      font-size: 15px;
+      width: 100%;
+      color: #333;
+      font-family: inherit;
+      padding-right: 40px;
+      font-weight: 400;
     }
 
-    .search-icon {
-      margin-right: 10px;
-      color: #555;
+    .search-container input::placeholder {
+      color: #999;
+      font-weight: 400;
+    }
+
+    .clear-search {
+      position: absolute;
+      right: 32px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      color: #999;
+      display: none;
+      line-height: 1;
+    }
+
+    .clear-search.visible {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clear-search:hover {
+      color: #666;
     }
 
     .filter-buttons {
@@ -394,6 +451,39 @@
   color: #000;
 }
 
+/* Add pagination styles */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin: 40px 0;
+}
+
+.pagination {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.page-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.page-btn:hover {
+  background: #f5f5f5;
+}
+
+.page-btn.active {
+  background: #000;
+  color: white;
+  border-color: #000;
+}
+
   </style>
 </head>
 <body>
@@ -516,18 +606,20 @@
     <main class="search-sort">
       <div class="search-bar">
         <div class="search-container">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon">
+            <i class="fas fa-search"></i>
+          </span>
           <input
             type="text"
             id="liveSearchInput"
             placeholder="Search products..."
             autocomplete="off"
           />
+          <button type="button" id="clearSearch" class="clear-search">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
       </div>
-
-
-      
 
       
 
@@ -554,7 +646,6 @@
                     <% } %>
               </div>
             </div>
-        
                 <div class="product-info">
                   <div class="meta">Sneakers</div>
                   <div class="title"><%= product.name %></div>
@@ -565,6 +656,30 @@
           <% }) %>
         <% } %>
       </section>
+
+      <!-- Add Pagination -->
+      <div class="pagination-container" id="paginationContainer">
+        <% if (pagination && pagination.totalPages > 1) { %>
+          <div class="pagination">
+            <% if (pagination.hasPrevPage) { %>
+              <button class="page-btn" onclick="changePage('<%= pagination.currentPage - 1 %>')">Previous</button>
+            <% } %>
+            
+            <% for(let i = 1; i <= pagination.totalPages; i++) { %>
+              <button 
+                class="page-btn <%= i === pagination.currentPage ? 'active' : '' %>"
+                onclick="changePage('<%= i %>')"
+              >
+                <%= i %>
+              </button>
+            <% } %>
+            
+            <% if (pagination.hasNextPage) { %>
+              <button class="page-btn" onclick="changePage('<%= pagination.currentPage + 1 %>')">Next</button>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
     </main>
   </div>
   <footer class="footer">
@@ -679,68 +794,141 @@
 
       const searchInput = document.getElementById('liveSearchInput');
       const productGrid = document.getElementById('productGrid');
+      const paginationContainer = document.getElementById('paginationContainer');
       let searchTimeout;
+      let currentPage = 1;
+      const ITEMS_PER_PAGE = 12;
+      const clearSearchBtn = document.getElementById('clearSearch');
 
-      searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const query = this.value.trim();
-
-        // Don't reload page if query is empty or too short
-        if (query.length < 2) {
-          return;
-        }
-
-        searchTimeout = setTimeout(async () => {
+      async function performSearch(query, page = 1) {
           try {
             // Show loading state
             productGrid.innerHTML = '<div class="loading">Searching...</div>';
 
-            const response = await fetch(`/search-live?q=${encodeURIComponent(query)}`);
+          const response = await fetch(`/search?q=${encodeURIComponent(query)}&page=${page}&limit=${ITEMS_PER_PAGE}`);
             if (!response.ok) throw new Error('Search failed');
 
-            const products = await response.json();
+          const data = await response.json();
+          const { products, pagination } = data;
 
             // Clear previous results
             productGrid.innerHTML = '';
 
-            if (products.length === 0) {
+          if (!products || products.length === 0) {
               productGrid.innerHTML = '<div class="no-products">No products found</div>';
+            paginationContainer.innerHTML = '';
               return;
             }
 
             // Create and append new product cards
             products.forEach(product => {
-              const card = document.createElement('div');
+            if (!product.isBlocked) {
+              const card = document.createElement('a');
               card.className = 'product-card';
-              card.setAttribute('data-id', product.id);
+              card.href = `/products/${product._id}`;
+              card.setAttribute('data-id', product._id);
+
+              const brandName = product.brand || 'MotionHaus';
+              const price = typeof product.price === 'number' ? product.price.toFixed(2) : '0.00';
+              const imageUrl = product.images && product.images.length > 0 ? product.images[0] : '/images/placeholder.jpg';
 
               card.innerHTML = `
                 <div class="image-wrapper">
-                  <img src="${product.imageUrl}" alt="${product.name}" 
+                  <img src="${imageUrl}" alt="${product.name}" 
                        onerror="this.onerror=null; this.src='/images/placeholder.jpg'">
-                  <div class="brand-logo">${product.brand}</div>
+                  <div class="brand-logo">${brandName}</div>
                 </div>
                 <div class="product-info">
                   <div class="meta">Sneakers</div>
                   <div class="title">${product.name}</div>
-                  <div class="price">From Rs. ${product.price.toFixed(2)}</div>
+                  <div class="price">From Rs. ${price}</div>
                 </div>
               `;
 
               productGrid.appendChild(card);
+            }
             });
+
+          // Update pagination
+          if (pagination.totalPages > 1) {
+            let paginationHTML = '<div class="pagination">';
+            
+            if (pagination.hasPrevPage) {
+              paginationHTML += `<button class="page-btn" onclick="changePage(${pagination.currentPage - 1})">Previous</button>`;
+            }
+            
+            for (let i = 1; i <= pagination.totalPages; i++) {
+              paginationHTML += `
+                <button 
+                  class="page-btn ${i === pagination.currentPage ? 'active' : ''}"
+                  onclick="changePage(${i})"
+                >
+                  ${i}
+                </button>
+              `;
+            }
+            
+            if (pagination.hasNextPage) {
+              paginationHTML += `<button class="page-btn" onclick="changePage(${pagination.currentPage + 1})">Next</button>`;
+            }
+            
+            paginationHTML += '</div>';
+            paginationContainer.innerHTML = paginationHTML;
+          } else {
+            paginationContainer.innerHTML = '';
+          }
           } catch (error) {
             console.error('Search error:', error);
             productGrid.innerHTML = '<div class="error">Error searching products. Please try again.</div>';
+          paginationContainer.innerHTML = '';
           }
-        }, 300); // 300ms debounce
+      }
+
+      function changePage(page) {
+        currentPage = parseInt(page);
+        const query = searchInput.value.trim();
+        if (query.length >= 2) {
+          performSearch(query, currentPage);
+        }
+      }
+
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        // Toggle clear button visibility
+        clearSearchBtn.classList.toggle('visible', query.length > 0);
+
+        // Don't reload page if query is empty
+        if (query.length === 0) {
+          window.location.href = '/products';
+          return;
+        }
+
+        // Don't search if query is too short
+        if (query.length < 2) {
+          return;
+        }
+
+        currentPage = 1; // Reset to first page on new search
+        searchTimeout = setTimeout(() => performSearch(query, currentPage), 300);
       });
 
-      // Initialize search input with current search value
+      // Add clear button functionality
+      clearSearchBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        clearSearchBtn.classList.remove('visible');
+        window.location.href = '/products';
+      });
+
+      // Initialize clear button visibility on page load
       document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('liveSearchInput');
-        if (searchInput) {
-          searchInput.value = '<%= search %>';
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchQuery = urlParams.get('q') || '';
+        
+        if (searchQuery) {
+          searchInput.value = searchQuery;
+          clearSearchBtn.classList.add('visible');
         }
       });
 

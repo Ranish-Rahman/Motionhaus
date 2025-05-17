@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>User Profile</title>
+  <title>User Profile - MotionHaus</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
       --primary-purple: #090909f5;
@@ -23,11 +24,12 @@
       font-family: 'Inter', sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-primary);
+      padding-top: 60px; /* Add padding for fixed navbar */
     }
 
     .layout {
       display: flex;
-      min-height: 100vh;
+      min-height: calc(100vh - 60px); /* Adjust for navbar height */
     }
 
     .sidebar {
@@ -36,9 +38,9 @@
       padding: 2rem 1.5rem;
       color: var(--text-primary);
       position: fixed;
-      height: 100vh;
+      height: calc(100vh - 60px); /* Adjust for navbar height */
       left: 0;
-      top: 0;
+      top: 60px; /* Position below navbar */
       z-index: 10;
       border-right: 1px solid var(--border-color);
       backdrop-filter: blur(10px);
@@ -177,6 +179,7 @@
       align-items: center;
       gap: 1rem;
       margin-bottom: 1.5rem;
+      position: relative;
     }
 
     .profile-card-header i {
@@ -190,8 +193,31 @@
       font-weight: 600;
     }
 
+    .edit-profile-btn {
+      margin-left: auto;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-primary);
+    }
+
+    .edit-profile-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .edit-profile-btn i {
+      margin-right: 0.5rem;
+    }
+
+    #profileDisplay {
+      margin-top: 1.5rem;
+    }
+
     .profile-info {
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
     }
 
     .info-label {
@@ -355,9 +381,50 @@
     .password-input-group {
       width: 100%;
     }
+
+    /* Modal styles */
+    .modal {
+      z-index: 1050;
+    }
+    
+    .modal-content {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      position: relative;
+    }
+
+    .modal-dialog {
+      pointer-events: auto;
+    }
+
+    .otp-input {
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      font-size: 1.2rem;
+      font-weight: 500;
+      cursor: text;
+      z-index: 1060;
+    }
+
+    .otp-input:focus {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 0.2rem rgba(255, 118, 117, 0.25);
+      color: var(--text-primary);
+    }
+
+    #otpModal {
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-backdrop {
+      z-index: 1040;
+    }
   </style>
 </head>
 <body>
+  <%- include('../partials/navbar') %>
   <div class="layout">
     <!-- Include the common sidebar -->
     <%- include('../partials/user-profile-sidebar', { currentPage: 'profile' }) %>
@@ -376,7 +443,7 @@
             <div class="profile-card-header">
               <i class="bi bi-person-circle"></i>
               <h3>Profile Information</h3>
-              <button class="btn btn-outline-light ms-auto edit-profile-btn">
+              <button type="button" class="btn btn-outline-light ms-auto edit-profile-btn">
                 <i class="bi bi-pencil"></i> Edit
               </button>
             </div>
@@ -406,7 +473,18 @@
                 </div>
                 <div class="mb-3">
                   <label for="email" class="form-label">Email</label>
-                  <input type="email" class="form-control" id="email" name="email" value="<%= user.email %>" required>
+                  <input type="email" 
+                         class="form-control" 
+                         id="email" 
+                         name="email" 
+                         value="<%= user.email %>" 
+                         pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
+                         oninput="validateEmail(this)"
+                         required>
+                  <div class="invalid-feedback">
+                    Please enter a valid email address
+                  </div>
+                  <input type="hidden" id="originalEmail" value="<%= user.email %>">
                 </div>
                 <div class="mb-3">
                   <label for="phone" class="form-label">Phone</label>
@@ -415,22 +493,57 @@
                          oninput="this.value = this.value.replace(/[^0-9]/g, '');">
                 </div>
                 <div class="d-flex gap-2">
-                  <button type="submit" class="btn btn-primary">Save Changes</button>
+                  <button type="submit" class="btn btn-primary" id="saveChangesBtn">Save Changes</button>
                   <button type="button" class="btn btn-outline-light" id="cancelEdit">Cancel</button>
                 </div>
               </form>
             </div>
 
-            <div class="profile-stats">
-              <div class="stat-item">
-                <div class="stat-value">12</div>
-                <div class="stat-label">Orders</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value">3</div>
-                <div class="stat-label">Addresses</div>
+            <!-- OTP Verification Modal -->
+            <div class="modal fade" id="otpModal" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-white">
+                  <div class="modal-header border-bottom border-secondary">
+                    <h5 class="modal-title" id="otpModalLabel">Email Verification</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div id="modalAlertPlaceholder"></div>
+                    <p>We've sent a verification code to your new email address. Please enter it below to confirm the change.</p>
+                    <div class="mb-3">
+                      <label class="form-label">Verification Code</label>
+                      <div class="d-flex justify-content-between gap-2 mb-3">
+                        <input type="text" class="form-control text-center otp-input" maxlength="1" style="width: 50px;" inputmode="numeric">
+                        <input type="text" class="form-control text-center otp-input" maxlength="1" style="width: 50px;" inputmode="numeric">
+                        <input type="text" class="form-control text-center otp-input" maxlength="1" style="width: 50px;" inputmode="numeric">
+                        <input type="text" class="form-control text-center otp-input" maxlength="1" style="width: 50px;" inputmode="numeric">
+                        <input type="text" class="form-control text-center otp-input" maxlength="1" style="width: 50px;" inputmode="numeric">
+                        <input type="text" class="form-control text-center otp-input" maxlength="1" style="width: 50px;" inputmode="numeric">
+                      </div>
+                      <div class="mt-2 d-flex align-items-center justify-content-between">
+                        <span id="otpTimer" class="text-muted"></span>
+                        <button type="button" id="resendOtp" class="btn btn-link text-info" style="display: none;">Resend Code</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer border-top border-secondary">
+                    <button type="button" class="btn btn-secondary" id="cancelOtpBtn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="verifyOtpBtn">Verify</button>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="profile-stats">
+          <div class="stat-item">
+            <div class="stat-value">12</div>
+            <div class="stat-label">Orders</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">3</div>
+            <div class="stat-label">Addresses</div>
           </div>
         </div>
       </div>
@@ -440,11 +553,40 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', function() {
+    // Move validateEmail function to global scope
+    window.validateEmail = function(input) {
+      const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+      const email = input.value;
+      const saveButton = document.getElementById('saveChangesBtn');
+      
+      if (!emailRegex.test(email)) {
+        input.classList.add('is-invalid');
+        input.classList.remove('is-valid');
+        saveButton.disabled = true;
+        return false;
+      } else {
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+        saveButton.disabled = false;
+        return true;
+      }
+    };
+
     const editBtn = document.querySelector('.edit-profile-btn');
     const profileDisplay = document.getElementById('profileDisplay');
     const profileEditForm = document.getElementById('profileEditForm');
     const cancelEditBtn = document.getElementById('cancelEdit');
     const updateProfileForm = document.getElementById('updateProfileForm');
+    const otpModalElement = document.getElementById('otpModal');
+    const otpModal = new bootstrap.Modal(otpModalElement);
+    const emailInput = document.getElementById('email');
+    const originalEmail = document.getElementById('originalEmail');
+    const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+    const cancelOtpBtn = document.getElementById('cancelOtpBtn');
+    const resendOtpBtn = document.getElementById('resendOtp');
+    const otpInputs = document.querySelectorAll('.otp-input');
+    let pendingFormData = null;
+    let otpTimerId = null;
 
     // Show edit form
     editBtn.addEventListener('click', function() {
@@ -459,40 +601,349 @@
       profileEditForm.style.display = 'none';
       editBtn.style.display = 'block';
       updateProfileForm.reset();
+      
+      // Reset validation states
+      const emailInput = document.getElementById('email');
+      emailInput.classList.remove('is-invalid', 'is-valid');
+      document.getElementById('saveChangesBtn').disabled = false;
     });
+
+    // Initialize OTP input handlers
+    function resetOTPInputs() {
+      otpInputs.forEach(input => {
+        input.value = '';
+        input.disabled = false;
+      });
+      otpInputs[0].focus();
+    }
+
+    // Handle OTP input
+    otpInputs.forEach((input, index) => {
+      input.addEventListener('keydown', function(e) {
+        // Allow only numbers, backspace, delete, arrow keys
+        const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+        if (!allowedKeys.includes(e.key) && !/^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+          return;
+        }
+
+        // Handle backspace
+        if (e.key === 'Backspace') {
+          if (this.value === '') {
+            if (index > 0) {
+              otpInputs[index - 1].focus();
+              otpInputs[index - 1].value = '';
+            }
+          } else {
+            this.value = '';
+          }
+          e.preventDefault();
+        }
+      });
+
+      input.addEventListener('input', function(e) {
+        // Remove any non-numeric characters
+        this.value = this.value.replace(/[^0-9]/g, '');
+
+        // Move to next input if value is entered
+        if (this.value !== '') {
+          if (index < otpInputs.length - 1) {
+            otpInputs[index + 1].focus();
+          }
+        }
+      });
+
+      // Handle paste event
+      input.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+        
+        if (pastedData) {
+          const digits = pastedData.split('').slice(0, otpInputs.length);
+          digits.forEach((digit, i) => {
+            if (otpInputs[i]) {
+              otpInputs[i].value = digit;
+            }
+          });
+          
+          // Focus the next empty input or the last one
+          const nextEmptyIndex = digits.length < otpInputs.length ? digits.length : otpInputs.length - 1;
+          otpInputs[nextEmptyIndex].focus();
+        }
+      });
+    });
+
+    // Reset OTP inputs when modal is shown
+    otpModalElement.addEventListener('shown.bs.modal', function () {
+      resetOTPInputs();
+    });
+
+    // Reset OTP inputs when modal is hidden
+    otpModalElement.addEventListener('hidden.bs.modal', function () {
+      resetOTPInputs();
+    });
+
+    function startOtpTimer(duration) {
+      const timerDisplay = document.getElementById('otpTimer');
+      const resendBtn = document.getElementById('resendOtp');
+      let timeLeft = duration;
+
+      clearInterval(otpTimerId);
+      resendBtn.style.display = 'none';
+      
+      otpTimerId = setInterval(() => {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerDisplay.textContent = `Resend code in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (--timeLeft < 0) {
+          clearInterval(otpTimerId);
+          timerDisplay.textContent = '';
+          resendBtn.style.display = 'inline-block';
+        }
+      }, 1000);
+    }
+
+    // Function to handle OTP verification
+    async function handleVerifyOTP() {
+      const verifyBtn = document.getElementById('verifyOtpBtn');
+      try {
+        const otp = Array.from(otpInputs).map(input => input.value).join('');
+        
+        if (otp.length !== 6) {
+          showAlert('danger', 'Please enter the complete 6-digit code');
+          return;
+        }
+
+        verifyBtn.disabled = true;
+        verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
+
+        const response = await fetch('/profile/verify-otp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            otp,
+            email: emailInput.value
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          showAlert('success', 'Email verified successfully!');
+          setTimeout(() => {
+            otpModal.hide();
+            submitProfileUpdate(pendingFormData);
+          }, 1500);
+        } else {
+          throw new Error(data.message || 'Verification failed');
+        }
+      } catch (error) {
+        console.error('OTP verification failed:', error);
+        showAlert('danger', error.message || 'Invalid verification code. Please try again.');
+        resetOTPInputs();
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify';
+      }
+    }
+
+    // Function to handle OTP resend
+    async function handleResendOTP() {
+      const resendBtn = document.getElementById('resendOtp');
+      try {
+        resendBtn.disabled = true;
+        const response = await fetch('/profile/send-otp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            email: emailInput.value
+          })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          showAlert('success', 'New verification code sent!');
+          startOtpTimer(180);
+          resetOTPInputs();
+        } else {
+          throw new Error(data.message || 'Failed to send verification code');
+        }
+      } catch (error) {
+        console.error('Failed to resend OTP:', error);
+        showAlert('danger', error.message || 'Failed to send verification code');
+      } finally {
+        resendBtn.disabled = false;
+      }
+    }
+
+    // Add click event listeners
+    if (verifyOtpBtn) {
+      verifyOtpBtn.addEventListener('click', handleVerifyOTP);
+    }
+
+    if (cancelOtpBtn) {
+      cancelOtpBtn.addEventListener('click', () => {
+        otpModal.hide();
+        resetOTPInputs();
+      });
+    }
+
+    if (resendOtpBtn) {
+      resendOtpBtn.addEventListener('click', handleResendOTP);
+    }
+
+    // Add keyboard event listener for Enter key
+    otpModalElement.addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        handleVerifyOTP();
+      }
+    });
+
+    function showAlert(type, message, container = 'modalAlertPlaceholder') {
+      const alertPlaceholder = document.getElementById(container);
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type} alert-dismissible fade show`;
+      alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      `;
+      alertPlaceholder.innerHTML = '';
+      alertPlaceholder.appendChild(alert);
+      setTimeout(() => alert.remove(), 3000);
+    }
 
     // Handle form submission
     updateProfileForm.addEventListener('submit', async function(e) {
       e.preventDefault();
 
+      const formData = Object.fromEntries(new FormData(this));
+      
+      // Validate email format
+      if (!validateEmail(emailInput)) {
+        showAlert('danger', 'Please enter a valid email address');
+        return;
+      }
+
+      // Check if email has been changed
+      if (formData.email !== originalEmail.value) {
+        try {
+          console.log('Email change detected. Sending OTP...');
+          // Send OTP to new email
+          const response = await fetch('/profile/send-otp', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email: formData.email
+            })
+          });
+
+          const data = await response.json();
+          console.log('Send OTP response:', data);
+
+          if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Failed to send verification code');
+          }
+
+          // Store form data and show OTP modal
+          pendingFormData = formData;
+          otpModal.show();
+          startOtpTimer(180); // Start 3-minute timer
+          
+          // Reset OTP inputs
+          resetOTPInputs();
+          
+          showAlert('success', 'Verification code sent to your new email address', 'modalAlertPlaceholder');
+        } catch (error) {
+          console.error('Failed to send OTP:', error);
+          showAlert('danger', error.message || 'Failed to send verification code. Please try again.');
+        }
+      } else {
+        // If email hasn't changed, proceed with update
+        submitProfileUpdate(formData);
+      }
+    });
+
+    // Handle OTP verification
+    verifyOtpBtn.addEventListener('click', async function() {
       try {
-        const formData = new FormData(this);
-        const jsonData = {};
-        formData.forEach((value, key) => {
-          jsonData[key] = value;
+        const otp = Array.from(otpInputs)
+          .map(input => input.value)
+          .join('');
+        
+        console.log('Verifying OTP:', { otp, email: pendingFormData.email });
+        
+        if (otp.length !== 6) {
+          throw new Error('Please enter the complete 6-digit code');
+        }
+        
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
+
+        const response = await fetch('/profile/verify-otp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            otp,
+            email: pendingFormData.email
+          })
         });
 
+        const data = await response.json();
+        console.log('OTP verification response:', data);
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Verification failed');
+        }
+
+        showAlert('success', 'Email verified successfully!', 'modalAlertPlaceholder');
+
+        // Wait a moment before proceeding with the update
+        setTimeout(() => {
+          otpModal.hide();
+          submitProfileUpdate(pendingFormData);
+        }, 1500);
+
+      } catch (error) {
+        console.error('OTP verification failed:', error);
+        showAlert('danger', error.message || 'Invalid verification code. Please try again.', 'modalAlertPlaceholder');
+        resetOTPInputs();
+      } finally {
+        this.disabled = false;
+        this.innerHTML = 'Verify';
+      }
+    });
+
+    async function submitProfileUpdate(formData) {
+      try {
+        console.log('Submitting profile update:', formData);
         const response = await fetch('/profile/update', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
-          body: JSON.stringify(jsonData),
+          body: JSON.stringify(formData),
           credentials: 'same-origin'
         });
 
-        if (!response.ok) {
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to update profile');
-          } else {
-            throw new Error('Server error occurred. Please try again.');
-          }
-        }
-
         const data = await response.json();
+        console.log('Profile update response:', data);
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to update profile');
+        }
         
         // Show success message
         const successAlert = document.createElement('div');
@@ -500,48 +951,35 @@
         successAlert.textContent = data.message || 'Profile updated successfully!';
         updateProfileForm.insertAdjacentElement('beforebegin', successAlert);
 
-        // Update the displayed profile information using specific selectors
-        const usernameDisplay = document.querySelector('#profileDisplay .username-value');
-        const emailDisplay = document.querySelector('#profileDisplay .email-value');
-        const phoneDisplay = document.querySelector('#profileDisplay .phone-value');
+        // Update displayed information
+        document.querySelector('.username-value').textContent = formData.username;
+        document.querySelector('.email-value').textContent = formData.email;
+        document.querySelector('.phone-value').textContent = formData.phone || 'Not provided';
+        document.querySelector('.content-header h1').textContent = `Welcome Back, ${formData.username}`;
 
-        if (usernameDisplay) usernameDisplay.textContent = jsonData.username;
-        if (emailDisplay) emailDisplay.textContent = jsonData.email;
-        if (phoneDisplay) phoneDisplay.textContent = jsonData.phone || 'Not provided';
+        // Update the original email value to match the new one
+        document.getElementById('originalEmail').value = formData.email;
 
-        // Update the header username if it exists
-        const headerUsername = document.querySelector('.content-header h1');
-        if (headerUsername) {
-          headerUsername.textContent = `Welcome Back, ${jsonData.username}`;
-        }
-
-        // Hide the form and show the display view
+        // Reset form and show profile display
         profileDisplay.style.display = 'block';
         profileEditForm.style.display = 'none';
         editBtn.style.display = 'block';
 
-        // Remove any existing error messages
-        const existingErrors = updateProfileForm.querySelectorAll('.alert-danger');
-        existingErrors.forEach(error => error.remove());
-
         // Remove success message after delay
-        setTimeout(() => {
-          successAlert.remove();
-        }, 3000);
+        setTimeout(() => successAlert.remove(), 3000);
 
+        // Reload the page to ensure all data is fresh
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } catch (error) {
         console.error('Update failed:', error);
-        // Remove any existing error messages
-        const existingErrors = updateProfileForm.querySelectorAll('.alert-danger');
-        existingErrors.forEach(error => error.remove());
-        
-        // Show error message
         const errorAlert = document.createElement('div');
         errorAlert.className = 'alert alert-danger';
         errorAlert.textContent = error.message || 'Failed to update profile. Please try again.';
         updateProfileForm.insertAdjacentElement('beforebegin', errorAlert);
       }
-    });
+    }
   });
   </script>
 </body>
