@@ -630,6 +630,7 @@
                   <option value="CA">Canada</option>
                   <option value="UK">United Kingdom</option>
                   <option value="AU">Australia</option>
+                   <option value="IND">India</option>
                 </select>
                 <div class="invalid-feedback">Please select a country</div>
               </div>
@@ -673,7 +674,7 @@
               <span>Cash on Delivery</span>
               <small style="display: block; color: #2ecc71; margin-top: 4px;">Available</small>
             </label>
-            <label style="opacity: 0.5; cursor: not-allowed;">
+            <!-- <label style="opacity: 0.5; cursor: not-allowed;">
               <input type="radio" name="paymentMethod" value="card" disabled>
               <span>Credit/Debit Card</span>
               <small style="display: block; color: #e74c3c; margin-top: 4px;">Currently Unavailable</small>
@@ -682,7 +683,7 @@
               <input type="radio" name="paymentMethod" value="paypal" disabled>
               <span>PayPal</span>
               <small style="display: block; color: #e74c3c; margin-top: 4px;">Currently Unavailable</small>
-            </label>
+            </label> -->
         </div>
           <input type="hidden" name="addressId" id="selectedAddressId">
           <% if (cart && cart.items && cart.items.length > 0) { %>

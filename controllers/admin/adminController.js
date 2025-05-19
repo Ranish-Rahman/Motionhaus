@@ -525,11 +525,27 @@ export const getOrders = async (req, res) => {
     // Build query
     let query = {};
     if (search) {
-      query.$or = [
-        { _id: { $regex: search, $options: 'i' } },
-        { 'user.name': { $regex: search, $options: 'i' } },
-        { 'user.email': { $regex: search, $options: 'i' } }
-      ];
+      // First try to match the exact order ID
+      try {
+        const exactMatch = await Order.findById(search);
+        if (exactMatch) {
+          query = { _id: search };
+        } else {
+          // If no exact match, use regex search on other fields
+          query.$or = [
+            { 'user.name': { $regex: new RegExp(search, 'i') } },
+            { 'user.email': { $regex: new RegExp(search, 'i') } },
+            { 'items.product.name': { $regex: new RegExp(search, 'i') } }
+          ];
+        }
+      } catch (err) {
+        // If ID search fails, use regex search
+        query.$or = [
+          { 'user.name': { $regex: new RegExp(search, 'i') } },
+          { 'user.email': { $regex: new RegExp(search, 'i') } },
+          { 'items.product.name': { $regex: new RegExp(search, 'i') } }
+        ];
+      }
     }
     if (status) {
       query.status = status;
@@ -623,7 +639,7 @@ export const getOrderDetails = async (req, res) => {
     const orderId = req.params.id;
     const order = await Order.findById(orderId)
       .populate('user', 'name email phone')
-      .populate('address')
+      .populate('shippingAddress')
       .populate('items.product', 'name price')
       .select('+returnRequest');
 
@@ -929,5 +945,211 @@ export const processReturnRequest = async (req, res) => {
   } catch (error) {
     console.error('Error processing return request:', error);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Process individual item return
+export const processItemReturn = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { returnAmount, refundMethod, adminResponse } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Find the specific item in the order
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
+    }
+
+    // Validate return amount
+    const itemTotal = item.price * item.quantity;
+    if (returnAmount > itemTotal) {
+      return res.status(400).json({
+        success: false,
+        message: 'Return amount cannot exceed item total'
+      });
+    }
+
+    // Create return request for the item
+    item.returnRequest = {
+      status: 'pending',
+      amount: returnAmount,
+      refundMethod,
+      adminResponse,
+      requestedAt: new Date()
+    };
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Return request created successfully',
+      returnRequest: item.returnRequest
+    });
+  } catch (error) {
+    console.error('Process item return error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process item return'
+    });
+  }
+};
+
+// Approve individual item return
+export const approveItemReturn = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Find the specific item in the order
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
+    }
+
+    if (!item.returnRequest || item.returnRequest.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'No pending return request found for this item'
+      });
+    }
+
+    // Update return request status
+    item.returnRequest.status = 'approved';
+    item.returnRequest.processedAt = new Date();
+
+    // Process refund based on method
+    if (item.returnRequest.refundMethod === 'wallet') {
+      const user = await User.findById(order.user);
+      if (user) {
+        user.wallet = (user.wallet || 0) + item.returnRequest.amount;
+        await user.save();
+      }
+    }
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Return request approved successfully',
+      returnRequest: item.returnRequest
+    });
+  } catch (error) {
+    console.error('Approve item return error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve item return'
+    });
+  }
+};
+
+// Deny individual item return
+export const denyItemReturn = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { reason } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Find the specific item in the order
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
+    }
+
+    if (!item.returnRequest || item.returnRequest.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'No pending return request found for this item'
+      });
+    }
+
+    // Update return request status
+    item.returnRequest.status = 'denied';
+    item.returnRequest.adminResponse = reason;
+    item.returnRequest.processedAt = new Date();
+
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Return request denied successfully',
+      returnRequest: item.returnRequest
+    });
+  } catch (error) {
+    console.error('Deny item return error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to deny item return'
+    });
+  }
+};
+
+// Update status of an individual order item
+export const updateOrderItemStatus = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { status } = req.body;
+
+    // Log the request body for debugging
+    console.log('Request body:', req.body);
+
+    // Validate status field
+    const allowedStatuses = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned'];
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status provided' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Order item not found' });
+    }
+
+    // Prevent status change if item is already cancelled
+    if (item.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot change status of a cancelled item' });
+    }
+
+    item.status = status;
+    await order.save();
+
+    res.json({ success: true, message: 'Item status updated', item });
+  } catch (error) {
+    console.error('Update item status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update item status' });
   }
 };

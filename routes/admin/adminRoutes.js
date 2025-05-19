@@ -17,7 +17,11 @@ import {
   processReturn,
   processReturnRequest,
   getReturnRequests,
-  updateReturnRequest
+  updateReturnRequest,
+  processItemReturn,
+  approveItemReturn,
+  denyItemReturn,
+  updateOrderItemStatus
 } from '../../controllers/admin/adminController.js';
 import { 
   getAddProduct, 
@@ -107,6 +111,12 @@ router.delete('/users/:userId', isAdmin, deleteUser);
 router.get('/orders/:id', isAdmin, getOrderDetails);
 router.post('/orders/:id/status', isAdmin, updateOrderStatus);
 router.post('/orders/:id/return', isAdmin, processReturn);
+
+// Item return request routes
+router.post('/orders/:orderId/items/:itemId/return', isAdmin, processItemReturn);
+router.post('/orders/:orderId/items/:itemId/return/approve', isAdmin, approveItemReturn);
+router.post('/orders/:orderId/items/:itemId/return/deny', isAdmin, denyItemReturn);
+router.post('/orders/:orderId/items/:itemId/status', isAdmin, updateOrderItemStatus);
 
 // Return request routes
 router.get('/return-requests', isAdmin, getReturnRequests);

@@ -978,7 +978,8 @@ const getOrderDetails = async (req, res) => {
 
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
-      .populate('items.product', 'name price images');
+      .populate('items.product', 'name price images')
+      .select('+shippingAddress +returnRequest');  // Explicitly select shippingAddress and returnRequest
 
     if (!order) {
       req.flash('error', 'Order not found');
@@ -1184,6 +1185,12 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Your cart is empty' });
     }
 
+    // Get the selected address
+    const selectedAddress = await Address.findById(addressId);
+    if (!selectedAddress) {
+      return res.status(400).json({ message: 'Selected address not found' });
+    }
+
     // Check for blocked products and remove them
     const blockedProducts = [];
     const validItems = [];
@@ -1219,7 +1226,14 @@ const createOrder = async (req, res) => {
     const order = new Order({
       orderID,
       user: userId,
-      address: addressId,
+      shippingAddress: {
+        fullName: selectedAddress.fullName,
+        address: selectedAddress.addressLine1 + (selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''),
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        postalCode: selectedAddress.zipCode,
+        phone: selectedAddress.phone
+      },
       items: cart.items.map(item => ({
         product: item.product._id,
         quantity: item.quantity,
@@ -1229,7 +1243,7 @@ const createOrder = async (req, res) => {
       totalAmount: cart.subtotal,
       paymentMethod: 'cod', // Force COD as payment method
       status: 'Pending',
-      paymentStatus: 'Pending' // For COD, payment status is always pending until delivery
+      paymentStatus: 'pending' // Changed to lowercase to match enum
     });
 
     await order.save();

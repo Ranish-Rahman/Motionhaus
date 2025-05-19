@@ -122,3 +122,143 @@ export const denyReturnRequest = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Error processing denial of return request' });
   }
 };
+
+// Cancel individual item
+export const cancelOrderItem = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide a reason for cancellation' 
+      });
+    }
+    
+    const order = await Order.findById(orderId).populate('items.product');
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Find the specific item
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found in order' });
+    }
+
+    // Check if item is already cancelled
+    if (item.status === 'Cancelled') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Item is already cancelled' 
+      });
+    }
+
+    // Check if order can be cancelled
+    const allowedStatuses = ['Pending', 'Confirmed', 'Processing', 'Partially Cancelled'];
+    if (!allowedStatuses.includes(order.status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Items cannot be cancelled in the current order state (${order.status})` 
+      });
+    }
+
+    // Update item status
+    item.status = 'Cancelled';
+    item.cancelReason = reason;
+
+    // Increment stock for the product
+    if (item.product) {
+      item.product.stock += item.quantity;
+      await item.product.save();
+    }
+
+    // Check if all items are cancelled
+    const allItemsCancelled = order.items.every(item => item.status === 'Cancelled');
+    if (allItemsCancelled) {
+      order.status = 'Cancelled';
+    } else {
+      order.status = 'Partially Cancelled';
+    }
+
+    // Save the updated order
+    await order.save();
+
+    return res.json({ 
+      success: true, 
+      message: 'Item cancelled successfully',
+      order: {
+        status: order.status,
+        items: order.items
+      }
+    });
+  } catch (error) {
+    console.error('Error cancelling item:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to cancel item',
+      error: error.message 
+    });
+  }
+};
+
+// Request return for individual item
+export const requestItemReturn = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ success: false, message: 'Please provide a reason for return' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Find the specific item
+    const item = order.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found in order' });
+    }
+
+    // Check if item is delivered
+    if (item.status !== 'Delivered') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Return can only be requested for delivered items' 
+      });
+    }
+
+    // Check if item already has a return request
+    if (item.returnRequest && item.returnRequest.status) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Return request already exists for this item' 
+      });
+    }
+
+    // Create a new return request for the item
+    item.returnRequest = {
+      status: 'pending',
+      reason,
+      requestedAt: new Date()
+    };
+
+    // Save the updated order
+    await order.save();
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Return request submitted successfully' 
+    });
+  } catch (error) {
+    console.error('Error requesting item return:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error processing return request' 
+    });
+  }
+};

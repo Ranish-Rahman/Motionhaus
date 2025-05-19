@@ -15,36 +15,86 @@ const orderSchema = new mongoose.Schema({
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
+      required: true
     },
-    quantity: Number,
-    price: Number,
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1
+    },
+    price: {
+      type: Number,
+      required: true
+    },
+    size: String,
     status: {
       type: String,
-      enum: ['Ordered', 'Cancelled', 'Returned'],
-      default: 'Ordered',
+      enum: ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Returned'],
+      default: 'Pending'
+    },
+    returnRequest: {
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'denied'],
+        default: null
+      },
+      reason: String,
+      amount: Number,
+      refundMethod: String,
+      adminResponse: String,
+      requestedAt: Date,
+      processedAt: Date
     }
   }],
-  totalAmount: Number,
+  totalAmount: {
+    type: Number,
+    required: true
+  },
   status: {
     type: String,
-    enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled', 'Returned'],
-    default: 'Pending',
+    enum: ['Pending', 'Partially Cancelled', 'Shipped', 'Delivered', 'Cancelled', 'Completed'],
+    default: 'Pending'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'pending'
   },
   cancellationReason: String,
   returnReason: String,
   shippingAddress: {
-    fullName: String,
-    address: String,
-    city: String,
-    state: String,
-    postalCode: String,
-    phone: String
+    fullName: {
+      type: String,
+      required: true
+    },
+    address: {
+      type: String,
+      required: true
+    },
+    city: {
+      type: String,
+      required: true
+    },
+    state: {
+      type: String,
+      required: true
+    },
+    postalCode: {
+      type: String,
+      required: true
+    },
+    phone: {
+      type: String,
+      required: true
+    }
   },
   paymentMethod: String,
   orderDate: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
+  cancelledAt: Date,
+  cancelReason: String,
   returnRequest: {
     status: {
       type: String,
@@ -65,6 +115,38 @@ const orderSchema = new mongoose.Schema({
 
 // Add index for return requests
 orderSchema.index({ 'returnRequest.status': 1 });
+
+// Method to update overall order status based on item statuses
+orderSchema.methods.updateOrderStatus = function() {
+  const itemStatuses = this.items.map(item => item.status);
+  
+  // Check if all items are cancelled
+  if (itemStatuses.every(status => status === 'Cancelled')) {
+    this.status = 'Cancelled';
+  }
+  // Check if some items are cancelled
+  else if (itemStatuses.some(status => status === 'Cancelled')) {
+    this.status = 'Partially Cancelled';
+  }
+  // Check if all items are shipped
+  else if (itemStatuses.every(status => status === 'Shipped')) {
+    this.status = 'Shipped';
+  }
+  // Check if all items are delivered
+  else if (itemStatuses.every(status => status === 'Delivered')) {
+    this.status = 'Completed';
+  }
+  // Default to Pending if no other conditions are met
+  else {
+    this.status = 'Pending';
+  }
+};
+
+// Pre-save middleware to update order status
+orderSchema.pre('save', function(next) {
+  this.updateOrderStatus();
+  next();
+});
 
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

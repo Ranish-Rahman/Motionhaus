@@ -65,7 +65,6 @@ app.set('views', './views');
 // Static files
 app.use(express.static('public'));
 
-// Route mounting order is important
 // 1. Auth routes (login, signup) - no session required
 app.use('/', authRoutes);
 

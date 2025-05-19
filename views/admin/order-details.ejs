@@ -1,0 +1,33 @@
+<td>
+  <div class="d-flex gap-2">
+    <select class="form-select form-select-sm item-status-select" 
+            data-order-id="<%= order._id %>" 
+            data-item-id="<%= item._id %>">
+      <option value="Pending" <%= item.status === 'Pending' ? 'selected' : '' %>>Pending</option>
+      <option value="Confirmed" <%= item.status === 'Confirmed' ? 'selected' : '' %>>Confirmed</option>
+      <option value="Processing" <%= item.status === 'Processing' ? 'selected' : '' %>>Processing</option>
+      <option value="Shipped" <%= item.status === 'Shipped' ? 'selected' : '' %>>Shipped</option>
+      <option value="Delivered" <%= item.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
+      <option value="Cancelled" <%= item.status === 'Cancelled' ? 'selected' : '' %>>Cancelled</option>
+      <option value="Returned" <%= item.status === 'Returned' ? 'selected' : '' %>>Returned</option>
+    </select>
+    <% if (item.status === 'Pending') { %>
+      <button class="btn btn-sm btn-danger cancel-item" 
+              data-order-id="<%= order._id %>" 
+              data-item-id="<%= item._id %>">
+        <i class="bi bi-x-circle"></i> Cancel
+      </button>
+    <% } %>
+    <% if (item.status === 'Delivered' && (!item.returnRequest || (item.returnRequest.status !== 'pending' && item.returnRequest.status !== 'approved'))) { %>
+      <button class="btn btn-sm btn-warning request-return" 
+              data-order-id="<%= order._id %>" 
+              data-item-id="<%= item._id %>">
+        <i class="bi bi-arrow-return-left"></i> Return
+      </button>
+    <% } else if (item.returnRequest && item.returnRequest.status === 'pending') { %>
+      <span class="badge bg-warning">Return Requested</span>
+    <% } else if (item.returnRequest && item.returnRequest.status === 'approved') { %>
+      <span class="badge bg-success">Return Approved</span>
+    <% } %>
+  </div>
+</td> 

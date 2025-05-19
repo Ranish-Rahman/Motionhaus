@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Add SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
         body { 
             background: #f8f9fa;
@@ -82,75 +84,60 @@
             </div>
         <% } else { %>
             <div class="table-responsive">
-                <table class="table">
+                <table class="table table-hover">
                     <thead>
                         <tr>
                             <th>Order ID</th>
                             <th>Date</th>
-                            <th>Status</th>
                             <th>Items</th>
                             <th>Total</th>
-                            <th>Action</th>
+                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <% orders.forEach(function(order) { 
-                            const orderId = order.orderID || 'N/A';
-                            const dateObj = order.orderDate ? new Date(order.orderDate) : null;
-                            const day = dateObj ? String(dateObj.getDate()).padStart(2, '0') : '??';
-                            const month = dateObj ? dateObj.toLocaleString('default', { month: 'short' }) : '???';
-                            const year = dateObj ? dateObj.getFullYear() : '????';
-                            const formattedDate = dateObj ? day + ' ' + month + ' ' + year : 'N/A';
-                            const status = order.status || 'N/A';
-                            let statusClass = 'status-badge';
-                            let displayStatus = status;
-
-                            if (order.returnRequest && order.returnRequest.status) {
-                                if (order.returnRequest.status.toLowerCase() === 'approved') {
-                                displayStatus = 'Return Request Approved';
-                                statusClass += ' status-return-approved';
-                                } else if (order.returnRequest.status.toLowerCase() === 'denied') {
-                                    displayStatus = 'Return Request Denied';
-                                    statusClass += ' status-cancelled';
-                                }
-                            } else if (status === 'Pending') statusClass += ' status-pending';
-                            else if (status === 'Processing') statusClass += ' status-processing';
-                            else if (status === 'Shipped') statusClass += ' status-shipped';
-                            else if (status === 'Delivered') statusClass += ' status-delivered';
-                            else if (status === 'Cancelled') statusClass += ' status-cancelled';
-                            else if (status === 'Returned') statusClass += ' status-return-approved';
-                        %>
-                        <tr>
-                            <td>#<%= orderId %></td>
-                            <td><%= formattedDate %></td>
-                            <td><span class="<%= statusClass %>"><%= displayStatus %></span></td>
-                            <td><%= order.items && order.items.length ? order.items.length : 0 %> items</td>
-                            <td>₹<%= (order.totalAmount || 0).toFixed(2) %></td>
+                        <% orders.forEach(order => { %>
+                            <tr>
+                                <td>#<%= order._id.toString().slice(-6) %></td>
+                                <td><%= new Date(order.orderDate).toLocaleDateString() %></td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <% order.items.forEach(item => { %>
+                                            <div class="d-flex align-items-center mb-1">
+                                                <img src="<%= item.product.images[0] %>" alt="<%= item.product.name %>" 
+                                                     class="img-thumbnail me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                                <div>
+                                                    <div class="small"><%= item.product.name %></div>
+                                                    <div class="small text-muted">
+                                                        Status: 
+                                                        <span class="badge bg-<%= item.status === 'Pending' ? 'warning' : 
+                                                                            item.status === 'Shipped' ? 'info' : 
+                                                                            item.status === 'Delivered' ? 'success' : 
+                                                                            'danger' %>">
+                                                            <%= item.status %>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <% }); %>
+                                    </div>
+                                </td>
+                                <td>₹<%= order.totalAmount.toFixed(2) %></td>
                             <td>
-                                <a href="/profile/orders/<%= order._id %>" class="btn-view">
-                                  <i class="bi bi-eye"></i> View
-                                </a>
-                              
-                                <% if (['Pending', 'Confirmed', 'Processing'].includes(order.status)) { %>
-                                    <button class="btn btn-danger btn-sm ms-2 cancel-order" data-order-id="<%= order._id %>">
-                                      <i class="bi bi-x-circle"></i> Cancel
-                                    </button>
-                                <% } else if (order.status === 'Delivered') { %>
-                                  <% if (!order.returnRequest || !order.returnRequest.status) { %>
-                                    <button class="btn btn-danger btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#returnRequestModal" data-order-id="<%= order._id %>">
-                                      <i class="bi bi-arrow-return-left"></i> Return
-                                    </button>
-                                  <% } else if (order.returnRequest.status.toLowerCase() === 'pending') { %>
-                                    <span class="text-warning ms-2">Return Request Pending</span>
-                                  <% } else if (order.returnRequest.status.toLowerCase() === 'approved') { %>
-                                    <span class="text-success ms-2">Return Request Approved</span>
-                                  <% } else if (order.returnRequest.status.toLowerCase() === 'denied') { %>
-                                    <span class="text-danger ms-2">Return Request Denied</span>
-                                  <% } %>
-                                <% } %>
+                                    <span class="badge bg-<%= order.status === 'Pending' ? 'warning' : 
+                                                                    order.status === 'Shipped' ? 'info' : 
+                                                                    order.status === 'Delivered' ? 'success' : 
+                                                                    order.status === 'Cancelled' ? 'danger' : 
+                                                                    order.status === 'Partially Cancelled' ? 'warning' : 
+                                                                    'secondary' %>">
+                                        <%= order.status %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="/profile/orders/<%= order._id %>" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
                               </td>
-                              
-                              
                         </tr>
                         <% }); %>
                     </tbody>
@@ -185,6 +172,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Add SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         // Handle return request modal
         const returnRequestModal = document.getElementById('returnRequestModal');
@@ -201,27 +190,60 @@
             button.addEventListener('click', async () => {
                 const orderId = button.getAttribute('data-order-id');
                 
-                if (!confirm('Are you sure you want to cancel this order?')) {
-                    return;
-                }
+                // Show SweetAlert2 confirmation dialog
+                const result = await Swal.fire({
+                    title: 'Cancel Order',
+                    text: 'Are you sure you want to cancel this order?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Yes, cancel it!',
+                    cancelButtonText: 'No, keep it',
+                    reverseButtons: true
+                });
 
-                try {
-                    const response = await fetch(`/order/${orderId}/cancel`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
+                if (result.isConfirmed) {
+                    try {
+                        // Show loading state
+                        Swal.fire({
+                            title: 'Cancelling Order...',
+                            html: 'Please wait...',
+                            allowOutsideClick: false,
+                            didOpen: () => {
+                                Swal.showLoading();
+                            }
+                        });
+
+                        const response = await fetch(`/order/${orderId}/cancel`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            await Swal.fire({
+                                title: 'Cancelled!',
+                                text: 'Your order has been cancelled.',
+                                icon: 'success',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                            location.reload();
+                        } else {
+                            throw new Error(data.message || 'Failed to cancel order');
                         }
-                    });
-
-                    const data = await response.json();
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert(data.message || 'Failed to cancel order');
+                    } catch (error) {
+                        console.error('Error:', error);
+                        Swal.fire({
+                            title: 'Error!',
+                            text: error.message || 'Failed to cancel order',
+                            icon: 'error',
+                            confirmButtonColor: '#dc3545'
+                        });
                     }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Failed to cancel order');
                 }
             });
         });
@@ -232,11 +254,26 @@
             const reason = document.getElementById('returnReason').value;
 
             if (!reason) {
-                alert('Please provide a reason for return');
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Please provide a reason for return',
+                    icon: 'error',
+                    confirmButtonColor: '#dc3545'
+                });
                 return;
             }
 
             try {
+                // Show loading state
+                Swal.fire({
+                    title: 'Submitting Return Request...',
+                    html: 'Please wait...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
                 const response = await fetch(`/order/${orderId}/return`, {
                     method: 'POST',
                     headers: {
@@ -247,13 +284,25 @@
 
                 const data = await response.json();
                 if (data.success) {
+                    await Swal.fire({
+                        title: 'Success!',
+                        text: 'Return request submitted successfully',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
                     location.reload();
                 } else {
-                    alert(data.message || 'Failed to submit return request');
+                    throw new Error(data.message || 'Failed to submit return request');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to submit return request');
+                Swal.fire({
+                    title: 'Error!',
+                    text: error.message || 'Failed to submit return request',
+                    icon: 'error',
+                    confirmButtonColor: '#dc3545'
+                });
             }
         });
     </script>

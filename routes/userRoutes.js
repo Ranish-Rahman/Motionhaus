@@ -31,7 +31,12 @@ import {
   sendProfileOTP,
   verifyProfileOTP
 } from '../controllers/user/userController.js';
-import { requestReturn, placeOrder } from '../controllers/user/orderController.js';
+import { 
+  requestReturn, 
+  placeOrder, 
+  cancelOrderItem, 
+  requestItemReturn 
+} from '../controllers/user/orderController.js';
 import { listProducts, getProductDetails } from '../controllers/user/productController.js';
 import { addToCart, updateCartItem, removeFromCart } from '../controllers/user/cartController.js';
 import { sessionCheck } from '../middleware/sessionMiddleware.js';
@@ -50,9 +55,13 @@ router.post('/login', postLogin);
 router.post('/forgot-password', postForgotPassword);
 router.post('/reset-password', resetPassword);
 
-// Root route - redirect to home
+// Landing page routes
 router.get('/', (req, res) => {
-  res.redirect('/home');
+  res.render('user/landing');
+});
+
+router.get('/user/landing', (req, res) => {
+  res.render('user/landing');
 });
 
 // Apply session check to protected routes
@@ -82,6 +91,10 @@ router.get('/profile/orders/:id', getOrderDetails);
 router.post('/order/create', createOrder);
 router.post('/order/:orderId/cancel', cancelOrder);
 
+// Add new routes for individual item operations
+router.post('/order/:orderId/item/:itemId/cancel', cancelOrderItem);
+router.post('/order/:orderId/item/:itemId/return', requestItemReturn);
+
 // Product-related routes
 router.get('/products', listProducts);
 router.get('/products/:id', getProductDetails);
@@ -97,7 +110,7 @@ router.post('/profile/change-password', postChangePassword);
 // Return request route
 router.post('/order/:orderId/return', (req, res, next) => {
   console.log('Return request route hit:', req.body);
-  requestReturn(req, res, next);  // Ensure requestReturn handles order status checks internally
+  requestReturn(req, res, next);
 });
 
 // Test route for debugging (can be removed in production)
