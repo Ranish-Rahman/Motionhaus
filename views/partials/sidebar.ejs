@@ -107,6 +107,22 @@
   .btn-docs:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+
+  .btn-logout {
+    width: 100%;
+    background: #ff5252;
+    color: white;
+    padding: 10px 0;
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: background 0.2s;
+  }
+
+  .btn-logout:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
 </style>
 
 <aside class="sidebar">
@@ -124,9 +140,8 @@
   </nav>
 
   <div class="sidebar-footer">
-    <div class="help-card">
-      <p>Need help?<br/><span>Check our docs</span></p>
-      <a href="#" class="btn-docs">DOCUMENTATION</a>
-    </div>
+    <form action="/admin/logout" method="POST" style="margin:0;">
+      <button type="submit" class="btn-logout" style="width:100%;background:#ff5252;color:white;padding:10px 0;border:none;border-radius:6px;font-weight:700;font-size:1rem;transition:background 0.2s;">Logout</button>
+    </form>
   </div>
 </aside>

@@ -24,18 +24,19 @@ import {
   getChangePassword,
   postChangePassword,
   getCheckout,
-  createOrder,
   cancelOrder,
   getHome,
   updateProfile,
   sendProfileOTP,
-  verifyProfileOTP
+  verifyProfileOTP,
+  generateInvoice
 } from '../controllers/user/userController.js';
 import { 
   requestReturn, 
   placeOrder, 
   cancelOrderItem, 
-  requestItemReturn 
+  requestItemReturn,
+  approveItemReturn 
 } from '../controllers/user/orderController.js';
 import { listProducts, getProductDetails } from '../controllers/user/productController.js';
 import { addToCart, updateCartItem, removeFromCart } from '../controllers/user/cartController.js';
@@ -88,12 +89,16 @@ router.post('/profile/address/set-default/:id', setDefaultAddress);
 // Order-related routes
 router.get('/orders', getOrders);
 router.get('/profile/orders/:id', getOrderDetails);
-router.post('/order/create', createOrder);
+router.post('/order/create', placeOrder);
 router.post('/order/:orderId/cancel', cancelOrder);
 
 // Add new routes for individual item operations
 router.post('/order/:orderId/item/:itemId/cancel', cancelOrderItem);
 router.post('/order/:orderId/item/:itemId/return', requestItemReturn);
+router.post('/order/:orderId/item/:itemId/return/approve', approveItemReturn);
+
+// Add invoice route
+router.get('/profile/orders/:id/invoice', generateInvoice);
 
 // Product-related routes
 router.get('/products', listProducts);
@@ -119,18 +124,15 @@ router.post('/test-return', (req, res) => {
   res.json({ success: true, message: 'Test successful' });
 });
 
-// New routes
-router.post('/orders', placeOrder);
-
-// Add password rules endpoint
-router.get('/api/password-rules', (req, res) => {
-  res.json(getPasswordRules());
-});
-
 // Profile routes
 router.get('/profile', sessionCheck, getProfile);
 router.post('/profile/update', sessionCheck, updateProfile);
 router.post('/profile/send-otp', sessionCheck, sendProfileOTP);
 router.post('/profile/verify-otp', sessionCheck, verifyProfileOTP);
+
+// Add password rules endpoint
+router.get('/api/password-rules', (req, res) => {
+  res.json(getPasswordRules());
+});
 
 export default router;

@@ -236,6 +236,13 @@
                     </div>
                 </div>
 
+                <!-- Invoice Button -->
+                <% if (order.status === 'Delivered' || order.status === 'Completed') { %>
+                    <a href="/profile/orders/<%= order._id %>/invoice" class="btn btn-primary w-100 mb-3" target="_blank">
+                        <i class="bi bi-file-earmark-text"></i> Download Invoice
+                    </a>
+                <% } %>
+
                 <!-- Return Request -->
                 <% if (order.status.toLowerCase() === 'delivered' && (!order.returnRequest || !order.returnRequest.status)) { %>
                     <button class="btn btn-return w-100" data-bs-toggle="modal" data-bs-target="#returnRequestModal">

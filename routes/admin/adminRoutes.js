@@ -48,18 +48,27 @@ const router = express.Router();
 
 // Admin authentication middleware
 const isAdmin = (req, res, next) => {
+  console.log('Admin middleware check:', {
+    path: req.path,
+    method: req.method,
+    session: req.session.admin,
+    headers: req.headers
+  });
+
   if (req.session.admin) {
     return next();
   }
   
   // Check if it's an API request
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
+    console.log('API request detected, sending 401');
     return res.status(401).json({ 
       success: false, 
       message: 'Unauthorized: Admin session expired' 
     });
   }
   
+  console.log('No admin session, redirecting to login');
   res.redirect('/admin/login');
 };
 
@@ -75,6 +84,7 @@ router.get('/login', (req, res) => {
 });
 router.post('/login', postAdminLogin);
 router.get('/logout', handleLogout);
+router.post('/logout', handleLogout);
 
 // Protected routes (require admin authentication)
 router.get('/dashboard', isAdmin, dashboard);

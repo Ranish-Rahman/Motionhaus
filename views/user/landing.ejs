@@ -324,6 +324,122 @@
         text-align: center;
       }
     }
+
+    .ari-lennox-section {
+      background: #000;
+      padding: 0 0 0 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ari-lennox-container {
+      display: flex;
+      width: 100vw;
+      max-width: 100vw;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6vw;
+      box-sizing: border-box;
+    }
+    .ari-lennox-left {
+      flex: 1 1 0;
+      max-width: 60vw;
+      color: #fff;
+    }
+    .ari-lennox-title-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 2vw;
+    }
+    .ari-lennox-title {
+      font-size: 4vw;
+      font-weight: 600;
+      line-height: 1.1;
+      margin: 0;
+      letter-spacing: -2px;
+    }
+    .ari-lennox-year {
+      font-size: 2vw;
+      color: #ccc;
+      font-weight: 400;
+      margin-left: 1vw;
+      white-space: nowrap;
+    }
+    .ari-lennox-hr {
+      border: none;
+      height: 1px;
+      background: #333;
+      margin: 2vw 0 2vw 0;
+      width: 100%;
+    }
+    .ari-lennox-label {
+      font-size: 0.9vw;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.7vw;
+      font-weight: 500;
+    }
+    .ari-lennox-about-text {
+      font-size: 2vw;
+      font-weight: 400;
+      margin-bottom: 2vw;
+    }
+    .ari-lennox-credits-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2vw;
+      margin-bottom: 1vw;
+    }
+    .ari-lennox-credit-block strong {
+      display: block;
+      font-size: 1vw;
+      font-weight: 600;
+      margin-bottom: 0.5vw;
+      color: #fff;
+    }
+    .ari-lennox-credit-block {
+      font-size: 1vw;
+      color: #ccc;
+    }
+    .ari-lennox-ge {
+      margin-top: 1vw;
+      font-size: 1vw;
+      color: #ccc;
+    }
+    .ari-lennox-ge strong {
+      color: #fff;
+      font-size: 1vw;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 0.5vw;
+    }
+    .ari-lennox-right {
+      flex: 0 0 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 80vh;
+    }
+    .ari-lennox-right img {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 0;
+      object-fit: cover;
+      box-shadow: none;
+    }
+    @media (max-width: 1100px) {
+      .ari-lennox-title { font-size: 7vw; }
+      .ari-lennox-year { font-size: 3vw; }
+      .ari-lennox-about-text { font-size: 3vw; }
+      .ari-lennox-credits-grid, .ari-lennox-credit-block, .ari-lennox-ge, .ari-lennox-ge strong { font-size: 2vw; }
+    }
+    @media (max-width: 800px) {
+      .ari-lennox-container { flex-direction: column; align-items: flex-start; }
+      .ari-lennox-right { width: 100%; height: auto; margin-top: 2vw; }
+      .ari-lennox-left { max-width: 100vw; }
+    }
   </style>
 </head>
 <body>
@@ -332,7 +448,7 @@
       <div class="top-bar">
         <div class="logo">OH Architecture</div>
         <div class="nav-links">
-          <a href="#">HOME</a>
+          <a href="/home">HOME</a>
           <a href="#">SHOP</a>
           <a href="#">ABOUT</a>
           <!-- <a href="#">GALLERY</a> -->
@@ -394,6 +510,47 @@
           <h3>Sidney House</h3>
           <p>2023 • Under Construction</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section ari-lennox-section" id="ari-lennox">
+    <div class="ari-lennox-container">
+      <div class="ari-lennox-left">
+        <div class="ari-lennox-title-row">
+          <h2 class="ari-lennox-title">Ari Lennox | Get Close</h2>
+          <span class="ari-lennox-year">(2023)</span>
+        </div>
+        <hr class="ari-lennox-hr">
+        <div class="ari-lennox-label">About</div>
+        <div class="ari-lennox-about-text">Music video by Ari Lennox performing Get Close.</div>
+        <hr class="ari-lennox-hr">
+        <div class="ari-lennox-label">Credits</div>
+        <div class="ari-lennox-credits-grid">
+          <div class="ari-lennox-credit-block">
+            <strong>Production Company:</strong>
+            Made by Heirs | @madexheirs
+          </div>
+          <div class="ari-lennox-credit-block">
+            <strong>Director:</strong>
+            Wes
+          </div>
+          <div class="ari-lennox-credit-block">
+            <strong>Director Of Photography:</strong>
+            Erin G. Wesley | @erin.g.wesley
+          </div>
+          <div class="ari-lennox-credit-block">
+            <strong>Camera:</strong>
+            Luke Rihl, Christo Mercado, Sergio Herrera, Abel Gonzalez, Kya Lou
+          </div>
+        </div>
+        <div class="ari-lennox-ge">
+          <strong>G+E:</strong>
+          Kay Zhou, Chris Ginnaven, Michael Roseman, Charles Tae, Esteban Sandoval, Steven Miller
+        </div>
+      </div>
+      <div class="ari-lennox-right">
+        <img src="https://eringwesley.com/uploads/Ari_Lennox_Get_Close_Poster_2_da59cba94e.jpg" alt="Ari Lennox Get Close">
       </div>
     </div>
   </section>

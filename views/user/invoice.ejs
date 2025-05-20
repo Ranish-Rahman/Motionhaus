@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice #<%= order.orderID %></title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .invoice-container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .company-info {
+            flex: 1;
+        }
+        .invoice-info {
+            text-align: right;
+        }
+        .invoice-title {
+            color: #333;
+            font-size: 24px;
+            margin: 0 0 10px 0;
+        }
+        .invoice-details {
+            margin: 20px 0;
+        }
+        .customer-info, .shipping-info {
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .total-section {
+            margin-top: 20px;
+            text-align: right;
+        }
+        .total-row {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <div class="invoice-header">
+            <div class="company-info">
+                <h1 class="invoice-title">MotionHaus</h1>
+                <p>123 Fashion Street</p>
+                <p>Mumbai, Maharashtra 400001</p>
+                <p>Phone: +91 1234567890</p>
+                <p>Email: support@motionhaus.com</p>
+            </div>
+            <div class="invoice-info">
+                <h2>INVOICE</h2>
+                <p><strong>Invoice #:</strong> <%= order.orderID %></p>
+                <p><strong>Date:</strong> <%= new Date(order.orderDate).toLocaleDateString() %></p>
+                <p><strong>Status:</strong> <%= order.status %></p>
+            </div>
+        </div>
+
+        <div class="invoice-details">
+            <div class="customer-info">
+                <h3>Customer Information</h3>
+                <p><strong>Name:</strong> <%= order.user.name %></p>
+                <p><strong>Email:</strong> <%= order.user.email %></p>
+                <p><strong>Phone:</strong> <%= order.user.phone %></p>
+            </div>
+
+            <div class="shipping-info">
+                <h3>Shipping Address</h3>
+                <p><%= order.shippingAddress.fullName %></p>
+                <p><%= order.shippingAddress.address %></p>
+                <p><%= order.shippingAddress.city %>, <%= order.shippingAddress.state %></p>
+                <p><%= order.shippingAddress.postalCode %></p>
+                <p>Phone: <%= order.shippingAddress.phone %></p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Size</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% order.items.forEach(item => { %>
+                        <tr>
+                            <td><%= item.product.name %></td>
+                            <td>UK <%= item.size %></td>
+                            <td><%= item.quantity %></td>
+                            <td>₹<%= item.price.toFixed(2) %></td>
+                            <td>₹<%= (item.price * item.quantity).toFixed(2) %></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+
+            <div class="total-section">
+                <div class="total-row">
+                    <p>Subtotal: ₹<%= order.totalAmount.toFixed(2) %></p>
+                    <p>Shipping: Free</p>
+                    <p>Total: ₹<%= order.totalAmount.toFixed(2) %></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Thank you for shopping with MotionHaus!</p>
+            <p>This is a computer-generated invoice, no signature required.</p>
+        </div>
+    </div>
+</body>
+</html> 

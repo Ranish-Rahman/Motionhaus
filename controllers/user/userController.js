@@ -7,6 +7,7 @@ import Wishlist from '../../models/wishlistModel.js';
 import Cart from '../../models/cartModel.js';
 import Order from '../../models/orderModel.js';
 import { validatePassword } from '../../utils/passwordValidation.js';
+import puppeteer from 'puppeteer';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -877,8 +878,20 @@ const updateAddress = async (req, res) => {
     address.zipCode = zipCode;
     address.country = country;
     address.addressType = addressType;
-    address.isDefault = defaultAddress === 'on';
     
+    // Only update isDefault if the field is present in the request
+    if (typeof defaultAddress !== 'undefined') {
+      if (defaultAddress === 'on') {
+        // Unset default for all other addresses of this user
+        await Address.updateMany(
+          { userId: req.session.user._id, _id: { $ne: addressId } },
+          { $set: { isDefault: false } }
+        );
+        address.isDefault = true;
+      } else {
+        address.isDefault = false;
+      }
+    }
     await address.save();
     
     req.flash('success', 'Address updated successfully');
@@ -1160,115 +1173,6 @@ const getCheckout = async (req, res) => {
       cart: { items: [], subtotal: 0 },
       addresses: []
     });
-  }
-};
-
-const createOrder = async (req, res) => {
-  try {
-    const { addressId, paymentMethod } = req.body;
-    
-    // Validate required fields
-    if (!addressId) {
-      return res.status(400).json({ message: 'Delivery address is required' });
-    }
-
-    // Only allow COD payment method
-    if (paymentMethod !== 'cod') {
-      return res.status(400).json({ 
-        message: 'Only Cash on Delivery (COD) payment method is currently available' 
-      });
-    }
-
-    const userId = req.session.user._id || req.session.user.id;
-    const cart = await Cart.findOne({ user: userId }).populate('items.product');
-    if (!cart || !cart.items || !cart.items.length) {
-      return res.status(400).json({ message: 'Your cart is empty' });
-    }
-
-    // Get the selected address
-    const selectedAddress = await Address.findById(addressId);
-    if (!selectedAddress) {
-      return res.status(400).json({ message: 'Selected address not found' });
-    }
-
-    // Check for blocked products and remove them
-    const blockedProducts = [];
-    const validItems = [];
-    for (const item of cart.items) {
-      if (item.product && !item.product.isBlocked) {
-        validItems.push(item);
-      } else if (item.product) {
-        blockedProducts.push(item.product.name);
-      }
-    }
-    cart.items = validItems;
-    cart.subtotal = cart.items.reduce(
-      (total, item) => total + (item.product.price * item.quantity),
-      0
-    );
-
-    if (cart.items.length === 0) {
-      return res.status(400).json({ 
-        message: 'All items in your cart are no longer available',
-        cart: cart
-      });
-    }
-    if (blockedProducts.length > 0) {
-      return res.status(400).json({ 
-        message: `Some items in your cart are no longer available: ${blockedProducts.join(', ')}`,
-        cart: cart
-      });
-    }
-
-    // Generate orderID
-    const orderID = `ORD-${Date.now().toString().slice(-8)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-
-    const order = new Order({
-      orderID,
-      user: userId,
-      shippingAddress: {
-        fullName: selectedAddress.fullName,
-        address: selectedAddress.addressLine1 + (selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''),
-        city: selectedAddress.city,
-        state: selectedAddress.state,
-        postalCode: selectedAddress.zipCode,
-        phone: selectedAddress.phone
-      },
-      items: cart.items.map(item => ({
-        product: item.product._id,
-        quantity: item.quantity,
-        price: item.product.price,
-        size: item.size
-      })),
-      totalAmount: cart.subtotal,
-      paymentMethod: 'cod', // Force COD as payment method
-      status: 'Pending',
-      paymentStatus: 'pending' // Changed to lowercase to match enum
-    });
-
-    await order.save();
-
-    // Clear the user's cart in the database
-    cart.items = [];
-    cart.subtotal = 0;
-    await cart.save();
-
-    // Render the order success page
-    res.render('user/order-success', {
-      user: req.session.user,
-      order: {
-        _id: order._id,
-        orderID: order.orderID,
-        createdAt: order.createdAt,
-        total: order.totalAmount,
-        paymentMethod: order.paymentMethod,
-        status: order.status,
-        paymentStatus: order.paymentStatus
-      }
-    });
-  } catch (error) {
-    console.error('Order creation error:', error);
-    res.status(500).json({ message: 'Failed to create order' });
   }
 };
 
@@ -1643,6 +1547,183 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// Generate invoice
+export const generateInvoice = async (req, res) => {
+  let browser;
+  try {
+    if (!req.session.user) {
+      return res.redirect('/login');
+    }
+
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name email phone')
+      .populate('items.product', 'name price images');
+
+    if (!order) {
+      req.flash('error', 'Order not found');
+      return res.redirect('/profile/orders');
+    }
+
+    // Check if the order belongs to the current user
+    const userId = req.session.user._id || req.session.user.id;
+    if (order.user._id.toString() !== userId.toString()) {
+      req.flash('error', 'You are not authorized to view this invoice');
+      return res.redirect('/profile/orders');
+    }
+
+    // Check if order is delivered or completed
+    if (order.status !== 'Delivered' && order.status !== 'Completed') {
+      req.flash('error', 'Invoice is only available for delivered orders');
+      return res.redirect('/profile/orders');
+    }
+
+    // Launch a new browser instance
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    // Create a new page
+    const page = await browser.newPage();
+
+    // Set the HTML content directly
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <title>Invoice #${order.orderID}</title>
+          <style>
+              @page { size: A4; margin: 20px; }
+              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; font-size: 12px; }
+              .invoice-container { max-width: 100%; margin: 0 auto; padding: 20px; }
+              .invoice-header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+              .company-info { flex: 1; }
+              .invoice-info { text-align: right; }
+              .invoice-title { color: #333; font-size: 24px; margin: 0 0 10px 0; }
+              .invoice-details { margin: 20px 0; }
+              .customer-info, .shipping-info { margin-bottom: 20px; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+              th { background-color: #f8f9fa; font-weight: bold; }
+              .total-section { margin-top: 20px; text-align: right; }
+              .total-row { font-size: 14px; font-weight: bold; }
+              .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px; }
+          </style>
+      </head>
+      <body>
+          <div class="invoice-container">
+              <div class="invoice-header">
+                  <div class="company-info">
+                      <h1 class="invoice-title">MotionHaus</h1>
+                      <p>123 Fashion Street</p>
+                      <p>Mumbai, Maharashtra 400001</p>
+                      <p>Phone: +91 1234567890</p>
+                      <p>Email: support@motionhaus.com</p>
+                  </div>
+                  <div class="invoice-info">
+                      <h2>INVOICE</h2>
+                      <p><strong>Invoice #:</strong> ${order.orderID}</p>
+                      <p><strong>Date:</strong> ${new Date(order.orderDate).toLocaleDateString()}</p>
+                      <p><strong>Status:</strong> ${order.status}</p>
+                  </div>
+              </div>
+
+              <div class="invoice-details">
+                  <div class="customer-info">
+                      <h3>Customer Information</h3>
+                      <p><strong>Name:</strong> ${order.user.name}</p>
+                      <p><strong>Email:</strong> ${order.user.email}</p>
+                      <p><strong>Phone:</strong> ${order.user.phone}</p>
+                  </div>
+
+                  <div class="shipping-info">
+                      <h3>Shipping Address</h3>
+                      <p>${order.shippingAddress.fullName}</p>
+                      <p>${order.shippingAddress.address}</p>
+                      <p>${order.shippingAddress.city}, ${order.shippingAddress.state}</p>
+                      <p>${order.shippingAddress.postalCode}</p>
+                      <p>Phone: ${order.shippingAddress.phone}</p>
+                  </div>
+
+                  <table>
+                      <thead>
+                          <tr>
+                              <th>Product</th>
+                              <th>Size</th>
+                              <th>Quantity</th>
+                              <th>Price</th>
+                              <th>Total</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          ${order.items.map(item => `
+                              <tr>
+                                  <td>${item.product.name}</td>
+                                  <td>UK ${item.size}</td>
+                                  <td>${item.quantity}</td>
+                                  <td>₹${item.price.toFixed(2)}</td>
+                                  <td>₹${(item.price * item.quantity).toFixed(2)}</td>
+                              </tr>
+                          `).join('')}
+                      </tbody>
+                  </table>
+
+                  <div class="total-section">
+                      <div class="total-row">
+                          <p>Subtotal: ₹${order.totalAmount.toFixed(2)}</p>
+                          <p>Shipping: Free</p>
+                          <p>Total: ₹${order.totalAmount.toFixed(2)}</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="footer">
+                  <p>Thank you for shopping with MotionHaus!</p>
+                  <p>This is a computer-generated invoice, no signature required.</p>
+              </div>
+          </div>
+      </body>
+      </html>
+    `;
+
+    // Set content to the page
+    await page.setContent(htmlContent, {
+      waitUntil: 'networkidle0'
+    });
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20px',
+        right: '20px',
+        bottom: '20px',
+        left: '20px'
+      }
+    });
+
+    // Close the browser
+    await browser.close();
+
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.orderID}.pdf`);
+    
+    // Send the PDF
+    return res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generating invoice:', error);
+    if (browser) {
+      await browser.close();
+    }
+    req.flash('error', 'Failed to generate invoice');
+    return res.redirect('/profile/orders');
+  }
+};
+
 export {
   signUpPage,
   getLogin,
@@ -1668,7 +1749,6 @@ export {
   getChangePassword,
   postChangePassword,
   getCheckout,
-  createOrder,
   requestReturn,
   updateProfile,
   sendProfileOTP,
