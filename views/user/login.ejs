@@ -3,7 +3,48 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Log in</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Login - MotionHaus</title>
+  <script>
+    // Immediately check if user is logged in
+    window.onload = function() {
+      // Check if user is already logged in
+      fetch('/auth/status', {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.authenticated) {
+          window.location.replace('/home');
+        }
+      })
+      .catch(error => console.error('Error:', error));
+
+      // Handle back button
+      if (window.performance && window.performance.navigation.type === window.performance.navigation.TYPE_BACK_FORWARD) {
+        window.location.replace('/home');
+      }
+    };
+
+    // Prevent back button
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+      history.go(1);
+    };
+
+    // Clear browser cache on page load
+    window.onpageshow = function(event) {
+      if (event.persisted) {
+        window.location.replace('/home');
+      }
+    };
+  </script>
 </head>
 <body>
   <header class="header">
@@ -158,6 +199,20 @@
         window.history.replaceState({}, document.title, newUrl);
       }
     });
+
+    // Prevent back button from showing cached pages
+    window.onload = function() {
+      if (window.performance && window.performance.navigation.type === window.performance.navigation.TYPE_BACK_FORWARD) {
+        window.location.reload();
+      }
+    };
+
+    // Clear browser cache on page load
+    window.onpageshow = function(event) {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    };
   </script>
 </body>
 </html>

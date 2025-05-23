@@ -456,8 +456,8 @@
   <%- include('../partials/header') %>
   <div class="container">
     <div class="main-checkout">
-      <form class="checkout-form" action="/checkout" method="POST">
-      <h2>Shipping Address</h2>
+      <div class="checkout-form">
+        <h2>Shipping Address</h2>
         
         <div class="saved-addresses">
           <% if (addresses && addresses.length > 0) { %>
@@ -663,7 +663,7 @@
             </div>
           </form>
         </div>
-      </form>
+      </div>
 
       <div class="payment-section">
         <h2>Payment Method</h2>
@@ -674,17 +674,7 @@
               <span>Cash on Delivery</span>
               <small style="display: block; color: #2ecc71; margin-top: 4px;">Available</small>
             </label>
-            <!-- <label style="opacity: 0.5; cursor: not-allowed;">
-              <input type="radio" name="paymentMethod" value="card" disabled>
-              <span>Credit/Debit Card</span>
-              <small style="display: block; color: #e74c3c; margin-top: 4px;">Currently Unavailable</small>
-            </label>
-            <label style="opacity: 0.5; cursor: not-allowed;">
-              <input type="radio" name="paymentMethod" value="paypal" disabled>
-              <span>PayPal</span>
-              <small style="display: block; color: #e74c3c; margin-top: 4px;">Currently Unavailable</small>
-            </label> -->
-        </div>
+          </div>
           <input type="hidden" name="addressId" id="selectedAddressId">
           <% if (cart && cart.items && cart.items.length > 0) { %>
             <button class="place-order-btn" type="submit" id="placeOrderBtn">
@@ -700,7 +690,7 @@
           <% } %>
         </form>
       </div>
-      </div>
+    </div>
 
     <div class="order-summary">
       <h3>Order Summary</h3>
@@ -713,7 +703,19 @@
                 <div class="order-item-details">
                   <div class="name"><%= item.product.name %></div>
                   <div class="meta">Size: <%= item.size %> | Qty: <%= item.quantity %></div>
-                  <div class="price">$<%= (item.product.price * item.quantity).toFixed(2) %></div>
+                  <% 
+                    const sizeObj = item.product.sizes.find(s => Number(s.size) === Number(item.size));
+                    const stockAvailable = sizeObj ? sizeObj.quantity : 0;
+                    const isOutOfStock = stockAvailable < item.quantity;
+                  %>
+                  <div class="stock-status <%= isOutOfStock ? 'out-of-stock' : 'in-stock' %>">
+                    <% if (isOutOfStock) { %>
+                      <span style="color: #e74c3c;">Out of Stock (Only <%= stockAvailable %> available)</span>
+                    <% } else { %>
+                      <span style="color: #2ecc71;">In Stock (<%= stockAvailable %> available)</span>
+                    <% } %>
+                  </div>
+                  <div class="price">₹<%= (item.product.price * item.quantity).toFixed(2) %></div>
                 </div>
               </div>
             <% } %>
@@ -728,7 +730,7 @@
       <% if (cart && cart.items && cart.items.length > 0) { %>
         <div class="summary-row">
           <span>Subtotal</span>
-          <span>$<%= cart.subtotal.toFixed(2) %></span>
+          <span>₹<%= cart.subtotal.toFixed(2) %></span>
         </div>
         <div class="summary-row">
           <span>Delivery Fee</span>
@@ -736,7 +738,7 @@
         </div>
         <div class="summary-row total">
           <span>Total</span>
-          <span>$<%= cart.subtotal.toFixed(2) %></span>
+          <span>₹<%= cart.subtotal.toFixed(2) %></span>
         </div>
       <% } %>
     </div>
@@ -889,6 +891,18 @@
             return;
           }
 
+          // Check for out of stock items
+          const outOfStockItems = document.querySelectorAll('.stock-status.out-of-stock');
+          if (outOfStockItems.length > 0) {
+            Swal.fire({
+              title: 'Out of Stock Items',
+              text: 'Some items in your cart are out of stock. Please remove them or reduce quantity before placing your order.',
+              icon: 'error',
+              confirmButtonColor: '#000'
+            });
+            return;
+          }
+
           // Update hidden address input
           document.getElementById('selectedAddressId').value = selectedAddress.value;
 
@@ -906,7 +920,7 @@
 
           try {
             const formData = new FormData(this);
-            const response = await fetch('/order/create', {
+            const response = await fetch(this.action, {  // Use the form's action attribute
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -916,10 +930,19 @@
             });
 
             if (response.ok) {
-              // Get the HTML content from the response
-              const html = await response.text();
-              // Replace the current page content with the success page
-              document.documentElement.innerHTML = html;
+              // If the response is a redirect, follow it
+              if (response.redirected) {
+                window.location.href = response.url;
+              } else {
+                // Otherwise, try to parse as JSON
+                const data = await response.json();
+                if (data.success) {
+                  // Redirect to order success page
+                  window.location.href = '/order/success/' + data.order._id;
+                } else {
+                  throw new Error(data.message || 'Failed to place order');
+                }
+              }
             } else {
               const errorData = await response.json();
               throw new Error(errorData.message || 'Failed to place order');

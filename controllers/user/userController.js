@@ -8,6 +8,7 @@ import Cart from '../../models/cartModel.js';
 import Order from '../../models/orderModel.js';
 import { validatePassword } from '../../utils/passwordValidation.js';
 import puppeteer from 'puppeteer';
+import ejs from 'ejs';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -228,11 +229,10 @@ const postLogin = async (req, res) => {
       });
     }
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Compare password using the model's method
+    const isMatch = await user.comparePassword(password);
     console.log(" Password match:", isMatch ? "Yes" : "No");
     console.log(" Input password:", password);
-    console.log(" Stored password hash:", user.password);
 
     if (!isMatch) {
       console.log(" Password mismatch");
@@ -241,6 +241,10 @@ const postLogin = async (req, res) => {
         message: "Invalid email or password"
       });
     }
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
 
     // Login successful
     req.session.user = {
@@ -445,19 +449,22 @@ const liveSearch = async (req, res) => {
       return res.json({ products: [], pagination: null });
     }
 
+    // Escape special characters in the search query
+    const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     // Calculate skip value for pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Get total count of matching products
     const totalProducts = await Product.countDocuments({
-      name: { $regex: q, $options: 'i' },
+      name: { $regex: escapedQuery, $options: 'i' },
       isDeleted: false,
       isBlocked: false
     });
 
     // Get paginated products
     const products = await Product.find({
-      name: { $regex: q, $options: 'i' },
+      name: { $regex: escapedQuery, $options: 'i' },
       isDeleted: false,
       isBlocked: false
     })
@@ -492,7 +499,16 @@ const liveSearch = async (req, res) => {
     });
   } catch (error) {
     console.error('Live search error:', error);
-    res.status(500).json({ products: [], pagination: null });
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      products: [], 
+      pagination: null,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Search failed'
+    });
   }
 };
 
@@ -615,17 +631,32 @@ const getWishlist = async (req, res) => {
 };
 
 // Get profile page
-const getProfile = (req, res) => {
+const getProfile = async (req, res) => {
   if (!req.session.user) {
     return res.redirect('/login');
   }
-  res.render('user/user-profile', {
-    user: req.session.user,
-    success: req.flash('success'),
-    error: req.flash('error'),
-    currentPage: 'profile'
-  });
+  try {
+    const userId = req.session.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      req.flash('error', 'User not found');
+      return res.redirect('/login');
+    }
+
+    res.render('user/user-profile', {
+      user,
+      success: req.flash('success'),
+      error: req.flash('error'),
+      currentPage: 'profile'
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    req.flash('error', 'Failed to load profile');
+    res.redirect('/login');
+  }
 };
+
 
 // Get address page
 const getAddress = async (req, res) => {
@@ -1075,6 +1106,9 @@ const postChangePassword = async (req, res) => {
     const userId = req.session.user._id;
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
+    console.log('Attempting password change for user:', userId);
+    console.log('Session user:', req.session.user);
+
     // Check rate limiting
     const attempts = passwordChangeAttempts.get(userId) || { count: 0, timestamp: Date.now() };
     
@@ -1111,7 +1145,17 @@ const postChangePassword = async (req, res) => {
 
     // Verify current password
     const user = await User.findById(userId);
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    console.log('Found user:', user ? 'Yes' : 'No');
+    
+    if (!user) {
+      console.log('User not found in database');
+      req.flash('error', 'User not found');
+      return res.redirect('/profile/change-password');
+    }
+
+    console.log('Comparing passwords...');
+    const isMatch = await user.comparePassword(currentPassword);
+    console.log('Password match result:', isMatch);
 
     if (!isMatch) {
       // Increment failed attempts
@@ -1122,12 +1166,8 @@ const postChangePassword = async (req, res) => {
       return res.redirect('/profile/change-password');
     }
 
-    // Hash new password with environment variable for salt rounds
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    // Update password
-    user.password = hashedPassword;
+    // Update password - let the model handle hashing
+    user.password = newPassword;
     await user.save();
 
     // Reset attempts on successful password change
@@ -1150,29 +1190,36 @@ const getCheckout = async (req, res) => {
     // Fetch cart from DB and populate product details
     let cart = await Cart.findOne({ user: userId }).populate('items.product');
     
-    if (cart && cart.items.length > 0) {
-      // Filter out items with null products or blocked products
-      cart.items = cart.items.filter(item => item.product && !item.product.isBlocked);
-      
-      // Recalculate subtotal
-      cart.subtotal = cart.items.reduce((total, item) => {
-        return total + (item.product.price * item.quantity);
-      }, 0);
-      
-      // Save the filtered cart
-      await cart.save();
+    if (!cart || !cart.items || cart.items.length === 0) {
+      req.flash('error', 'Your cart is empty. Please add items before proceeding to checkout.');
+      return res.redirect('/cart');
     }
 
+    // Filter out items with null products or blocked products
+    cart.items = cart.items.filter(item => item.product && !item.product.isBlocked);
+    
+    // If all items were filtered out, redirect to cart
+    if (cart.items.length === 0) {
+      req.flash('error', 'All items in your cart are no longer available.');
+      return res.redirect('/cart');
+    }
+    
+    // Recalculate subtotal
+    cart.subtotal = cart.items.reduce((total, item) => {
+      return total + (item.product.price * item.quantity);
+    }, 0);
+    
+    // Save the filtered cart
+    await cart.save();
+
     res.render('user/checkout', { 
-      cart: cart || { items: [], subtotal: 0 },
+      cart: cart,
       addresses: addresses
     });
   } catch (error) {
     console.error('Error fetching addresses for checkout:', error);
-    res.render('user/checkout', { 
-      cart: { items: [], subtotal: 0 },
-      addresses: []
-    });
+    req.flash('error', 'An error occurred while loading the checkout page.');
+    res.redirect('/cart');
   }
 };
 
@@ -1515,27 +1562,44 @@ const updateProfile = async (req, res) => {
       newPhone: user.phone
     });
 
-    // Update session
+    // Update session with all user data
     req.session.user = {
       ...req.session.user,
       username: user.username,
       email: user.email,
-      phone: user.phone
+      phone: user.phone,
+      _id: user._id,
+      role: user.role,
+      isVerified: user.isVerified,
+      isBlocked: user.isBlocked,
+      status: user.status,
+      wallet: user.wallet
     };
 
     // Save session explicitly to ensure it's updated
     await new Promise((resolve, reject) => {
       req.session.save((err) => {
-        if (err) reject(err);
-        else resolve();
+        if (err) {
+          console.error('Session save error:', err);
+          reject(err);
+        } else {
+          console.log('Session saved successfully');
+          resolve();
+        }
       });
     });
 
-    console.log('Session updated:', req.session.user);
+    // Verify session was updated
+    console.log('Updated session data:', req.session.user);
 
     return res.json({
       success: true,
-      message: 'Profile updated successfully'
+      message: 'Profile updated successfully',
+      user: {
+        username: user.username,
+        email: user.email,
+        phone: user.phone
+      }
     });
 
   } catch (error) {
@@ -1586,106 +1650,8 @@ export const generateInvoice = async (req, res) => {
     // Create a new page
     const page = await browser.newPage();
 
-    // Set the HTML content directly
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <title>Invoice #${order.orderID}</title>
-          <style>
-              @page { size: A4; margin: 20px; }
-              body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; font-size: 12px; }
-              .invoice-container { max-width: 100%; margin: 0 auto; padding: 20px; }
-              .invoice-header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
-              .company-info { flex: 1; }
-              .invoice-info { text-align: right; }
-              .invoice-title { color: #333; font-size: 24px; margin: 0 0 10px 0; }
-              .invoice-details { margin: 20px 0; }
-              .customer-info, .shipping-info { margin-bottom: 20px; }
-              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-              th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-              th { background-color: #f8f9fa; font-weight: bold; }
-              .total-section { margin-top: 20px; text-align: right; }
-              .total-row { font-size: 14px; font-weight: bold; }
-              .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px; }
-          </style>
-      </head>
-      <body>
-          <div class="invoice-container">
-              <div class="invoice-header">
-                  <div class="company-info">
-                      <h1 class="invoice-title">MotionHaus</h1>
-                      <p>123 Fashion Street</p>
-                      <p>Mumbai, Maharashtra 400001</p>
-                      <p>Phone: +91 1234567890</p>
-                      <p>Email: support@motionhaus.com</p>
-                  </div>
-                  <div class="invoice-info">
-                      <h2>INVOICE</h2>
-                      <p><strong>Invoice #:</strong> ${order.orderID}</p>
-                      <p><strong>Date:</strong> ${new Date(order.orderDate).toLocaleDateString()}</p>
-                      <p><strong>Status:</strong> ${order.status}</p>
-                  </div>
-              </div>
-
-              <div class="invoice-details">
-                  <div class="customer-info">
-                      <h3>Customer Information</h3>
-                      <p><strong>Name:</strong> ${order.user.name}</p>
-                      <p><strong>Email:</strong> ${order.user.email}</p>
-                      <p><strong>Phone:</strong> ${order.user.phone}</p>
-                  </div>
-
-                  <div class="shipping-info">
-                      <h3>Shipping Address</h3>
-                      <p>${order.shippingAddress.fullName}</p>
-                      <p>${order.shippingAddress.address}</p>
-                      <p>${order.shippingAddress.city}, ${order.shippingAddress.state}</p>
-                      <p>${order.shippingAddress.postalCode}</p>
-                      <p>Phone: ${order.shippingAddress.phone}</p>
-                  </div>
-
-                  <table>
-                      <thead>
-                          <tr>
-                              <th>Product</th>
-                              <th>Size</th>
-                              <th>Quantity</th>
-                              <th>Price</th>
-                              <th>Total</th>
-                          </tr>
-                      </thead>
-                      <tbody>
-                          ${order.items.map(item => `
-                              <tr>
-                                  <td>${item.product.name}</td>
-                                  <td>UK ${item.size}</td>
-                                  <td>${item.quantity}</td>
-                                  <td>₹${item.price.toFixed(2)}</td>
-                                  <td>₹${(item.price * item.quantity).toFixed(2)}</td>
-                              </tr>
-                          `).join('')}
-                      </tbody>
-                  </table>
-
-                  <div class="total-section">
-                      <div class="total-row">
-                          <p>Subtotal: ₹${order.totalAmount.toFixed(2)}</p>
-                          <p>Shipping: Free</p>
-                          <p>Total: ₹${order.totalAmount.toFixed(2)}</p>
-                      </div>
-                  </div>
-              </div>
-
-              <div class="footer">
-                  <p>Thank you for shopping with MotionHaus!</p>
-                  <p>This is a computer-generated invoice, no signature required.</p>
-              </div>
-          </div>
-      </body>
-      </html>
-    `;
+    // Render the invoice template
+    const htmlContent = await ejs.renderFile('views/user/invoice.ejs', { order });
 
     // Set content to the page
     await page.setContent(htmlContent, {
@@ -1724,6 +1690,63 @@ export const generateInvoice = async (req, res) => {
   }
 };
 
+// Get profile data
+const getProfileData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    const user = await User.findById(req.session.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update session with latest user data
+    req.session.user = {
+      ...req.session.user,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      _id: user._id,
+      role: user.role,
+      isVerified: user.isVerified,
+      isBlocked: user.isBlocked,
+      status: user.status,
+      wallet: user.wallet
+    };
+
+    // Save session explicitly
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    return res.json({
+      success: true,
+      user: {
+        username: user.username,
+        email: user.email,
+        phone: user.phone
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching profile data:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch profile data'
+    });
+  }
+};
+
 export {
   signUpPage,
   getLogin,
@@ -1752,6 +1775,7 @@ export {
   requestReturn,
   updateProfile,
   sendProfileOTP,
-  verifyProfileOTP
+  verifyProfileOTP,
+  getProfileData
 };
 

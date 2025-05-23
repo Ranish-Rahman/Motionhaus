@@ -179,22 +179,53 @@
       font-size: 0.875rem;
     }
     .pagination {
-      margin-bottom: 0;
+      margin-top: 2rem;
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
     }
+
+    .page-item {
+      list-style: none;
+    }
+
     .page-link {
-      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.5rem;
+      height: 2.5rem;
+      padding: 0.5rem;
+      border-radius: 8px;
       background-color: #1e1f22;
-      border-color: rgba(255, 255, 255, 0.1);
+      color: #a0aec0;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
+
     .page-link:hover {
-      color: white;
       background-color: rgba(255, 255, 255, 0.1);
+      color: white;
       border-color: rgba(255, 255, 255, 0.2);
     }
+
     .page-item.active .page-link {
       background-color: #3b82f6;
+      color: white;
       border-color: #3b82f6;
-    } 
+    }
+
+    .page-item.disabled .page-link {
+      background-color: #1e1f22;
+      color: #4a5568;
+      cursor: not-allowed;
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .page-link i {
+      font-size: 1rem;
+    }
     /* Vision UI styled search bar */
 .search-bar {
   display: flex;
@@ -347,27 +378,68 @@
           <!-- Pagination -->
           <% if (pagination.totalPages > 1) { %>
             <nav aria-label="Page navigation" class="mt-4">
-              <ul class="pagination justify-content-center">
+              <ul class="pagination">
+                <!-- First Page -->
+                <% if (pagination.currentPage > 1) { %>
+                  <li class="page-item">
+                    <a class="page-link" href="?page=1<%= search ? '&search=' + search : '' %>" title="First Page">
+                      <i class="bi bi-chevron-double-left"></i>
+                    </a>
+                  </li>
+                <% } %>
+
+                <!-- Previous Page -->
                 <% if (pagination.hasPrevPage) { %>
                   <li class="page-item">
-                    <a class="page-link" href="?page=<%= pagination.prevPage %><%= search ? '&search=' + search : '' %>">
+                    <a class="page-link" href="?page=<%= pagination.prevPage %><%= search ? '&search=' + search : '' %>" title="Previous Page">
                       <i class="bi bi-chevron-left"></i>
                     </a>
                   </li>
                 <% } %>
                 
-                <% for(let i = 1; i <= pagination.totalPages; i++) { %>
+                <!-- Page Numbers -->
+                <% 
+                  let startPage = Math.max(1, pagination.currentPage - 2);
+                  let endPage = Math.min(pagination.totalPages, startPage + 4);
+                  if (endPage - startPage < 4) {
+                    startPage = Math.max(1, endPage - 4);
+                  }
+                %>
+                
+                <% if (startPage > 1) { %>
+                  <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                  </li>
+                <% } %>
+
+                <% for(let i = startPage; i <= endPage; i++) { %>
                   <li class="page-item <%= i === pagination.currentPage ? 'active' : '' %>">
                     <a class="page-link" href="?page=<%= i %><%= search ? '&search=' + search : '' %>">
                       <%= i %>
                     </a>
                   </li>
                 <% } %>
+
+                <% if (endPage < pagination.totalPages) { %>
+                  <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                  </li>
+                <% } %>
                 
+                <!-- Next Page -->
                 <% if (pagination.hasNextPage) { %>
                   <li class="page-item">
-                    <a class="page-link" href="?page=<%= pagination.nextPage %><%= search ? '&search=' + search : '' %>">
+                    <a class="page-link" href="?page=<%= pagination.nextPage %><%= search ? '&search=' + search : '' %>" title="Next Page">
                       <i class="bi bi-chevron-right"></i>
+                    </a>
+                  </li>
+                <% } %>
+
+                <!-- Last Page -->
+                <% if (pagination.currentPage < pagination.totalPages) { %>
+                  <li class="page-item">
+                    <a class="page-link" href="?page=<%= pagination.totalPages %><%= search ? '&search=' + search : '' %>" title="Last Page">
+                      <i class="bi bi-chevron-double-right"></i>
                     </a>
                   </li>
                 <% } %>

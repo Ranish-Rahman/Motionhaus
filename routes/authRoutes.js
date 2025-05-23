@@ -1,30 +1,16 @@
 import express from 'express';
 import passport from 'passport';
 import { isAuthenticated, isNotAuthenticated } from '../middleware/authMiddleware.js';
+import { sessionCheck } from '../middleware/sessionMiddleware.js';
 
 const router = express.Router();
 
 // Auth status route - must be defined before other routes
 router.get('/auth/status', (req, res) => {
-  try {
-    console.log('Auth status check - Session:', req.session);
-    console.log('Auth status check - User:', req.user);
-    res.json({ 
-      isAuthenticated: req.isAuthenticated(),
-      user: req.user ? {
-        id: req.user._id,
-        email: req.user.email,
-        username: req.user.username
-      } : null
-    });
-  } catch (error) {
-    console.error('Error in status route:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error checking authentication status',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
+  res.json({
+    authenticated: !!req.session?.user,
+    user: req.session?.user || null
+  });
 });
 
 // Google authentication routes

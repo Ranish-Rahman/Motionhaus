@@ -25,7 +25,8 @@ export const sessionCheck = async (req, res, next) => {
   if (req.path === '/login' || req.path === '/signup') {
     if (req.session?.user) {
       console.log('Redirecting logged in user from public route to home');
-      return res.redirect('/home');
+      // Use 303 redirect to prevent caching
+      return res.redirect(303, '/home');
     }
     return next();
   }
@@ -41,7 +42,7 @@ export const sessionCheck = async (req, res, next) => {
     if (!req.session?.admin) {
       console.log('No admin session found, redirecting to admin login');
       req.session.returnTo = req.originalUrl;
-      return res.redirect('/admin/login');
+      return res.redirect(303, '/admin/login');
     }
     return next();
   }

@@ -119,7 +119,7 @@ export const placeOrder = async (req, res) => {
     console.log('Order process completed successfully');
 
     // Check if the request wants JSON response
-    if (req.xhr || req.headers.accept.includes('application/json')) {
+    if (req.xhr || req.headers.accept?.includes('application/json') || req.headers['content-type']?.includes('application/json')) {
       return res.json({
         success: true,
         message: 'Order placed successfully',
@@ -135,13 +135,20 @@ export const placeOrder = async (req, res) => {
       });
     }
 
-    // For regular form submissions, redirect to orders page
-    res.redirect('/orders');
+    // For regular form submissions, redirect to order success page
+    res.render('user/order-success', {
+      order: {
+        orderNumber: order.orderID,
+        createdAt: order.createdAt,
+        total: order.totalAmount,
+        paymentMethod: order.paymentMethod
+      }
+    });
   } catch (err) {
     console.error('Order placement failed:', err);
     
     // Check if the request wants JSON response
-    if (req.xhr || req.headers.accept.includes('application/json')) {
+    if (req.xhr || req.headers.accept?.includes('application/json') || req.headers['content-type']?.includes('application/json')) {
       return res.status(500).json({
         success: false,
         message: err.message

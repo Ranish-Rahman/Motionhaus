@@ -29,7 +29,8 @@ import {
   updateProfile,
   sendProfileOTP,
   verifyProfileOTP,
-  generateInvoice
+  generateInvoice,
+  getProfileData
 } from '../controllers/user/userController.js';
 import { 
   requestReturn, 
@@ -42,6 +43,7 @@ import { listProducts, getProductDetails } from '../controllers/user/productCont
 import { addToCart, updateCartItem, removeFromCart } from '../controllers/user/cartController.js';
 import { sessionCheck } from '../middleware/sessionMiddleware.js';
 import { getPasswordRules } from '../utils/passwordValidation.js';
+import Order from '../models/orderModel.js';
 
 const router = express.Router();
 
@@ -64,6 +66,9 @@ router.get('/', (req, res) => {
 router.get('/user/landing', (req, res) => {
   res.render('user/landing');
 });
+
+// Search route (public)
+router.get('/search', liveSearch);
 
 // Apply session check to protected routes
 router.use(sessionCheck);
@@ -104,9 +109,6 @@ router.get('/profile/orders/:id/invoice', generateInvoice);
 router.get('/products', listProducts);
 router.get('/products/:id', getProductDetails);
 
-// Search route
-router.get('/search', liveSearch);
-
 // Checkout and password routes
 router.get('/checkout', getCheckout);
 router.get('/profile/change-password', getChangePassword);
@@ -129,10 +131,34 @@ router.get('/profile', sessionCheck, getProfile);
 router.post('/profile/update', sessionCheck, updateProfile);
 router.post('/profile/send-otp', sessionCheck, sendProfileOTP);
 router.post('/profile/verify-otp', sessionCheck, verifyProfileOTP);
+router.get('/profile/data', sessionCheck, getProfileData);
 
 // Add password rules endpoint
 router.get('/api/password-rules', (req, res) => {
   res.json(getPasswordRules());
+});
+
+router.post('/order/create', placeOrder);
+router.get('/order/success/:id', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      req.flash('error', 'Order not found');
+      return res.redirect('/orders');
+    }
+    res.render('user/order-success', {
+      order: {
+        orderNumber: order.orderID,
+        createdAt: order.createdAt,
+        total: order.totalAmount,
+        paymentMethod: order.paymentMethod
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching order:', error);
+    req.flash('error', 'Failed to load order details');
+    res.redirect('/orders');
+  }
 });
 
 export default router;

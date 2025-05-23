@@ -172,6 +172,11 @@ export const removeFromCart = async (req, res) => {
 
     const userId = req.session.user._id || req.session.user.id;
     const { itemId } = req.params;
+    const { size } = req.body;
+
+    if (!size) {
+      return res.status(400).json({ success: false, message: 'Size is required' });
+    }
 
     // Find cart
     const cart = await Cart.findOne({ user: userId });
@@ -179,8 +184,10 @@ export const removeFromCart = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    // Remove item from cart
-    cart.items = cart.items.filter(item => item.product.toString() !== itemId);
+    // Remove item from cart based on both product ID and size
+    cart.items = cart.items.filter(item => 
+      !(item.product.toString() === itemId && item.size === size)
+    );
 
     // Save cart (pre-save hook will calculate subtotal)
     await cart.save();

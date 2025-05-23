@@ -54,6 +54,26 @@ app.use(session({
   rolling: true
 }));
 
+// Add no-cache middleware for all routes
+app.use(nocache());
+
+// Add security headers middleware
+app.use((req, res, next) => {
+  // Prevent caching of all responses
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('Vary', '*');
+  
+  // Add security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  next();
+});
+
 // Initialize passport
 app.use(passport.initialize());
 app.use(passport.session());
