@@ -88,7 +88,7 @@ app.use(express.static('public'));
 // 1. Auth routes (login, signup) - no session required
 app.use('/', authRoutes);
 
-// 2. User routes
+// 2. User routes - mount at root for non-profile routes
 app.use('/', userRoutes);
 
 // 3. Admin routes

@@ -151,7 +151,7 @@
       <div class="order-info">
         <div class="info-item">
           <div class="info-label">Order Number</div>
-          <div class="info-value">#<%= order.orderNumber %></div>
+          <div class="info-value">#<%= order.orderID %></div>
         </div>
         <div class="info-item">
           <div class="info-label">Order Date</div>
@@ -159,17 +159,17 @@
         </div>
         <div class="info-item">
           <div class="info-label">Total Amount</div>
-          <div class="info-value">$<%= order.total.toFixed(2) %></div>
+          <div class="info-value">₹<%= order.totalAmount.toFixed(2) %></div>
         </div>
         <div class="info-item">
           <div class="info-label">Payment Method</div>
-          <div class="info-value"><%= order.paymentMethod %></div>
+          <div class="info-value"><%= order.paymentMethod === 'razorpay' ? 'Razorpay' : 'Cash on Delivery' %></div>
         </div>
       </div>
     </div>
     
     <div class="action-buttons">
-      <a href="/orders" class="btn btn-primary">
+      <a href="/profile/orders" class="btn btn-primary">
         <i class="bi bi-receipt"></i> View Orders
       </a>
       <a href="/products" class="btn btn-secondary">

@@ -74,7 +74,7 @@
     <div class="container py-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Order Details</h2>
-            <a href="/orders" class="btn btn-outline-secondary">
+            <a href="/profile/orders" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Back to Orders
             </a>
         </div>
@@ -222,7 +222,10 @@
                         <hr>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal:</span>
-                            <span>₹<%= order.totalAmount.toFixed(2) %></span>
+                            <span>₹<%= order.items
+                                .filter(item => item.status !== 'Cancelled' && item.status !== 'Returned')
+                                .reduce((total, item) => total + (item.price * item.quantity), 0)
+                                .toFixed(2) %></span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Shipping:</span>
@@ -231,13 +234,16 @@
                         <hr>
                         <div class="d-flex justify-content-between mb-0">
                             <span class="fw-bold">Total:</span>
-                            <span class="fw-bold">₹<%= order.totalAmount.toFixed(2) %></span>
+                            <span class="fw-bold">₹<%= order.items
+                                .filter(item => item.status !== 'Cancelled' && item.status !== 'Returned')
+                                .reduce((total, item) => total + (item.price * item.quantity), 0)
+                                .toFixed(2) %></span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Invoice Button -->
-                <% if (order.status === 'Delivered' || order.status === 'Completed') { %>
+                <% if (order.items.some(item => item.status === 'Delivered' || item.status === 'Completed')) { %>
                     <a href="/profile/orders/<%= order._id %>/invoice" class="btn btn-primary w-100 mb-3" target="_blank">
                         <i class="bi bi-file-earmark-text"></i> Download Invoice
                     </a>

@@ -4,6 +4,13 @@ import mongoose from 'mongoose';
 import { nanoid } from 'nanoid'; // Ensure nanoid is imported
 import Cart from '../../models/cartModel.js';
 import Address from '../../models/addressModel.js';
+import Razorpay from 'razorpay';
+import User from '../../models/userModel.js';
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_SECRET
+});
 
 // Place Order function
 export const placeOrder = async (req, res) => {
@@ -38,6 +45,16 @@ export const placeOrder = async (req, res) => {
     }
 
     console.log('Processing cart items:', validItems);
+
+  if(paymentMethod === 'wallet'){
+    const user = await User.findById(userId);
+    if(!user.wallet || user.wallet.balance < cart.subtotal){
+    throw new Error('Insufficient wallet balance to place the order');
+    }
+    user.wallet.balance -= cart.subtotal;
+    await user.save();
+
+  }
 
     // Generate custom orderID
     const orderID = `ORD-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${nanoid(8).toUpperCase()}`;
@@ -85,13 +102,41 @@ export const placeOrder = async (req, res) => {
         postalCode: selectedAddress.zipCode,
         phone: selectedAddress.phone
       },
-      paymentMethod: paymentMethod || 'cod',
+      paymentMethod: ['wallet', 'razorpay'].includes(paymentMethod) ? paymentMethod : 'cod',
       status: 'Pending',
-      paymentStatus: 'pending'
+      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending'
     });
 
     await order.save();
     console.log('Order created successfully:', orderID);
+
+    if(paymentMethod === 'razorpay') {
+      const options = {
+        amount: cart.subtotal * 100, // Amount in paise
+        currency: 'INR',
+        receipt: orderID,
+        payment_capture: 1 
+      };
+
+      const razorpayOrder = await razorpay.orders.create(options);
+      
+      // Update order with Razorpay order ID
+      order.paymentDetails = {
+        razorpayOrderId: razorpayOrder.id
+      };
+      await order.save();
+
+      return res.json({
+        success: true,
+        isRazorpay: true,
+        razorpayOrder: {
+          id: razorpayOrder.id,
+          amount: razorpayOrder.amount,
+          currency: razorpayOrder.currency,
+          orderID: order.orderID
+        }
+      });
+    }
 
     // Decrease stock for each item
     for (const item of validItems) {
@@ -478,6 +523,68 @@ export const approveItemReturn = async (req, res) => {
     return res.status(500).json({ 
       success: false, 
       message: 'Failed to approve return request',
+      error: error.message 
+    });
+  }
+};
+
+// Cancel entire order
+export const cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    
+    console.log('Cancelling order:', { orderId, reason });
+    
+    const order = await Order.findById(orderId).populate('items.product');
+    if (!order) {
+      console.log('Order not found:', orderId);
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    console.log('Current order status:', order.status);
+
+    // Check if order can be cancelled (case-insensitive)
+    const allowedStatuses = ['pending', 'confirmed', 'processing'];
+    if (!allowedStatuses.includes(order.status.toLowerCase())) {
+      console.log('Order cannot be cancelled. Current status:', order.status);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Order cannot be cancelled in its current state (${order.status})` 
+      });
+    }
+
+    // Update order status
+    order.status = 'Cancelled';
+    order.cancelReason = reason;
+    order.cancelledAt = new Date();
+
+    // Increment stock for each product
+    for (const item of order.items) {
+      if (item.product) {
+        item.product.stock += item.quantity;
+        await item.product.save();
+        console.log(`Updated stock for product ${item.product._id}: +${item.quantity}`);
+      }
+    }
+
+    // Save the updated order
+    await order.save();
+    console.log('Order cancelled successfully:', orderId);
+
+    return res.json({ 
+      success: true, 
+      message: 'Order cancelled successfully',
+      order: {
+        status: order.status,
+        cancelledAt: order.cancelledAt
+      }
+    });
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to cancel order',
       error: error.message 
     });
   }

@@ -60,6 +60,21 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'paid', 'failed', 'refunded'],
     default: 'pending'
   },
+  paymentMethod: String,
+  paymentDetails: {
+    razorpayOrderId: {
+      type: String,
+      required: false
+    },
+    razorpayPaymentId:{
+      type: String,
+      required: false
+    },
+    razorpaySignature: {
+      type: String,
+      required: false
+    }
+  },
   cancellationReason: String,
   returnReason: String,
   shippingAddress: {

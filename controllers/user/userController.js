@@ -528,108 +528,6 @@ const getCart = async (req, res) => {
   });
 };
 
-// Get wishlist page
-const getWishlist = async (req, res) => {
-    try {
-        console.log('==================== START WISHLIST ====================');
-        
-        if (!req.session.user || !req.session.user._id) {
-            return res.redirect('/login');
-        }
-
-        console.log('User ID:', req.session.user._id);
-
-        // Get wishlist
-        let wishlist = await Wishlist.findOne({ user: req.session.user._id });
-        
-        if (!wishlist) {
-            console.log('No wishlist found, creating new one');
-            wishlist = new Wishlist({ user: req.session.user._id, items: [] });
-            await wishlist.save();
-        } else {
-            console.log('Found existing wishlist with', wishlist.items.length, 'items');
-            console.log('Wishlist items before population:', JSON.stringify(wishlist.items, null, 2));
-        }
-
-        // Populate product data
-        await wishlist.populate({
-            path: 'items.product',
-            model: 'Product',
-            select: 'name price images sizes isDeleted isBlocked brand description category'
-        });
-
-        console.log('Wishlist after population:', JSON.stringify(
-            wishlist.items.map(item => ({
-                productName: item.product.name,
-                size: item.size,
-                productSizes: item.product.sizes
-            })), null, 2)
-        );
-
-        // Convert to plain object
-        const wishlistObj = wishlist.toObject();
-
-        // Process items
-        if (wishlistObj.items && Array.isArray(wishlistObj.items)) {
-            wishlistObj.items = wishlistObj.items
-                .filter(item => item && item.product && !item.product.isDeleted && !item.product.isBlocked)
-                .map(item => {
-                    try {
-                        const product = item.product;
-                        const itemSize = Number(item.size);
-
-                        console.log('\nProcessing product:', product.name);
-                        console.log('Looking for size:', itemSize);
-                        console.log('Available sizes:', JSON.stringify(product.sizes, null, 2));
-
-                        // Find the selected size
-                        const selectedSizeObj = product.sizes.find(s => Number(s.size) === itemSize);
-                        
-                        console.log('Found size object:', selectedSizeObj);
-
-                        // Calculate stock status
-                        const selectedSizeStock = selectedSizeObj ? selectedSizeObj.quantity : 0;
-                        const hasStock = selectedSizeStock > 0;
-
-                        console.log('Stock calculation:', {
-                            size: itemSize,
-                            quantity: selectedSizeStock,
-                            hasStock: hasStock
-                        });
-
-                        return {
-                            ...item,
-                            product: {
-                                ...product,
-                                hasStock,
-                                selectedSizeStock
-                            }
-                        };
-                    } catch (error) {
-                        console.error('Error processing item:', error);
-                        return null;
-                    }
-                })
-                .filter(Boolean);
-        }
-
-        console.log('==================== END WISHLIST ====================');
-
-        return res.render('user/wishlist', {
-            title: 'My Wishlist',
-            user: req.session.user,
-            wishlist: wishlistObj
-        });
-
-    } catch (error) {
-        console.error('Error in getWishlist:', error);
-        return res.render('error', {
-            message: 'Error loading wishlist',
-            error: process.env.NODE_ENV === 'development' ? error : {}
-        });
-    }
-};
-
 // Get profile page
 const getProfile = async (req, res) => {
   if (!req.session.user) {
@@ -656,7 +554,6 @@ const getProfile = async (req, res) => {
     res.redirect('/login');
   }
 };
-
 
 // Get address page
 const getAddress = async (req, res) => {
@@ -998,19 +895,36 @@ const setDefaultAddress = async (req, res) => {
 
 // Get orders page
 const getOrders = async (req, res) => {
-  if (!req.session.user) return res.redirect('/login');
-  const userId = req.session.user._id || req.session.user.id;
-  const orders = await Order.find({ user: userId })
-    .select('_id orderID orderDate totalAmount status returnRequest items')
-    .populate('items.product', 'name price images')
-    .sort({ orderDate: -1 });
+  console.log('=== GET ORDERS STARTED ===');
+  console.log('Session user:', req.session.user);
   
-  res.render('user/orders', {
-    user: req.session.user,
-    orders,
-    success: req.flash('success'),
-    error: req.flash('error')
-  });
+  if (!req.session.user) {
+    console.log('No user session found, redirecting to login');
+    return res.redirect('/login');
+  }
+  
+  try {
+    const userId = req.session.user._id || req.session.user.id;
+    console.log('User ID:', userId);
+    
+    const orders = await Order.find({ user: userId })
+      .select('_id orderID orderDate totalAmount status returnRequest items')
+      .populate('items.product', 'name price images')
+      .sort({ orderDate: -1 });
+    
+    console.log('Found orders:', orders.length);
+    
+    res.render('user/orders', {
+      user: req.session.user,
+      orders,
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Error in getOrders:', error);
+    req.flash('error', 'Failed to load orders');
+    res.redirect('/login');
+  }
 };
 
 // Get order details page
@@ -1265,67 +1179,6 @@ const requestReturn = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Error processing return request' 
-    });
-  }
-};
-
-export const cancelOrder = async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const { reason } = req.body;
-    
-    console.log('Cancelling order:', { orderId, reason });
-    
-    const order = await Order.findById(orderId).populate('items.product');
-    if (!order) {
-      console.log('Order not found:', orderId);
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    console.log('Current order status:', order.status);
-
-    // Check if order can be cancelled (case-insensitive)
-    const allowedStatuses = ['pending', 'confirmed', 'processing'];
-    if (!allowedStatuses.includes(order.status.toLowerCase())) {
-      console.log('Order cannot be cancelled. Current status:', order.status);
-      return res.status(400).json({ 
-        success: false, 
-        message: `Order cannot be cancelled in its current state (${order.status})` 
-      });
-    }
-
-    // Update order status
-    order.status = 'Cancelled';
-      order.cancelReason = reason;
-      order.cancelledAt = new Date();
-
-      // Increment stock for each product
-      for (const item of order.items) {
-        if (item.product) {
-          item.product.stock += item.quantity;
-          await item.product.save();
-        console.log(`Updated stock for product ${item.product._id}: +${item.quantity}`);
-        }
-      }
-
-    // Save the updated order
-      await order.save();
-    console.log('Order cancelled successfully:', orderId);
-
-    return res.json({ 
-      success: true, 
-      message: 'Order cancelled successfully',
-      order: {
-        status: order.status,
-        cancelledAt: order.cancelledAt
-      }
-    });
-  } catch (error) {
-    console.error('Error cancelling order:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Failed to cancel order',
-      error: error.message 
     });
   }
 };
@@ -1635,9 +1488,13 @@ export const generateInvoice = async (req, res) => {
       return res.redirect('/profile/orders');
     }
 
-    // Check if order is delivered or completed
-    if (order.status !== 'Delivered' && order.status !== 'Completed') {
-      req.flash('error', 'Invoice is only available for delivered orders');
+    // Check if at least one item is delivered or completed
+    const hasDeliveredItems = order.items.some(item => 
+      item.status === 'Delivered' || item.status === 'Completed'
+    );
+
+    if (!hasDeliveredItems) {
+      req.flash('error', 'Invoice is only available for orders with delivered items');
       return res.redirect('/profile/orders');
     }
 
@@ -1759,7 +1616,6 @@ export {
   resetPassword,
   liveSearch,
   getCart,
-  getWishlist,
   getProfile,
   getOrders,
   getOrderDetails,

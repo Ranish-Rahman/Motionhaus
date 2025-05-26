@@ -69,6 +69,59 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+        /* Pagination Styles */
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 2rem;
+            padding: 1rem;
+        }
+        .pagination {
+            display: flex;
+            gap: 0.5rem;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .page-item {
+            display: inline-block;
+        }
+        .page-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            height: 40px;
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            color: #0d6efd;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            background: white;
+        }
+        .page-link:hover {
+            background: #e9ecef;
+            border-color: #dee2e6;
+            color: #0a58ca;
+        }
+        .page-item.active .page-link {
+            background: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+        }
+        .page-item.disabled .page-link {
+            color: #6c757d;
+            pointer-events: none;
+            background: #f8f9fa;
+            border-color: #dee2e6;
+        }
+        .page-info {
+            text-align: center;
+            color: #6c757d;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
@@ -143,6 +196,39 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination -->
+            <% if (orders && orders.length > 0) { %>
+                <div class="pagination-container">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination">
+                            <!-- Previous Page -->
+                            <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                                <a class="page-link" href="?page=<%= currentPage - 1 %>" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+
+                            <!-- Page Numbers -->
+                            <% for(let i = 1; i <= totalPages; i++) { %>
+                                <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                                    <a class="page-link" href="?page=<%= i %>"><%= i %></a>
+                                </li>
+                            <% } %>
+
+                            <!-- Next Page -->
+                            <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                                <a class="page-link" href="?page=<%= currentPage + 1 %>" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+                <div class="page-info">
+                    Showing <%= (currentPage - 1) * limit + 1 %> to <%= Math.min(currentPage * limit, totalOrders) %> of <%= totalOrders %> orders
+                </div>
+            <% } %>
         <% } %>
     </div>
 

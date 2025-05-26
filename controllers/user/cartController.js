@@ -1,7 +1,7 @@
 import Cart from '../../models/cartModel.js';
 import Product from '../../models/ProductModel.js';
 
-// Add to cart (DB version)
+// Add to cart 
 export const addToCart = async (req, res) => {
   try {
     if (!req.session.user) {
