@@ -9,6 +9,8 @@ import Order from '../../models/orderModel.js';
 import { validatePassword } from '../../utils/passwordValidation.js';
 import puppeteer from 'puppeteer';
 import ejs from 'ejs';
+import razorpay from '../../utils/razorpay.js';
+import { nanoid } from 'nanoid';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -894,7 +896,7 @@ const setDefaultAddress = async (req, res) => {
 };
 
 // Get orders page
-const getOrders = async (req, res) => {
+export const getOrders = async (req, res) => {
   console.log('=== GET ORDERS STARTED ===');
   console.log('Session user:', req.session.user);
   
@@ -907,23 +909,39 @@ const getOrders = async (req, res) => {
     const userId = req.session.user._id || req.session.user.id;
     console.log('User ID:', userId);
     
+    // Add pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5; // Number of orders per page
+    const skip = (page - 1) * limit;
+
+    // Get total count of orders
+    const totalOrders = await Order.countDocuments({ user: userId });
+    const totalPages = Math.ceil(totalOrders / limit);
+    
     const orders = await Order.find({ user: userId })
       .select('_id orderID orderDate totalAmount status returnRequest items')
       .populate('items.product', 'name price images')
-      .sort({ orderDate: -1 });
+      .sort({ orderDate: -1 })
+      .skip(skip)
+      .limit(limit);
     
     console.log('Found orders:', orders.length);
+    console.log('Pagination info:', { page, totalPages, totalOrders });
     
     res.render('user/orders', {
       user: req.session.user,
       orders,
+      currentPage: page,
+      totalPages,
+      totalOrders,
+      limit,
       success: req.flash('success'),
       error: req.flash('error')
     });
   } catch (error) {
     console.error('Error in getOrders:', error);
     req.flash('error', 'Failed to load orders');
-    res.redirect('/login');
+    res.redirect('/profile');
   }
 };
 
@@ -1126,9 +1144,22 @@ const getCheckout = async (req, res) => {
     // Save the filtered cart
     await cart.save();
 
+    // Get user data including wallet balance
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      req.flash('error', 'User not found');
+      return res.redirect('/cart');
+    }
+
+    // Ensure wallet object exists
+    if (!user.wallet) {
+      user.wallet = { balance: 0 };
+    }
+
     res.render('user/checkout', { 
       cart: cart,
-      addresses: addresses
+      addresses: addresses,
+      user: user
     });
   } catch (error) {
     console.error('Error fetching addresses for checkout:', error);
@@ -1604,6 +1635,380 @@ const getProfileData = async (req, res) => {
   }
 };
 
+// Handle payment failure
+export const handlePaymentFailure = async (req, res) => {
+  try {
+    const { orderID, razorpayOrderId, error } = req.body;
+    const userId = req.session.user._id;
+
+    console.log('Handling failed payment:', { orderID, razorpayOrderId, error });
+
+    if (!orderID) {
+      throw new Error('Order ID is required');
+    }
+
+    // First check if order already exists
+    let order = await Order.findOne({ 
+      orderID: orderID,
+      user: userId 
+    });
+
+    if (!order) {
+      console.log('Order not found, creating new order for failed payment');
+      
+      // Get pending order data from session
+      const pendingOrder = req.session.pendingOrder;
+      if (!pendingOrder || pendingOrder.orderID !== orderID) {
+        console.log('No pending order found in session:', {
+          hasPendingOrder: !!pendingOrder,
+          pendingOrderID: pendingOrder?.orderID,
+          requestedOrderID: orderID
+        });
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid order data'
+        });
+      }
+
+      // Create new order with failed status
+      order = new Order({
+        orderID: pendingOrder.orderID,
+        user: pendingOrder.userId,
+        items: pendingOrder.items,
+        totalAmount: pendingOrder.totalAmount,
+        shippingAddress: pendingOrder.shippingAddress,
+        paymentMethod: 'razorpay',
+        status: 'payment-failed',
+        paymentStatus: 'failed',
+        cancelReason: error || 'Payment failed',
+        paymentDetails: {
+          razorpayOrderId: razorpayOrderId
+        }
+      });
+
+      await order.save();
+      console.log('Created new order for failed payment:', order.orderID);
+    } else {
+      // Update existing order status
+      order.status = 'payment-failed';
+      order.paymentStatus = 'failed';
+      order.cancelReason = error || 'Payment failed';
+      await order.save();
+      console.log('Updated existing order status:', order.orderID);
+    }
+
+    // Restore product stock and clear cart
+    await handleOrderCleanup(userId, req.session);
+
+    res.json({
+      success: true,
+      message: 'Payment failure handled successfully',
+      orderId: order.orderID
+    });
+  } catch (error) {
+    console.error('Error handling payment failure:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to handle payment failure',
+      error: error.message
+    });
+  }
+};
+
+// Handle Razorpay order cancellation
+export const cancelRazorpayOrder = async (req, res) => {
+  try {
+    const { orderID, razorpayOrderId } = req.body;
+    const userId = req.session.user._id;
+
+    console.log('[Debug] Cancelling Razorpay order:', { orderID, razorpayOrderId });
+
+    if (!orderID) {
+      throw new Error('Order ID is required');
+    }
+
+    // First check if we have pending order data in session
+    let orderData = req.session.pendingOrder;
+    console.log('[Debug] Session data for cancelled order:', {
+      hasPendingOrder: !!orderData,
+      sessionOrderID: orderData?.orderID,
+      requestedOrderID: orderID,
+      sessionData: orderData
+    });
+
+    // If no session data, try to find existing order
+    if (!orderData || orderData.orderID !== orderID) {
+      const existingOrder = await Order.findOne({ 
+        $or: [
+          { orderID: orderID, user: userId },
+          { 'paymentDetails.razorpayOrderId': razorpayOrderId, user: userId }
+        ]
+      });
+
+      if (existingOrder) {
+        orderData = {
+          orderID: existingOrder.orderID,
+          items: existingOrder.items,
+          totalAmount: existingOrder.totalAmount,
+          shippingAddress: existingOrder.shippingAddress,
+          userId: userId,
+          razorpayOrderId: razorpayOrderId
+        };
+      } else {
+        // If no existing order and no session data, get user's default address
+        const defaultAddress = await Address.findOne({ 
+          userId: userId,
+          isDefault: true 
+        });
+
+        if (!defaultAddress) {
+          return res.status(400).json({
+            success: false,
+            message: 'No shipping address found. Please add a shipping address and try again.'
+          });
+        }
+
+        // Get cart data for minimal order
+        const cart = await Cart.findOne({ user: userId }).populate('items.product');
+        const orderItems = cart?.items || [];
+        const orderAmount = cart?.items.reduce((total, item) => 
+          total + (item.product.price * item.quantity), 0
+        ) || 0;
+
+        orderData = {
+          orderID: `ORD-${Date.now()}-${nanoid(8).toUpperCase()}`,
+          items: orderItems,
+          totalAmount: orderAmount,
+          shippingAddress: {
+            fullName: defaultAddress.fullName,
+            phone: defaultAddress.phone,
+            address: defaultAddress.addressLine1,
+            city: defaultAddress.city,
+            state: defaultAddress.state,
+            postalCode: defaultAddress.zipCode,
+            country: defaultAddress.country
+          },
+          userId: userId,
+          razorpayOrderId: razorpayOrderId
+        };
+      }
+    }
+
+    // If we have order data (either from session or database), create/update the order
+    if (orderData) {
+      let order = await Order.findOne({ 
+        $or: [
+          { orderID: orderData.orderID },
+          { 'paymentDetails.razorpayOrderId': orderData.razorpayOrderId }
+        ]
+      });
+
+      if (!order) {
+        console.log('[Debug] Creating new order for cancelled payment');
+        order = new Order({
+          orderID: orderData.orderID,
+          user: userId,
+          items: orderData.items || [],
+          totalAmount: orderData.totalAmount || 0,
+          shippingAddress: orderData.shippingAddress,
+          paymentMethod: 'razorpay',
+          status: 'payment-failed',
+          paymentStatus: 'failed',
+          cancelReason: 'Payment cancelled by user',
+          paymentDetails: {
+            razorpayOrderId: razorpayOrderId || orderData.razorpayOrderId
+          }
+        });
+      } else {
+        console.log('[Debug] Updating existing order status:', order.orderID);
+        order.status = 'payment-failed';
+        order.paymentStatus = 'failed';
+        order.cancelReason = 'Payment cancelled by user';
+        order.paymentDetails = order.paymentDetails || {};
+        order.paymentDetails.razorpayOrderId = razorpayOrderId || orderData.razorpayOrderId;
+      }
+
+      await order.save();
+      console.log('[Debug] Saved order:', order.orderID);
+
+      // Try to cancel the Razorpay order
+      try {
+        if (razorpayOrderId) {
+          const razorpayOrder = await razorpay.orders.fetch(razorpayOrderId);
+          if (razorpayOrder.status !== 'paid') {
+            await razorpay.orders.edit(razorpayOrderId, {
+              status: 'cancelled'
+            });
+            console.log('[Debug] Razorpay order cancelled successfully:', razorpayOrderId);
+          }
+        }
+      } catch (razorpayError) {
+        console.error('[Debug] Error cancelling Razorpay order:', razorpayError);
+        // We continue even if Razorpay cancellation fails
+      }
+
+      // Keep the order data in session for retry
+      req.session.pendingOrder = {
+        ...orderData,
+        orderID: order.orderID, // Use the saved order ID
+        razorpayOrderId: razorpayOrderId || orderData.razorpayOrderId
+      };
+
+      await new Promise((resolve) => req.session.save(resolve));
+      console.log('[Debug] Updated session with order data:', req.session.pendingOrder);
+
+      res.json({
+        success: true,
+        message: 'Order cancelled successfully',
+        orderId: order.orderID
+      });
+    } else {
+      console.error('[Debug] No order data found for cancellation');
+      res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+  } catch (error) {
+    console.error('[Debug] Error cancelling order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel order',
+      error: error.message
+    });
+  }
+};
+
+// Helper function for cleanup tasks
+async function handleOrderCleanup(userId, session) {
+  // Restore product stock
+  if (session?.pendingOrder?.items) {
+    for (const item of session.pendingOrder.items) {
+      const product = await Product.findById(item.product);
+      if (product) {
+        const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
+        if (sizeObj) {
+          sizeObj.quantity += item.quantity;
+          await product.save();
+          console.log(`Restored stock for product ${product._id} size ${item.size}: +${item.quantity}`);
+        }
+      }
+    }
+  }
+
+  // Clear the cart
+  const cart = await Cart.findOne({ user: userId });
+  if (cart) {
+    cart.items = [];
+    cart.subtotal = 0;
+    await cart.save();
+    console.log('Cleared cart for user:', userId);
+  }
+
+  // Clear the pending order from session
+  if (session && session.pendingOrder) {
+    session.pendingOrder = null;
+    await new Promise((resolve, reject) => {
+      session.save((err) => {
+        if (err) {
+          console.error('Error saving session:', err);
+          reject(err);
+        } else {
+          console.log('Cleared pending order from session');
+          resolve();
+        }
+      });
+    });
+  }
+}
+
+// Handle order success page
+export const getOrderSuccess = async (req, res) => {
+  try {
+    // Try to find by _id first, then by orderID if not found
+    let order = await Order.findById(req.params.id);
+    if (!order) {
+      order = await Order.findOne({ orderID: req.params.id });
+    }
+    
+    if (!order) {
+      req.flash('error', 'Order not found');
+      return res.redirect('/profile/orders');
+    }
+
+    res.render('user/order-success', {
+      order: {
+        orderID: order.orderID,
+        createdAt: order.createdAt,
+        totalAmount: order.totalAmount,
+        paymentMethod: order.paymentMethod
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching order:', error);
+    req.flash('error', 'Failed to load order details');
+    res.redirect('/profile/orders');
+  }
+};
+
+// Handle order failure page
+export const getOrderFailure = async (req, res) => {
+  try {
+    console.log('Looking up failed order with ID:', req.params.id);
+    
+    let order;
+    const error = req.query.error;
+    
+    // First try to find by orderID (string)
+    order = await Order.findOne({ orderID: req.params.id });
+    
+    // If not found by orderID, try _id as fallback (if it's a valid ObjectId)
+    if (!order && req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findById(req.params.id);
+    }
+
+    // If still no order found but we have an error message, show the error
+    // This handles cases where the order creation failed but we still want to show an error
+    if (!order && error) {
+      console.log('Order not found but error present:', error);
+      return res.render('user/order-failed', {
+        orderId: req.params.id,
+        error: error
+      });
+    }
+
+    // If no order and no error, show generic message
+    if (!order) {
+      console.log('Order not found and no error message:', req.params.id);
+      return res.render('user/order-failed', {
+        orderId: req.params.id,
+        error: 'Order not found or has been removed'
+      });
+    }
+
+    console.log('Found failed order:', {
+      orderID: order.orderID,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      cancelReason: order.cancelReason
+    });
+
+    // Use error message in this priority: query param > order.cancelReason > default message
+    const displayError = error || order.cancelReason || 'An error occurred while processing your order';
+
+    res.render('user/order-failed', {
+      orderId: order.orderID || req.params.id, // Fallback to passed ID if no order
+      error: displayError
+    });
+  } catch (error) {
+    console.error('Error fetching failed order:', error);
+    res.render('user/order-failed', {
+      orderId: req.params.id,
+      error: 'Failed to load order details'
+    });
+  }
+};
+
 export {
   signUpPage,
   getLogin,
@@ -1617,7 +2022,6 @@ export {
   liveSearch,
   getCart,
   getProfile,
-  getOrders,
   getOrderDetails,
   getAddress,
   addAddress,

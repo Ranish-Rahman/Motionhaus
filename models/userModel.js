@@ -62,8 +62,10 @@ const userSchema = new mongoose.Schema({
     type: Date
   },
   wallet: {
-    type: Number,
-    default: 0
+    balance: {
+      type: Number,
+      default: 0
+    }
   }
 }, {
   timestamps: true,

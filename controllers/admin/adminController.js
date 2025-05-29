@@ -7,7 +7,7 @@ import path from 'path';
 import Session from '../../models/sessionModel.js';
 import mongoose from 'mongoose';
 import Order from '../../models/orderModel.js';
-import WalletTransaction from '../../models/walletTransactionModel.js';
+import Transaction from '../../models/transactionModel.js';
 
 export const getAdminLogin = (req, res) => {
   console.log('Admin login page requested');

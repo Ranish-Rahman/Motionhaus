@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Wallet - MotionHaus</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-purple: #090909f5;
+            --sidebar-width: 250px;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            padding-top: 60px;
+        }
+
+        .layout {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--primary-purple);
+            padding: 2rem 1.5rem;
+            color: white;
+            position: fixed;
+            height: calc(100vh - 60px);
+            left: 0;
+            top: 60px;
+            z-index: 10;
+            border-right: 1px solid #232326;
+        }
+
+        .sidebar-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 3rem;
+            color: white;
+            text-decoration: none;
+            display: block;
+        }
+
+        .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-link i {
+            font-size: 1.2rem;
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex-grow: 1;
+            padding: 2rem;
+            background-color: #ffffff;
+        }
+
+        .wallet-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .wallet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .date-range {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .balance-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+        }
+
+        .balance-label {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .balance-amount {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .card-info {
+            color: #666;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-info i {
+            color: #333;
+        }
+
+        .transactions-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .transaction-id {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .transaction-amount {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .transaction-amount.credit {
+            color: #28a745;
+        }
+
+        .transaction-amount.debit {
+            color: #dc3545;
+        }
+
+        .transaction-date {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+        }
+
+        .status-success {
+            background-color: #e6f7ed;
+            color: #1f9254;
+        }
+
+        .status-pending {
+            background-color: #fff7e6;
+            color: #d48806;
+        }
+
+        .status-cancel {
+            background-color: #fff1f0;
+            color: #cf1322;
+        }
+
+        .no-transactions {
+            text-align: center;
+            padding: 32px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                top: 0;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+
+            .wallet-container {
+                padding: 0 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+    <div class="layout">
+        <%- include('../partials/user-profile-sidebar', { currentPage: 'wallet' }) %>
+        
+        <main class="main-content">
+            <div class="wallet-container">
+                <div class="wallet-header">
+                    <h1>Wallet</h1>
+                    <div class="date-range">12 Sep - 28 Oct 2024</div>
+                </div>
+
+                <div class="balance-card">
+                    <div class="balance-label">Available Balance</div>
+                    <div class="balance-amount">₹<%= typeof user.wallet === 'number' ? user.wallet.toFixed(2) : (user.wallet?.balance || 0).toFixed(2) %></div>
+                    <div class="card-info">
+                        <i class="bi bi-credit-card"></i>
+                        <span>Use your wallet for payments</span>
+                    </div>
+                </div>
+
+                <div class="transactions-section">
+                    <div class="section-header">
+                        <div class="section-title">Recent Transitions</div>
+                        <div class="date-range">12 Sep - 28 Oct 2024</div>
+                    </div>
+
+                    <% if (transactions && transactions.length > 0) { %>
+                        <div class="transaction-list">
+                            <% transactions.forEach(transaction => { %>
+                                <div class="transaction-item">
+                                    <div class="transaction-details">
+                                        <div class="transaction-id"><%= transaction.description %></div>
+                                        <div class="transaction-amount <%= transaction.type %>">
+                                            <%= transaction.type === 'credit' ? '+' : '-' %>₹<%= transaction.amount.toFixed(2) %>
+                                        </div>
+                                    </div>
+                                    <div class="transaction-info">
+                                        <div class="transaction-date">
+                                            <%= new Date(transaction.createdAt).toLocaleDateString('en-US', { 
+                                                day: 'numeric',
+                                                month: 'short',
+                                                year: 'numeric'
+                                            }) %>
+                                        </div>
+                                        <% 
+                                            let statusClass = '';
+                                            if (transaction.status === 'success') statusClass = 'status-success';
+                                            else if (transaction.status === 'pending') statusClass = 'status-pending';
+                                            else if (transaction.status === 'cancel') statusClass = 'status-cancel';
+                                        %>
+                                        <div class="status <%= statusClass %>">
+                                            <%= transaction.status ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) : 'Success' %>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <div class="no-transactions">
+                            <p>No transactions yet</p>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

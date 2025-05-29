@@ -219,6 +219,17 @@
                             <span>Payment Method:</span>
                             <span><%= order.paymentMethod %></span>
                         </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Payment Status:</span>
+                            <span class="<%= order.paymentStatus === 'failed' ? 'text-danger' : 'text-success' %>">
+                                <%= order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1) %>
+                            </span>
+                        </div>
+                        <% if (order.paymentStatus === 'failed' && order.paymentMethod === 'razorpay') { %>
+                            <button id="retryPayment" class="btn btn-warning w-100 mb-3">
+                                <i class="bi bi-arrow-repeat"></i> Retry Payment
+                            </button>
+                        <% } %>
                         <hr>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Subtotal:</span>
@@ -324,6 +335,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>
         // Cancel item functionality
         document.querySelectorAll('.cancel-item').forEach(button => {
@@ -460,6 +472,116 @@
                 Swal.fire({
                     title: 'Error!',
                     text: error.message || 'Failed to submit return request',
+                    icon: 'error',
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        });
+
+        // Retry Payment functionality
+        document.getElementById('retryPayment')?.addEventListener('click', async () => {
+            try {
+                // Show loading state
+                Swal.fire({
+                    title: 'Initializing Payment...',
+                    html: 'Please wait...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // Get order details for payment
+                const response = await fetch(`/order/<%= order._id %>/retry-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to initialize payment');
+                }
+
+                // Close loading dialog
+                Swal.close();
+
+                // Initialize Razorpay
+                const options = {
+                    key: data.razorpayKeyId,
+                    amount: data.amount,
+                    currency: data.currency,
+                    order_id: data.orderId,
+                    name: 'Your Store Name',
+                    description: 'Order Payment',
+                    handler: async function (response) {
+                        try {
+                            // Show processing state
+                            Swal.fire({
+                                title: 'Processing Payment...',
+                                html: 'Please wait...',
+                                allowOutsideClick: false,
+                                didOpen: () => {
+                                    Swal.showLoading();
+                                }
+                            });
+
+                            // Verify payment
+                            const verifyResponse = await fetch(`/order/<%= order._id %>/verify-payment`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_order_id: response.razorpay_order_id,
+                                    razorpay_signature: response.razorpay_signature
+                                })
+                            });
+
+                            const verifyData = await verifyResponse.json();
+
+                            if (verifyData.success) {
+                                await Swal.fire({
+                                    title: 'Success!',
+                                    text: 'Payment successful',
+                                    icon: 'success',
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                });
+                                location.reload();
+                            } else {
+                                throw new Error(verifyData.message || 'Payment verification failed');
+                            }
+                        } catch (error) {
+                            console.error('Payment verification error:', error);
+                            Swal.fire({
+                                title: 'Error!',
+                                text: error.message || 'Payment verification failed',
+                                icon: 'error',
+                                confirmButtonColor: '#dc3545'
+                            });
+                        }
+                    },
+                    prefill: {
+                        name: '<%= order.shippingAddress?.fullName %>',
+                        contact: '<%= order.shippingAddress?.phone %>',
+                    },
+                    theme: {
+                        color: 'hsl(227deg 71% 51% / 1)'
+                    }
+                };
+
+                const rzp = new Razorpay(options);
+                rzp.open();
+
+            } catch (error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    title: 'Error!',
+                    text: error.message || 'Failed to initialize payment',
                     icon: 'error',
                     confirmButtonColor: '#dc3545'
                 });

@@ -17,6 +17,8 @@ import adminRoutes from './routes/admin/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import wishlistRoutes from './routes/wishlistRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import walletRoutes from './routes/user/walletRoutes.js';
 
 // Suppress deprecation warnings
 process.removeAllListeners('warning');
@@ -88,20 +90,26 @@ app.use(express.static('public'));
 // 1. Auth routes (login, signup) - no session required
 app.use('/', authRoutes);
 
-// 2. User routes - mount at root for non-profile routes
+// 2. Payment routes - must be before session check
+app.use('/order', paymentRoutes);
+
+// 3. User routes - mount at root for non-profile routes
 app.use('/', userRoutes);
 
-// 3. Admin routes
+// 4. Admin routes
 app.use('/admin', adminRoutes);
 
-// 4. Category routes
+// 5. Category routes
 app.use('/categories', categoryRoutes);
 
-// 5. Product routes
+// 6. Product routes
 app.use('/products', productRoutes);
 
-// 6. Wishlist routes
+// 7. Wishlist routes
 app.use('/wishlist', wishlistRoutes);
+
+// 8. Wallet routes - mount on both paths
+app.use(['/wallet', '/profile/wallet'], walletRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
