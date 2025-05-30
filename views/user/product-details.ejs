@@ -483,7 +483,24 @@
 
       <div class="product-info">
         <h1 class="product-name"><%= product.name %></h1>
-        <div class="product-price">Rs. <%= product.price.toFixed(2) %></div>
+        <div class="product-price">
+          <% if (bestOffer) { %>
+            <div class="original-price" style="text-decoration: line-through; color: #999; font-size: 18px;">
+              Rs. <%= product.price.toFixed(2) %>
+            </div>
+            <div class="discounted-price" style="font-size: 24px; font-weight: 600; color: #000;">
+              Rs. <%= discountedPrice.toFixed(2) %>
+            </div>
+            <div class="offer-badge" style="display: inline-block; background: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; margin-left: 8px;">
+              <%= bestOffer.discount %>% OFF
+            </div>
+            <div class="offer-details" style="font-size: 14px; color: #28a745; margin-top: 4px;">
+              <%= bestOffer.name %>
+            </div>
+          <% } else { %>
+            <div class="price">Rs. <%= product.price.toFixed(2) %></div>
+          <% } %>
+        </div>
 
         <div class="size-selector">
           <label class="size-label">SIZE</label>

@@ -175,8 +175,17 @@
                                         <% }); %>
                                     </div>
                                 </td>
-                                <td>₹<%= order.totalAmount.toFixed(2) %></td>
-                            <td>
+                                <td>
+                                    <% 
+                                    // Calculate total based on actual paid prices
+                                    const displayAmount = order.items.reduce((total, item) => {
+                                        // Use the price field which contains the actual paid price
+                                        return total + (item.price * item.quantity);
+                                    }, 0);
+                                    %>
+                                    ₹<%= displayAmount.toFixed(2) %>
+                                </td>
+                                <td>
                                     <span class="badge bg-<%= order.status === 'Pending' ? 'warning' : 
                                                                     order.status === 'Shipped' ? 'info' : 
                                                                     order.status === 'Delivered' ? 'success' : 
@@ -191,7 +200,7 @@
                                         <i class="fas fa-eye"></i> View
                                     </a>
                               </td>
-                        </tr>
+                            </tr>
                         <% }); %>
                     </tbody>
                 </table>

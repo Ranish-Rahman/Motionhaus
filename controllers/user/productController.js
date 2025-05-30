@@ -1,5 +1,50 @@
 import Product from '../../models/ProductModel.js';
 import Category from '../../models/categoryModel.js';
+import Offer from '../../models/OfferModel.js';
+
+// Helper function to get the best offer for a product
+export const getBestOffer = async (productId) => {
+  try {
+    const product = await Product.findById(productId);
+    if (!product) return null;
+
+    const now = new Date();
+
+    // Get active product-specific offer
+    const productOffer = await Offer.findOne({
+      type: 'Product',
+      target: productId,
+      status: 'Active',
+      startDate: { $lte: now },
+      endDate: { $gte: now }
+    });
+
+    // Find the category document to get its ID
+    const category = await Category.findOne({ name: product.category });
+    
+    // Get active category offer if category exists
+    let categoryOffer = null;
+    if (category) {
+      categoryOffer = await Offer.findOne({
+        type: 'Category',
+        target: category._id,
+        status: 'Active',
+        startDate: { $lte: now },
+        endDate: { $gte: now }
+      });
+    }
+
+    // Return the offer with the highest discount
+    if (!productOffer && !categoryOffer) return null;
+    if (!productOffer) return categoryOffer;
+    if (!categoryOffer) return productOffer;
+    
+    return productOffer.discount > categoryOffer.discount ? productOffer : categoryOffer;
+  } catch (error) {
+    console.error('Error getting best offer:', error);
+    return null;
+  }
+};
 
 // List products for users
 export const listProducts = async (req, res) => {
@@ -88,6 +133,21 @@ export const listProducts = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
+    // Get best offers for all products
+    const productsWithOffers = await Promise.all(products.map(async (product) => {
+      const bestOffer = await getBestOffer(product._id);
+      let discountedPrice = product.price;
+      if (bestOffer) {
+        const discountAmount = (product.price * bestOffer.discount) / 100;
+        discountedPrice = product.price - discountAmount;
+      }
+      return {
+        ...product.toObject(),
+        bestOffer,
+        discountedPrice
+      };
+    }));
+
     // Calculate pagination info
     const pagination = {
       currentPage: page,
@@ -101,11 +161,8 @@ export const listProducts = async (req, res) => {
       pages: Array.from({ length: totalPages }, (_, i) => i + 1)
     };
 
-    // Debug pagination
-    console.log('Pagination data:', pagination);
-
     res.render('user/products', {
-      products,
+      products: productsWithOffers,
       categories: categories.map(cat => cat.name),
       selectedCategories: category ? [category] : [],
       search: search || '',
@@ -147,6 +204,16 @@ export const getProductDetails = async (req, res) => {
       });
     }
 
+    // Get the best applicable offer for this product
+    const bestOffer = await getBestOffer(productId);
+    
+    // Calculate discounted price if offer exists
+    let discountedPrice = product.price;
+    if (bestOffer) {
+      const discountAmount = (product.price * bestOffer.discount) / 100;
+      discountedPrice = product.price - discountAmount;
+    }
+
     // Get related products (same category)
     const relatedProducts = await Product.find({
       category: product.category,
@@ -159,11 +226,17 @@ export const getProductDetails = async (req, res) => {
       id: product._id,
       name: product.name,
       category: product.category,
-      brand: product.brand
+      brand: product.brand,
+      bestOffer: bestOffer ? {
+        name: bestOffer.name,
+        discount: bestOffer.discount
+      } : null
     });
 
     res.render('user/product-details', {
       product,
+      bestOffer,
+      discountedPrice,
       relatedProducts,
       title: `${product.name} - Product Details`,
       user: req.session.user,

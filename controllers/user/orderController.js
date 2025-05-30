@@ -136,7 +136,10 @@ export const placeOrder = async (req, res) => {
       items: validItems.map(item => ({
         product: item.product._id,
         quantity: item.quantity,
-        price: item.product.price,
+        price: item.price,
+        originalPrice: item.product.price,
+        discountApplied: item.product.price > item.price ? 
+          Math.round(((item.product.price - item.price) / item.product.price) * 100) : null,
         size: item.size
       })),
       totalAmount: cart.subtotal,

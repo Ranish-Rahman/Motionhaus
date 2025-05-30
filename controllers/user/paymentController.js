@@ -80,7 +80,14 @@ export const createRazorpayOrder = async (req, res) => {
         existingOrder = new Order({
           orderID: `ORD-${Date.now()}-${nanoid(8).toUpperCase()}`,
           user: userId,
-          items: orderItems || [],
+          items: orderItems.map(item => ({
+            product: item.product._id,
+            quantity: item.quantity,
+            price: item.price,
+            originalPrice: item.product.price || item.price,
+            size: item.size,
+            status: 'Pending'
+          })) || [],
           totalAmount: orderAmount || 0,
           status: 'Pending',
           paymentStatus: 'pending',
@@ -204,7 +211,13 @@ export const createRazorpayOrder = async (req, res) => {
       orderID: existingOrder?.orderID || orderOptions.receipt,
       razorpayOrderId: razorpayOrder.id,
       totalAmount: orderAmount,
-      items: orderItems,
+      items: orderItems.map(item => ({
+        product: item.product,
+        quantity: item.quantity,
+        price: item.price,
+        originalPrice: item.product.price || item.price,
+        size: item.size
+      })),
       shippingAddress: shippingAddress,
       userId: userId,
       isRetry: Boolean(existingOrder)
@@ -300,7 +313,14 @@ export const verifyPayment = async (req, res) => {
         order = new Order({
           orderID: req.session.pendingOrder.orderID,
           user: userId,
-          items: req.session.pendingOrder.items,
+          items: req.session.pendingOrder.items.map(item => ({
+            product: item.product._id,
+            quantity: item.quantity,
+            price: item.price,
+            originalPrice: item.product.price || item.price,
+            size: item.size,
+            status: 'Pending'
+          })),
           totalAmount: req.session.pendingOrder.totalAmount,
           shippingAddress: {
             fullName: req.session.pendingOrder.shippingAddress.fullName,
@@ -335,7 +355,14 @@ export const verifyPayment = async (req, res) => {
       order = new Order({
         orderID: req.session.pendingOrder.orderID,
         user: userId,
-        items: req.session.pendingOrder.items,
+        items: req.session.pendingOrder.items.map(item => ({
+          product: item.product._id,
+          quantity: item.quantity,
+          price: item.price,
+          originalPrice: item.product.price || item.price,
+          size: item.size,
+          status: 'Pending'
+        })),
         totalAmount: req.session.pendingOrder.totalAmount,
         shippingAddress: {
           fullName: req.session.pendingOrder.shippingAddress.fullName,

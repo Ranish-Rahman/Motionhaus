@@ -1,5 +1,6 @@
 import Cart from '../../models/cartModel.js';
 import Product from '../../models/ProductModel.js';
+import { getBestOffer } from './productController.js';
 
 // Add to cart 
 export const addToCart = async (req, res) => {
@@ -43,6 +44,16 @@ export const addToCart = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Not enough stock available' });
     }
 
+    // Get best offer for the product
+    const bestOffer = await getBestOffer(productId);
+    
+    // Calculate price with offer if available
+    let finalPrice = product.price;
+    if (bestOffer) {
+      const discountAmount = (product.price * bestOffer.discount) / 100;
+      finalPrice = product.price - discountAmount;
+    }
+
     // Find or create cart for the user
     let cart = await Cart.findOne({ user: userId });
     if (!cart) {
@@ -61,13 +72,14 @@ export const addToCart = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Not enough stock available' });
       }
       cart.items[existingItemIndex].quantity = newQuantity;
+      cart.items[existingItemIndex].price = finalPrice; // Update price in case offer changed
     } else {
       // Add new item
       cart.items.push({
         product: product._id,
         size,
         quantity: qty,
-        price: product.price
+        price: finalPrice
       });
     }
 
@@ -138,13 +150,24 @@ export const updateCartItem = async (req, res) => {
         cart
       });
     }
-    
-    if (qty > product.stock) {
+
+    // Find the size object for stock check
+    const sizeObj = product.sizes.find(s => s.size === parseInt(cart.items[itemIndex].size));
+    if (!sizeObj || qty > sizeObj.quantity) {
       return res.status(400).json({ success: false, message: 'Not enough stock available' });
     }
 
-    // Update quantity
+    // Get best offer and calculate price
+    const bestOffer = await getBestOffer(itemId);
+    let finalPrice = product.price;
+    if (bestOffer) {
+      const discountAmount = (product.price * bestOffer.discount) / 100;
+      finalPrice = product.price - discountAmount;
+    }
+
+    // Update quantity and ensure price is current
     cart.items[itemIndex].quantity = qty;
+    cart.items[itemIndex].price = finalPrice;
 
     // Save cart (pre-save hook will calculate subtotal)
     await cart.save();

@@ -33,8 +33,10 @@ connectDB();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
-app.use(nocache());
 app.use(flash());
+
+// Use nocache middleware
+app.use(nocache());
 
 // Session configuration
 app.use(session({
@@ -48,25 +50,19 @@ app.use(session({
   }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    sameSite: 'lax'
   },
-  name: 'sessionId',
-  rolling: true
+  name: 'sessionId' // Changed from connect.sid to be more generic
 }));
-
-// Add no-cache middleware for all routes
-app.use(nocache());
 
 // Add security headers middleware
 app.use((req, res, next) => {
   // Prevent caching of all responses
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.setHeader('Vary', '*');
   
   // Add security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -87,28 +83,14 @@ app.set('views', './views');
 // Static files
 app.use(express.static('public'));
 
-// 1. Auth routes (login, signup) - no session required
+// Routes
 app.use('/', authRoutes);
-
-// 2. Payment routes - must be before session check
 app.use('/order', paymentRoutes);
-
-// 3. User routes - mount at root for non-profile routes
 app.use('/', userRoutes);
-
-// 4. Admin routes
 app.use('/admin', adminRoutes);
-
-// 5. Category routes
 app.use('/categories', categoryRoutes);
-
-// 6. Product routes
 app.use('/products', productRoutes);
-
-// 7. Wishlist routes
 app.use('/wishlist', wishlistRoutes);
-
-// 8. Wallet routes - mount on both paths
 app.use(['/wallet', '/profile/wallet'], walletRoutes);
 
 // 404 handler

@@ -323,7 +323,21 @@
             In Stock (<%= stockAvailable %> available)
           <% } %>
         </div>
-        <div style="font-size: 20px; font-weight: 700; margin-top: 10px;">₹<%= item.product.price.toFixed(2) %></div>
+        <div style="margin-top: 10px;">
+          <% if (item.price < item.product.price) { %>
+            <span style="text-decoration: line-through; color: #999; font-size: 14px; margin-right: 8px;">
+              ₹<%= item.product.price.toFixed(2) %>
+            </span>
+            <span style="font-size: 20px; font-weight: 700; color: #000;">
+              ₹<%= item.price.toFixed(2) %>
+            </span>
+            <span style="color: #28a745; font-size: 14px; margin-left: 8px;">
+              <%= (((item.product.price - item.price) / item.product.price) * 100).toFixed(0) %>% OFF
+            </span>
+          <% } else { %>
+            <span style="font-size: 20px; font-weight: 700;">₹<%= item.price.toFixed(2) %></span>
+          <% } %>
+        </div>
         <% if (item.product.isBlocked) { %>
           <div style="color: #e74c3c; font-size: 14px; margin-top: 8px; font-weight: 500;">This item is no longer available</div>
         <% } %>

@@ -16,6 +16,11 @@ export const sessionCheck = async (req, res, next) => {
   res.setHeader('Surrogate-Control', 'no-store');
   res.setHeader('Vary', '*');
   
+  // Skip session check for admin routes - let admin middleware handle these
+  if (req.path.startsWith('/admin')) {
+    return next();
+  }
+  
   // Skip session check for OTP verification routes
   if (req.path === '/verify-otp' || req.path === '/resend-otp') {
     return next();
@@ -25,79 +30,19 @@ export const sessionCheck = async (req, res, next) => {
   if (req.path === '/login' || req.path === '/signup') {
     if (req.session?.user) {
       console.log('Redirecting logged in user from public route to home');
-      // Use 303 redirect to prevent caching
-      return res.redirect(303, '/home');
+      return res.redirect('/home');
     }
     return next();
   }
 
-  // For admin routes
-  if (req.path.startsWith('/admin')) {
-    // Allow access to admin login page without admin session
-    if (req.path === '/admin/login') {
-      return next();
-    }
-
-    // Check admin session for other admin routes
-    if (!req.session?.admin) {
-      console.log('No admin session found, redirecting to admin login');
-      req.session.returnTo = req.originalUrl;
-      return res.redirect(303, '/admin/login');
-    }
-    return next();
-  }
-
-  // Special handling for product detail routes
-  if (req.path.match(/^\/products?\/[a-zA-Z0-9]+$/)) {
-    if (!req.session?.user) {
-      console.log('No user session found for product route, redirecting to login');
-      handleSessionCleanup(req, res, req.originalUrl);
-      return;
-    }
-  }
-
-  // For protected user routes
+  // For protected routes, check user session
   if (!req.session?.user) {
-    console.log('No user session found for protected route, redirecting to login');
-    handleSessionCleanup(req, res, req.originalUrl);
-    return;
+    console.log('No user session found, redirecting to login');
+    req.session.returnTo = req.originalUrl;
+    return res.redirect('/login');
   }
 
-  // Verify user exists and is not blocked
-  try {
-    // Safely access user ID - check for both id and _id
-    const userId = req.session?.user?.id || req.session?.user?._id;
-    if (!userId) {
-      console.log('Invalid user ID in session:', req.session?.user);
-      handleSessionCleanup(req, res, req.originalUrl);
-      return;
-    }
-
-    const user = await User.findById(userId);
-    if (!user || user.isBlocked) {
-      console.log('User not found or blocked, clearing session');
-      handleSessionCleanup(req, res, req.originalUrl);
-      return;
-    }
-
-    // Update session with fresh user data - ensure consistent ID field
-    req.session.user = {
-      id: user._id.toString(), // Store as id for consistency
-      _id: user._id.toString(), // Keep _id for backward compatibility
-      name: user.name,
-      email: user.email,
-      username: user.username
-    };
-    
-    // Add user data to response locals for EJS templates
-    res.locals.user = req.session.user;
-    console.log('Session validated successfully for user:', user.email);
-    next();
-  } catch (error) {
-    console.error('Error checking user status:', error);
-    handleSessionCleanup(req, res, req.originalUrl);
-    return;
-  }
+  next();
 };
 
 // Helper function to handle session cleanup and redirect

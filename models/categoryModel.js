@@ -30,6 +30,6 @@ categorySchema.index({ name: 1, isDeleted: 1 }, {
   partialFilterExpression: { isDeleted: false }
 });
 
+// Export the model directly
 const Category = mongoose.model('Category', categorySchema);
-
 export default Category;

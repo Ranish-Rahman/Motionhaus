@@ -23,22 +23,13 @@ export const getAdminLogin = (req, res) => {
 
 // Handle admin login
 export const postAdminLogin = async (req, res) => {
-  console.log('Login request received:', {
-    body: req.body,
-    headers: req.headers,
-    session: req.session
-  });
-
   try {
     const { email, password } = req.body;
     
     // Validate input
     if (!email || !password) {
-      console.log('Missing credentials');
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and password are required' 
-      });
+      req.flash('error', 'Email and password are required');
+      return res.redirect('/admin/login');
     }
 
     // Get admin credentials from environment variables
@@ -46,41 +37,30 @@ export const postAdminLogin = async (req, res) => {
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      console.log('Admin credentials verified');
-      
       // Create admin session
       req.session.admin = {
         email: email,
         loggedIn: true,
         role: 'admin'
       };
-
-      console.log('Admin session created:', req.session.admin);
       
-      return res.json({ 
-        success: true, 
-        redirect: '/admin/dashboard' 
+      // Save session before redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          req.flash('error', 'Login failed. Please try again.');
+          return res.redirect('/admin/login');
+        }
+        res.redirect('/admin/dashboard');
       });
+    } else {
+      req.flash('error', 'Invalid email or password');
+      res.redirect('/admin/login');
     }
-
-    console.log('Invalid credentials provided');
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Invalid email or password' 
-    });
-
   } catch (error) {
     console.error('Login error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-
-    return res.status(500).json({ 
-      success: false, 
-      message: 'An error occurred during login. Please try again.' 
-    });
+    req.flash('error', 'An error occurred during login');
+    res.redirect('/admin/login');
   }
 };
 
@@ -641,10 +621,15 @@ export const getOrderDetails = async (req, res) => {
   try {
     const orderId = req.params.id;
     const order = await Order.findById(orderId)
-      .populate('user', 'name email phone')
-      .populate('shippingAddress')
-      .populate('items.product', 'name price')
-      .select('+returnRequest');
+      .populate({
+        path: 'user',
+        select: 'name email phone'
+      })
+      .populate({
+        path: 'items.product',
+        select: 'name price images'
+      })
+      .lean();  // Convert to plain JavaScript object
 
     if (!order) {
       return res.status(404).json({
@@ -652,6 +637,17 @@ export const getOrderDetails = async (req, res) => {
         message: 'Order not found'
       });
     }
+
+    // Format the date
+    order.formattedDate = new Date(order.orderDate).toLocaleDateString();
+
+    // Calculate and add discounted prices if applicable
+    order.items = order.items.map(item => ({
+      ...item,
+      originalPrice: item.originalPrice || item.price,
+      discountApplied: item.originalPrice ? 
+        Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100) : 0
+    }));
 
     res.json({
       success: true,
@@ -1147,11 +1143,13 @@ export const updateOrderItemStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid status provided' });
     }
 
+    // Find the order and use findOneAndUpdate to avoid validation issues
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    // Find the specific item in the order
     const item = order.items.id(itemId);
     if (!item) {
       return res.status(404).json({ success: false, message: 'Order item not found' });
@@ -1162,12 +1160,30 @@ export const updateOrderItemStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Cannot change status of a cancelled item' });
     }
 
+    // Update only the status field of the specific item
     item.status = status;
-    await order.save();
 
-    res.json({ success: true, message: 'Item status updated', item });
+    // Save with validation options
+    await order.save({ validateModifiedOnly: true });
+
+    res.json({ 
+      success: true, 
+      message: 'Item status updated', 
+      item: {
+        _id: item._id,
+        status: item.status,
+        product: item.product,
+        quantity: item.quantity,
+        price: item.price,
+        originalPrice: item.originalPrice
+      }
+    });
   } catch (error) {
     console.error('Update item status error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update item status' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update item status',
+      error: error.message 
+    });
   }
 };

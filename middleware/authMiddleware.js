@@ -39,9 +39,30 @@ export const isNotAuthenticated = (req, res, next) => {
 
 // Middleware to check if user is admin
 export const isAdmin = (req, res, next) => {
-  if (req.session.admin) {
+  // Skip check for admin login page and logout
+  if (req.path === '/admin/login' || req.path === '/admin/logout') {
+    if (req.session.admin) {
+      return res.redirect('/admin/dashboard');
+    }
     return next();
   }
+
+  if (req.session.admin) {
+    // Add admin data to locals for views
+    res.locals.admin = req.session.admin;
+    return next();
+  }
+
+  // For API requests
+  if (req.headers.accept && req.headers.accept.includes('application/json')) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Unauthorized: Admin session expired' 
+    });
+  }
+
+  // Store return URL and redirect to login
+  req.session.returnTo = req.originalUrl;
   res.redirect('/admin/login');
 };
 
@@ -72,38 +93,6 @@ export const requireAuth = (req, res, next) => {
     });
     
     return res.redirect('/login');
-  }
-  
-  next();
-};
-
-// Admin authentication middleware
-export const requireAdminAuth = (req, res, next) => {
-  // Set cache control headers for all responses
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  
-  if (!req.session.admin) {
-    // Store the original URL to redirect after login
-    req.session.returnTo = req.originalUrl;
-    
-    // Clear any existing session data
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Error destroying session:', err);
-      }
-    });
-    
-    // Clear session cookie
-    res.clearCookie('connect.sid', {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
-    });
-    
-    return res.redirect('/admin/login');
   }
   
   next();

@@ -9,14 +9,20 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-purple: #090909f5;
+            --primary-dark: #1e1f22;
+            --secondary-dark: #2d3748;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.8);
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --border-color: rgba(255, 255, 255, 0.1);
             --sidebar-width: 250px;
         }
 
         body {
             margin: 0;
             font-family: 'Inter', sans-serif;
-            background-color: #f8f9fa;
+            background: linear-gradient(207deg, rgb(25, 25, 25), rgb(0, 0, 0));
+            color: var(--text-primary);
             padding-top: 60px;
         }
 
@@ -27,15 +33,15 @@
 
         .sidebar {
             width: var(--sidebar-width);
-            background: var(--primary-purple);
+            background: var(--primary-dark);
             padding: 2rem 1.5rem;
-            color: white;
+            color: var(--text-primary);
             position: fixed;
             height: calc(100vh - 60px);
             left: 0;
             top: 60px;
             z-index: 10;
-            border-right: 1px solid #232326;
+            border-right: 1px solid var(--border-color);
         }
 
         .sidebar-logo {
@@ -48,7 +54,7 @@
         }
 
         .nav-link {
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-secondary);
             padding: 0.75rem 1rem;
             display: flex;
             align-items: center;
@@ -60,7 +66,7 @@
 
         .nav-link:hover,
         .nav-link.active {
-            color: white;
+            color: var(--text-primary);
             background: rgba(255, 255, 255, 0.1);
         }
 
@@ -72,7 +78,7 @@
             margin-left: var(--sidebar-width);
             flex-grow: 1;
             padding: 2rem;
-            background-color: #ffffff;
+            background: transparent;
         }
 
         .wallet-container {
@@ -87,35 +93,41 @@
             margin-bottom: 2rem;
         }
 
+        .wallet-header h1 {
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
         .date-range {
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.9rem;
         }
 
         .balance-card {
-            background: white;
-            border-radius: 12px;
+            background: var(--primary-dark);
+            border-radius: 16px;
             padding: 2rem;
             margin-bottom: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            border: 1px solid #eee;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
         }
 
         .balance-label {
             font-size: 1.1rem;
-            color: #666;
+            color: var(--text-muted);
             margin-bottom: 0.5rem;
         }
 
         .balance-amount {
             font-size: 2.5rem;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 1rem;
         }
 
         .card-info {
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.9rem;
             display: flex;
             align-items: center;
@@ -127,11 +139,11 @@
         }
 
         .transactions-section {
-            background: white;
-            border-radius: 12px;
+            background: var(--primary-dark);
+            border-radius: 16px;
             padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            border: 1px solid #eee;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
         }
 
         .section-header {
@@ -139,12 +151,14 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .section-title {
             font-size: 1.2rem;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .transaction-item {
@@ -152,7 +166,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 1rem 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .transaction-item:last-child {
@@ -167,7 +181,7 @@
 
         .transaction-id {
             font-size: 0.9rem;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .transaction-amount {
@@ -176,43 +190,46 @@
         }
 
         .transaction-amount.credit {
-            color: #28a745;
+            color: #22c55e;
         }
 
         .transaction-amount.debit {
-            color: #dc3545;
+            color: #ef4444;
         }
 
         .transaction-date {
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.9rem;
+            text-align: right;
         }
 
         .status {
             padding: 0.25rem 0.75rem;
             border-radius: 50px;
             font-size: 0.8rem;
+            margin-top: 0.5rem;
+            display: inline-block;
         }
 
         .status-success {
-            background-color: #e6f7ed;
-            color: #1f9254;
+            background-color: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
         }
 
         .status-pending {
-            background-color: #fff7e6;
-            color: #d48806;
+            background-color: rgba(234, 179, 8, 0.2);
+            color: #eab308;
         }
 
         .status-cancel {
-            background-color: #fff1f0;
-            color: #cf1322;
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
         }
 
         .no-transactions {
             text-align: center;
             padding: 32px;
-            color: #666;
+            color: var(--text-muted);
         }
 
         @media (max-width: 768px) {
@@ -246,8 +263,7 @@
         <main class="main-content">
             <div class="wallet-container">
                 <div class="wallet-header">
-                    <h1>Wallet</h1>
-                    <div class="date-range">12 Sep - 28 Oct 2024</div>
+                    <h1>My Wallet</h1>
                 </div>
 
                 <div class="balance-card">
@@ -261,8 +277,7 @@
 
                 <div class="transactions-section">
                     <div class="section-header">
-                        <div class="section-title">Recent Transitions</div>
-                        <div class="date-range">12 Sep - 28 Oct 2024</div>
+                        <div class="section-title">Recent Transactions</div>
                     </div>
 
                     <% if (transactions && transactions.length > 0) { %>
