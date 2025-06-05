@@ -8,6 +8,7 @@ import Session from '../../models/sessionModel.js';
 import mongoose from 'mongoose';
 import Order from '../../models/orderModel.js';
 import Transaction from '../../models/transactionModel.js';
+import { addRefund } from '../user/walletController.js';
 
 export const getAdminLogin = (req, res) => {
   console.log('Admin login page requested');
@@ -558,24 +559,22 @@ export const getOrders = async (req, res) => {
       Order.find(query)
         .populate('user', 'name email phone')
         .populate('items.product', 'name')
-        .select('+returnRequest')
         .sort(sort)
         .skip(skip)
         .limit(limit),
       Order.countDocuments(query)
     ]);
 
-    // Log orders with return requests
-    console.log('Orders with return requests:', orders.map(order => ({
-      orderId: order._id,
-      status: order.status,
-      returnRequest: order.returnRequest ? {
-        status: order.returnRequest.status,
-        reason: order.returnRequest.reason,
-        requestedAt: order.returnRequest.requestedAt,
-        processedAt: order.returnRequest.processedAt
-      } : null
-    })));
+    // Process return requests for each order
+    orders.forEach(order => {
+      if (order.items) {
+        order.items.forEach(item => {
+          if (item.returnRequest && !item.returnRequest.status) {
+            item.returnRequest.status = 'pending';
+          }
+        });
+      }
+    });
 
     // Calculate pagination info
     const totalPages = Math.ceil(total / limit);
@@ -979,16 +978,25 @@ export const processItemReturn = async (req, res) => {
       });
     }
 
-    // Create return request for the item
+    // Create return request for the item with explicit status
     item.returnRequest = {
       status: 'pending',
-      amount: returnAmount,
-      refundMethod,
-      adminResponse,
-      requestedAt: new Date()
+      amount: returnAmount || itemTotal,
+      refundMethod: refundMethod || 'wallet',
+      adminResponse: adminResponse || '',
+      requestedAt: new Date(),
+      processedAt: null
     };
 
+    // Save the order
     await order.save();
+
+    // Log the created return request
+    console.log('Created return request:', {
+      orderId: order._id,
+      itemId: item._id,
+      returnRequest: item.returnRequest
+    });
 
     res.json({
       success: true,
@@ -1007,73 +1015,75 @@ export const processItemReturn = async (req, res) => {
 // Approve individual item return
 export const approveItemReturn = async (req, res) => {
   try {
-    console.log('approveItemReturn called with:', {
-      orderId: req.params.orderId,
-      itemId: req.params.itemId,
-      body: req.body
-    });
-
-    const order = await Order.findById(req.params.orderId);
+    const { orderId, itemId } = req.params;
+    
+    const order = await Order.findById(orderId);
     if (!order) {
-      console.log('Order not found:', req.params.orderId);
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
     }
 
-    const item = order.items.find(item => item._id.toString() === req.params.itemId);
+    // Find the specific item
+    const item = order.items.id(itemId);
     if (!item) {
-      console.log('Item not found:', req.params.itemId);
-      return res.status(404).json({ success: false, message: 'Item not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Order item not found'
+      });
     }
 
-    const returnRequest = item.returnRequest;
-    if (!returnRequest || returnRequest.status !== 'pending') {
-      console.log('No pending return request found for item:', req.params.itemId);
-      return res.status(400).json({ success: false, message: 'No pending return request found' });
+    if (!item.returnRequest || item.returnRequest.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'No pending return request found for this item'
+      });
     }
 
-    // Find the product and increment stock
-    const product = await Product.findById(item.product);
-    if (!product) {
-      console.log('Product not found:', item.product);
-      return res.status(404).json({ success: false, message: 'Product not found' });
+    // Calculate refund amount
+    const refundAmount = item.returnRequest.amount || (item.price * item.quantity);
+
+    // Process refund to wallet
+    try {
+      await addRefund(
+        order.user,
+        refundAmount,
+        `Refund for returned item in order #${order._id}`,
+        order._id
+      );
+
+      // Update item status and return request
+      item.status = 'Returned';
+      item.returnRequest.status = 'approved';
+      item.returnRequest.processedAt = new Date();
+
+      // Check if all items are returned
+      const allItemsReturned = order.items.every(i => i.status === 'Returned');
+      if (allItemsReturned) {
+        order.status = 'Returned';
+      }
+
+      await order.save();
+
+      res.json({ 
+        success: true, 
+        message: 'Return request approved and refund processed',
+        order: order
+      });
+    } catch (refundError) {
+      console.error('Error processing refund:', refundError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process refund'
+      });
     }
-
-    // Convert item.size to number for comparison
-    const itemSize = Number(item.size);
-    console.log('Looking for size:', itemSize, 'in product sizes:', product.sizes);
-
-    const size = product.sizes.find(s => Number(s.size) === itemSize);
-    if (!size) {
-      console.log('Size not found:', itemSize);
-      return res.status(404).json({ success: false, message: 'Size not found' });
-    }
-
-    console.log('Incrementing stock for product:', {
-      productId: product._id,
-      size: size.size,
-      currentQuantity: size.quantity,
-      incrementBy: item.quantity
-    });
-
-    size.quantity += item.quantity;
-    await product.save();
-
-    // Update return request status
-    returnRequest.status = 'approved';
-    returnRequest.processedAt = new Date();
-    returnRequest.processedBy = req.session.admin._id;
-
-    await order.save();
-    console.log('Return request approved successfully');
-
-    res.json({ 
-      success: true, 
-      message: 'Return request approved successfully',
-      order: order
-    });
   } catch (error) {
     console.error('Error in approveItemReturn:', error);
-    res.status(500).json({ success: false, message: 'Error processing return request' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error processing return request' 
+    });
   }
 };
 

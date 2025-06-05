@@ -245,12 +245,19 @@
                     amount: responseData.amount,
                     currency: responseData.currency || 'INR',
                     name: 'MotionHaus',
-                    description: 'Retry payment for order: ' + orderId,
+                    description: `Total: ₹${(responseData.amount / 100).toFixed(2)} ${responseData.notes?.discountAmount > 0 ? 
+                        `(Original: ₹${(responseData.notes.originalAmount).toFixed(2)}, You Save: ₹${(responseData.notes.discountAmount).toFixed(2)})` : ''}`,
                     order_id: responseData.orderId,
                     prefill: {
                         name: responseData.customerName || '',
                         email: responseData.customerEmail || '',
                         contact: responseData.customerPhone || ''
+                    },
+                    notes: {
+                        orderID: responseData.receipt || orderId,
+                        originalAmount: responseData.notes?.originalAmount,
+                        discountAmount: responseData.notes?.discountAmount,
+                        finalAmount: responseData.notes?.finalAmount
                     },
                     handler: async function(response) {
                         console.log('[Debug] Payment success response:', response);
@@ -287,17 +294,15 @@
                             console.log('[Debug] Verification response:', verifyData);
 
                             if (verifyData.success) {
-                                window.location.href = `/order/success/${orderId}`;
+                                window.location.href = `/order/success/${verifyData.orderId}`;
                             } else {
                                 throw new Error(verifyData.message || 'Payment verification failed');
                             }
                         } catch (error) {
                             console.error('[Debug] Payment verification error:', error);
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Payment Failed',
-                                text: error.message || 'Failed to verify payment',
-                                confirmButtonColor: '#000'
+                            await handlePaymentError(error, {
+                                orderID: orderId,
+                                razorpayOrderId: response.razorpay_order_id
                             });
                         }
                     },
@@ -305,37 +310,13 @@
                         ondismiss: async function() {
                             console.log('[Debug] Payment modal dismissed');
                             try {
-                                const response = await fetch('/order/cancel-razorpay-order', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
+                                await handlePaymentCancellation({
                                         orderID: orderId,
-                                        razorpayOrderId: responseData.orderId,
-                                        isRetry: true
-                                    }),
-                                    credentials: 'same-origin'
-                                });
-
-                                if (!response.ok) {
-                                    throw new Error('Failed to cancel order');
-                                }
-
-                                Swal.fire({
-                                    icon: 'info',
-                                    title: 'Payment Cancelled',
-                                    text: 'You have cancelled the payment',
-                                    confirmButtonColor: '#000'
+                                    razorpayOrderId: responseData.orderId
                                 });
                             } catch (error) {
-                                console.error('[Debug] Error cancelling order:', error);
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Error',
-                                    text: 'Failed to cancel payment',
-                                    confirmButtonColor: '#000'
-                                });
+                                console.error('[Debug] Error in modal dismiss:', error);
+                                window.location.href = `/order/failed/${orderId}?error=${encodeURIComponent('Payment cancelled')}`;
                             }
                         }
                     }
@@ -343,6 +324,16 @@
 
                 console.log('[Debug] Initializing Razorpay with options:', razorpayOptions);
                 const rzp = new Razorpay(razorpayOptions);
+                
+                // Add payment failed handler
+                rzp.on('payment.failed', async function(response) {
+                    console.error('[Debug] Payment failed:', response.error);
+                    await handlePaymentError(response.error, {
+                        orderID: orderId,
+                        razorpayOrderId: responseData.orderId
+                    });
+                });
+
                 rzp.open();
 
             } catch (error) {
@@ -360,6 +351,89 @@
                         window.location.href = '/profile/orders';
                     }
                 });
+            }
+        }
+
+        // Helper function to handle payment errors
+        async function handlePaymentError(error, order) {
+            console.error('[Debug] Payment error:', error);
+            console.log('[Debug] Order data:', order);
+            try {
+                // Show error message to user
+                await Swal.fire({
+                    title: 'Payment Failed',
+                    text: error.description || error.message || 'Your payment could not be processed',
+                    icon: 'error',
+                    confirmButtonColor: '#000'
+                });
+
+                // Handle the failed payment in backend
+                const response = await fetch('/order/payment-failed', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderID: order.orderID,
+                        razorpayOrderId: order.razorpayOrderId,
+                        error: error.description || error.message || 'Payment failed'
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to handle payment failure on server');
+                }
+
+                const result = await response.json();
+                console.log('[Debug] Payment failure handled:', result);
+                
+                // Redirect to failed order page
+                window.location.href = `/order/failed/${order.orderID}?error=${encodeURIComponent(error.description || error.message || 'Payment failed')}`;
+            } catch (handlingError) {
+                console.error('[Debug] Error while handling payment failure:', handlingError);
+                window.location.href = `/order/failed/${order.orderID || 'unknown'}?error=${encodeURIComponent('Error processing payment failure')}`;
+            }
+        }
+
+        // Helper function to handle payment cancellation
+        async function handlePaymentCancellation(order) {
+            console.log('[Debug] Handling payment cancellation', order);
+            try {
+                // Show cancellation message
+                await Swal.fire({
+                    title: 'Payment Cancelled',
+                    text: 'You have cancelled the payment',
+                    icon: 'info',
+                    confirmButtonColor: '#000'
+                });
+
+                // Handle the cancellation in backend
+                const response = await fetch('/order/cancel-razorpay-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderID: order.orderID,
+                        razorpayOrderId: order.razorpayOrderId,
+                        isRetry: true
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to handle cancellation on server');
+                }
+
+                const result = await response.json();
+                console.log('[Debug] Cancellation handled:', result);
+
+                // Redirect to failed order page with cancellation message
+                window.location.href = `/order/failed/${order.orderID}?error=${encodeURIComponent('Payment cancelled by user')}`;
+            } catch (error) {
+                console.error('[Debug] Error in cancellation handler:', error);
+                window.location.href = `/order/failed/${order.orderID || 'unknown'}?error=${encodeURIComponent('Error while cancelling payment')}`;
             }
         }
     </script>

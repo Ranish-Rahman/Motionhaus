@@ -5,6 +5,7 @@ import Order from '../../models/orderModel.js';
 import { nanoid } from 'nanoid';
 import Address from '../../models/addressModel.js';
 import razorpay from '../../utils/razorpay.js';
+import { getBestOffer } from './productController.js';
 
 export const createRazorpayOrder = async (req, res) => {
   try {
@@ -19,6 +20,9 @@ export const createRazorpayOrder = async (req, res) => {
     let orderItems;
     let existingOrder;
     let shippingAddress;
+    let subtotal = 0;
+    let discountAmount = 0;
+    let finalAmount = 0;
 
     if (isRetry && retryOrderId) {
       console.log('[Debug] Fetching existing order for retry. OrderID:', retryOrderId);
@@ -31,6 +35,9 @@ export const createRazorpayOrder = async (req, res) => {
         orderAmount = req.session.pendingOrder.totalAmount;
         orderItems = req.session.pendingOrder.items;
         shippingAddress = req.session.pendingOrder.shippingAddress;
+        subtotal = req.session.pendingOrder.originalAmount || orderAmount;
+        discountAmount = req.session.pendingOrder.discountAmount || 0;
+        finalAmount = req.session.pendingOrder.totalAmount;
         existingOrder = await Order.findOne({ 
           $or: [
             { orderID: req.session.pendingOrder.orderID },
@@ -129,6 +136,8 @@ export const createRazorpayOrder = async (req, res) => {
       orderAmount = existingOrder.totalAmount;
       orderItems = existingOrder.items;
       shippingAddress = existingOrder.shippingAddress;
+      subtotal = existingOrder.totalAmount;  // For retries without discount info
+      finalAmount = existingOrder.totalAmount;
     } else {
       // Handle new order creation
       const cart = await Cart.findOne({ user: userId }).populate('items.product');
@@ -151,10 +160,40 @@ export const createRazorpayOrder = async (req, res) => {
         });
       }
 
-      orderAmount = validItems.reduce((total, item) => 
+      // Calculate amounts considering discounts
+      subtotal = validItems.reduce((total, item) => 
         total + (item.product.price * item.quantity), 0
       );
-      orderItems = validItems;
+      
+      // Calculate discounts for each item
+      for (const item of validItems) {
+        const offer = await getBestOffer(item.product._id);
+        if (offer) {
+          const itemSubtotal = item.product.price * item.quantity;
+          const itemDiscount = Math.round((itemSubtotal * offer.discount) / 100);
+          discountAmount += itemDiscount;
+        }
+      }
+
+      finalAmount = subtotal - discountAmount;
+      orderAmount = finalAmount;
+
+      // Calculate per-item discount proportionally
+      const discountRatio = discountAmount > 0 ? discountAmount / subtotal : 0;
+      orderItems = validItems.map(item => {
+        const itemSubtotal = item.product.price * item.quantity;
+        const itemDiscount = Math.round(itemSubtotal * discountRatio * 100) / 100;
+        const finalItemPrice = Math.round((itemSubtotal - itemDiscount) * 100) / 100;
+        
+        return {
+          product: item.product._id,
+          quantity: item.quantity,
+          price: finalItemPrice / item.quantity, // Per unit price after discount
+          originalPrice: item.product.price,
+          discountAmount: itemDiscount,
+          size: item.size
+        };
+      });
 
       // Get shipping address
       const addressId = req.body.addressId;
@@ -186,7 +225,10 @@ export const createRazorpayOrder = async (req, res) => {
       receipt: existingOrder?.orderID || `ORD-${Date.now()}-${nanoid(8).toUpperCase()}`,
       payment_capture: 1,
       notes: {
-        internal_order_id: existingOrder?.orderID || 'new_order'
+        internal_order_id: existingOrder?.orderID || 'new_order',
+        originalAmount: subtotal,
+        discountAmount: discountAmount,
+        finalAmount: finalAmount
       }
     };
 
@@ -210,12 +252,15 @@ export const createRazorpayOrder = async (req, res) => {
     req.session.pendingOrder = {
       orderID: existingOrder?.orderID || orderOptions.receipt,
       razorpayOrderId: razorpayOrder.id,
-      totalAmount: orderAmount,
+      totalAmount: finalAmount,
+      originalAmount: subtotal,
+      discountAmount: discountAmount,
       items: orderItems.map(item => ({
         product: item.product,
         quantity: item.quantity,
         price: item.price,
-        originalPrice: item.product.price || item.price,
+        originalPrice: item.originalPrice,
+        discountAmount: item.discountAmount,
         size: item.size
       })),
       shippingAddress: shippingAddress,
@@ -271,13 +316,16 @@ export const verifyPayment = async (req, res) => {
       isRetry
     } = req.body;
 
-    console.log('Verifying payment:', {
+    console.log('[Debug] Verifying payment:', {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
       isRetry,    
       orderID,
-      hasSession: !!req.session.pendingOrder,
-      sessionData: req.session.pendingOrder
+      sessionData: {
+        hasPendingOrder: !!req.session.pendingOrder,
+        pendingOrderID: req.session.pendingOrder?.orderID,
+        pendingRazorpayOrderId: req.session.pendingOrder?.razorpayOrderId
+      }
     });
 
     // Verify the payment signature
@@ -297,8 +345,11 @@ export const verifyPayment = async (req, res) => {
     const userId = req.session.user._id;
     let order;
 
-    // For retry payments, use pendingOrder from session
-    if (isRetry && req.session.pendingOrder) {
+    // Check session data matches
+    if (req.session.pendingOrder && 
+       (req.session.pendingOrder.razorpayOrderId === razorpay_order_id || 
+        req.session.pendingOrder.orderID === orderID)) {
+      
       // Try to find existing order
       order = await Order.findOne({
         $or: [
@@ -309,19 +360,30 @@ export const verifyPayment = async (req, res) => {
       });
 
       if (!order) {
-        // If no existing order found, create new one from session data
+        console.log('[Debug] Creating new order from session data');
+        // Create new order from session data
+        const orderItems = req.session.pendingOrder.items.map(item => ({
+          product: item.product?._id || item.product, // Handle both populated and unpopulated products
+          quantity: item.quantity,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          size: item.size,
+          status: 'Pending'
+        }));
+
+        // Validate all items have product IDs
+        const validItems = orderItems.filter(item => item.product);
+        if (validItems.length === 0) {
+          throw new Error('No valid items found in order');
+        }
+
         order = new Order({
           orderID: req.session.pendingOrder.orderID,
           user: userId,
-          items: req.session.pendingOrder.items.map(item => ({
-            product: item.product._id,
-            quantity: item.quantity,
-            price: item.price,
-            originalPrice: item.product.price || item.price,
-            size: item.size,
-            status: 'Pending'
-          })),
+          items: validItems,
           totalAmount: req.session.pendingOrder.totalAmount,
+          originalAmount: req.session.pendingOrder.originalAmount,
+          discountAmount: req.session.pendingOrder.discountAmount,
           shippingAddress: {
             fullName: req.session.pendingOrder.shippingAddress.fullName,
             address: req.session.pendingOrder.shippingAddress.addressLine1 + 
@@ -349,72 +411,41 @@ export const verifyPayment = async (req, res) => {
           razorpayPaymentId: razorpay_payment_id,
           razorpaySignature: razorpay_signature
         };
-      }
-    } else if (!isRetry && req.session.pendingOrder) {
-      // Handle new order
-      order = new Order({
-        orderID: req.session.pendingOrder.orderID,
-        user: userId,
-        items: req.session.pendingOrder.items.map(item => ({
-          product: item.product._id,
-          quantity: item.quantity,
-          price: item.price,
-          originalPrice: item.product.price || item.price,
-          size: item.size,
-          status: 'Pending'
-        })),
-        totalAmount: req.session.pendingOrder.totalAmount,
-        shippingAddress: {
-          fullName: req.session.pendingOrder.shippingAddress.fullName,
-          address: req.session.pendingOrder.shippingAddress.addressLine1 + 
-                  (req.session.pendingOrder.shippingAddress.addressLine2 ? ', ' + req.session.pendingOrder.shippingAddress.addressLine2 : ''),
-          city: req.session.pendingOrder.shippingAddress.city,
-          state: req.session.pendingOrder.shippingAddress.state,
-          postalCode: req.session.pendingOrder.shippingAddress.zipCode,
-          phone: req.session.pendingOrder.shippingAddress.phone
-        },
-        status: 'Completed',
-        paymentStatus: 'paid',
-        paymentMethod: 'razorpay',
-        paymentDetails: {
-          razorpayOrderId: razorpay_order_id,
-          razorpayPaymentId: razorpay_payment_id,
-          razorpaySignature: razorpay_signature
-        }
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid order session"
-      });
     }
 
     await order.save();
 
-    // Clear session data
-    delete req.session.pendingOrder;
-    await new Promise((resolve) => req.session.save(resolve));
-
-    // Clear cart if this is a new order
-    if (!isRetry) {
+      // Clear cart
       await Cart.findOneAndUpdate(
         { user: userId },
-        { $set: { items: [], subtotal: 0 } }
+        { $set: { items: [], subtotal: 0, discount: 0 } }
       );
-    }
 
-    res.json({
+      // Clear session data
+      delete req.session.pendingOrder;
+      await new Promise((resolve) => req.session.save(resolve));
+
+      return res.json({
       success: true,
       message: "Payment verified successfully",
       orderId: order._id
     });
+    }
+
+    // If we get here, something went wrong
+    console.error('[Debug] Payment verification failed:', {
+      sessionMatch: false,
+      pendingOrder: req.session.pendingOrder?.orderID,
+      razorpayOrderId: razorpay_order_id,
+      orderID
+    });
+
+    throw new Error('Invalid order session or mismatch in order IDs');
 
   } catch (error) {
-    console.error('Payment verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Payment verification failed"
-    });
+    console.error('[Debug] Payment verification error:', error);
+    // Forward to payment failure handler
+    await handlePaymentFailure(req, res);
   }
 };
 
@@ -423,12 +454,16 @@ export const handlePaymentFailure = async (req, res) => {
     const { orderID, razorpayOrderId, error } = req.body;
     const userId = req.session.user._id;
 
-    console.log('[Debug] Handling failed payment:', { orderID, razorpayOrderId, error });
-    console.log('[Debug] Session data:', req.session.pendingOrder);
-
-    if (!orderID && !razorpayOrderId) {
-      throw new Error('Order ID or Razorpay Order ID is required');
-    }
+    console.log('[Debug] Handling failed payment:', { 
+      orderID, 
+      razorpayOrderId,
+      error,
+      sessionData: {
+        hasPendingOrder: !!req.session.pendingOrder,
+        pendingOrderID: req.session.pendingOrder?.orderID,
+        requestedOrderID: orderID
+      }
+    });
 
     // First check if order already exists
     let order = await Order.findOne({ 
@@ -439,81 +474,60 @@ export const handlePaymentFailure = async (req, res) => {
       user: userId 
     });
 
-    if (!order) {
-      console.log('[Debug] Order not found, creating new order for failed payment');
+    if (!order && req.session.pendingOrder) {
+      console.log('[Debug] Creating new order for failed payment from session');
       
-      // Get pending order data from session
-      const pendingOrder = req.session.pendingOrder;
-      if (!pendingOrder) {
-        console.log('[Debug] No pending order found in session');
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid order data'
-        });
+      const orderItems = req.session.pendingOrder.items.map(item => ({
+        product: item.product?._id || item.product,
+        quantity: item.quantity,
+        price: item.price,
+        originalPrice: item.originalPrice,
+        size: item.size,
+        status: 'Failed'
+      }));
+
+      // Validate all items have product IDs
+      const validItems = orderItems.filter(item => item.product);
+      if (validItems.length === 0) {
+        throw new Error('No valid items found in order');
       }
 
-      // Create new order with failed status
       order = new Order({
-        orderID: pendingOrder.orderID,
+        orderID: req.session.pendingOrder.orderID,
         user: userId,
-        items: pendingOrder.items,
-        totalAmount: pendingOrder.totalAmount,
-        shippingAddress: pendingOrder.shippingAddress,
+        items: validItems,
+        totalAmount: req.session.pendingOrder.totalAmount,
+        originalAmount: req.session.pendingOrder.originalAmount,
+        discountAmount: req.session.pendingOrder.discountAmount,
+        shippingAddress: req.session.pendingOrder.shippingAddress,
         paymentMethod: 'razorpay',
         status: 'payment-failed',
         paymentStatus: 'failed',
         cancelReason: error || 'Payment failed',
         paymentDetails: {
-          razorpayOrderId: razorpayOrderId || pendingOrder.razorpayOrderId
+          razorpayOrderId: razorpayOrderId || req.session.pendingOrder.razorpayOrderId
         }
       });
 
-      console.log('[Debug] Attempting to save failed order:', order);
       await order.save();
-      console.log('[Debug] Created new order for failed payment:', order.orderID);
-    } else {
-      // Update existing order status
-      console.log('[Debug] Updating existing order:', order.orderID);
-      order.status = 'payment-failed';
-      order.paymentStatus = 'failed';
-      order.cancelReason = error || 'Payment failed';
-      if (razorpayOrderId) {
-        order.paymentDetails = order.paymentDetails || {};
-        order.paymentDetails.razorpayOrderId = razorpayOrderId;
-      }
-      await order.save();
-      console.log('[Debug] Updated existing order status:', order.orderID);
     }
 
-    // Restore product stock
-    if (order.items && order.items.length > 0) {
-      console.log('[Debug] Restoring stock for items:', order.items.length);
-      for (const item of order.items) {
-        const product = await Product.findById(item.product);
-        if (product) {
-          const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
-          if (sizeObj) {
-            sizeObj.quantity += item.quantity;
-            await product.save();
-            console.log(`[Debug] Restored stock for product ${product._id} size ${item.size}: +${item.quantity}`);
-          }
-        }
-      }
+    if (!order) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order data'
+      });
     }
 
-    // Clear cart and session data
-    const cart = await Cart.findOne({ user: userId });
-    if (cart) {
-      cart.items = [];
-      cart.subtotal = 0;
-      await cart.save();
-      console.log('[Debug] Cleared cart for user:', userId);
-    }
-
-    // Clear session data
+    // Clear session and cart
     delete req.session.pendingOrder;
-    await new Promise((resolve) => req.session.save(resolve));
-    console.log('[Debug] Cleared session data');
+    await Promise.all([
+      new Promise((resolve) => req.session.save(resolve)),
+      Cart.findOneAndUpdate(
+        { user: userId },
+        { $set: { items: [], subtotal: 0, discount: 0 } }
+      )
+    ]);
 
     res.json({
       success: true,

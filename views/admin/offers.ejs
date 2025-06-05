@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Add SweetAlert2 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <style>
     body {
       background-color: #f8f9fa;
@@ -320,12 +322,14 @@
                   </span>
                 </td>
                 <td>
-                  <button class="btn-action btn-edit" onclick="editOffer('<%= offer._id %>')">Edit</button>
-                  <% if (offer.status === 'Active') { %>
-                    <button class="btn-action btn-deactivate" onclick="deactivateOffer('<%= offer._id %>')">Deactivate</button>
-                  <% } else { %>
-                    <button class="btn-action btn-activate" onclick="activateOffer('<%= offer._id %>')">Activate</button>
-                  <% } %>
+                  <button class="btn-action btn-edit" onclick="editOffer('<%= offer._id %>')">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn-action toggle-status <%= offer.status === 'Active' ? 'btn-deactivate' : 'btn-activate' %>"
+                          data-offer-id="<%= offer._id %>"
+                          data-current-status="<%= offer.status === 'Active' %>">
+                    <i class="fas <%= offer.status === 'Active' ? 'fa-ban' : 'fa-check' %>"></i>
+                  </button>
                 </td>
               </tr>
             <% }) %>
@@ -496,6 +500,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Add SweetAlert2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
     // Add form validation
     const offerForm = document.getElementById('addOfferForm');
@@ -586,35 +592,70 @@
       }
     }
 
-    async function updateOfferStatus(offerId, status) {
-      try {
-        const response = await fetch(`/admin/offers/${offerId}/status`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ status })
-        });
+    // Toggle offer status
+    document.querySelectorAll('.toggle-status').forEach(button => {
+      button.addEventListener('click', async function() {
+        const offerId = this.dataset.offerId;
+        const currentStatus = this.dataset.currentStatus === 'true';
+        const action = currentStatus ? 'deactivate' : 'activate';
 
-        if (response.ok) {
-          location.reload();
-        } else {
-          const error = await response.json();
-          alert(error.message || 'Error updating offer status');
+        try {
+          const result = await Swal.fire({
+            title: `${action.charAt(0).toUpperCase() + action.slice(1)} Offer?`,
+            text: `Are you sure you want to ${action} this offer?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: currentStatus ? '#dc3545' : '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: `Yes, ${action} it!`
+          });
+
+          if (result.isConfirmed) {
+            // Show loading state
+            Swal.fire({
+              title: `${action.charAt(0).toUpperCase() + action.slice(1)}ing Offer...`,
+              text: 'Please wait...',
+              allowOutsideClick: false,
+              didOpen: () => {
+                Swal.showLoading();
+              }
+            });
+
+            const response = await fetch(`/admin/offers/${offerId}/status`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ 
+                status: currentStatus ? 'Inactive' : 'Active' 
+              })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              await Swal.fire({
+                title: 'Success!',
+                text: data.message,
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+              });
+              location.reload();
+            } else {
+              throw new Error(data.message || `Failed to ${action} offer`);
+            }
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          Swal.fire({
+            title: 'Error!',
+            text: error.message || `Failed to ${action} offer`,
+            icon: 'error'
+          });
         }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Error updating offer status');
-      }
-    }
-
-    function activateOffer(offerId) {
-      updateOfferStatus(offerId, 'Active');
-    }
-
-    function deactivateOffer(offerId) {
-      updateOfferStatus(offerId, 'Inactive');
-    }
+      });
+    });
 
     function searchOffers() {
       const searchTerm = document.getElementById('searchOffers').value.toLowerCase();

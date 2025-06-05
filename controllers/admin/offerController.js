@@ -89,23 +89,33 @@ export const createOffer = async (req, res) => {
 // Update offer status
 export const updateOfferStatus = async (req, res) => {
     try {
-        const { offerId } = req.params;
+        const { id } = req.params;
         const { status } = req.body;
 
         const offer = await OfferModel.findByIdAndUpdate(
-            offerId,
+            id,
             { status },
             { new: true }
         );
 
         if (!offer) {
-            return res.status(404).json({ error: 'Offer not found' });
+            return res.status(404).json({ 
+                success: false,
+                message: 'Offer not found' 
+            });
         }
 
-        res.json({ message: 'Offer status updated successfully' });
+        res.json({ 
+            success: true,
+            message: 'Offer status updated successfully',
+            offer 
+        });
     } catch (error) {
         console.error('Error updating offer status:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            message: 'Internal server error' 
+        });
     }
 };
 

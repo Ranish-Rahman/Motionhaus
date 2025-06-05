@@ -25,9 +25,23 @@
         <i class="bi bi-arrow-return-left"></i> Return
       </button>
     <% } else if (item.returnRequest && item.returnRequest.status === 'pending') { %>
-      <span class="badge bg-warning">Return Requested</span>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="badge bg-warning">Return Requested</span>
+        <button class="btn btn-sm btn-success accept-item-return"
+                data-order-id="<%= order._id %>"
+                data-item-id="<%= item._id %>">
+          <i class="bi bi-check-circle"></i> Accept
+        </button>
+        <button class="btn btn-sm btn-danger deny-item-return"
+                data-order-id="<%= order._id %>"
+                data-item-id="<%= item._id %>">
+          <i class="bi bi-x-circle"></i> Deny
+        </button>
+      </div>
     <% } else if (item.returnRequest && item.returnRequest.status === 'approved') { %>
       <span class="badge bg-success">Return Approved</span>
+    <% } else if (item.returnRequest && item.returnRequest.status === 'denied') { %>
+      <span class="badge bg-danger">Return Denied</span>
     <% } %>
   </div>
 </td> 

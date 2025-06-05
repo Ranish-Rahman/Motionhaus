@@ -11,6 +11,7 @@ import puppeteer from 'puppeteer';
 import ejs from 'ejs';
 import razorpay from '../../utils/razorpay.js';
 import { nanoid } from 'nanoid';
+import { getBestOffer } from './productController.js';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -1117,9 +1118,7 @@ const postChangePassword = async (req, res) => {
 const getCheckout = async (req, res) => {
   try {
     const userId = req.session.user._id || req.session.user.id;
-    // Fetch user's addresses from the database
     const addresses = await Address.find({ userId });
-    // Fetch cart from DB and populate product details
     let cart = await Cart.findOne({ user: userId }).populate('items.product');
     
     if (!cart || !cart.items || cart.items.length === 0) {
@@ -1127,42 +1126,105 @@ const getCheckout = async (req, res) => {
       return res.redirect('/cart');
     }
 
-    // Filter out items with null products or blocked products
-    cart.items = cart.items.filter(item => item.product && !item.product.isBlocked);
-    
-    // If all items were filtered out, redirect to cart
-    if (cart.items.length === 0) {
-      req.flash('error', 'All items in your cart are no longer available.');
-      return res.redirect('/cart');
-    }
-    
-    // Recalculate subtotal
-    cart.subtotal = cart.items.reduce((total, item) => {
-      return total + (item.product.price * item.quantity);
-    }, 0);
-    
-    // Save the filtered cart
-    await cart.save();
+    // Calculate cart totals and apply discounts
+    let cartTotal = 0;
+    let totalDiscount = 0;
+    const processedItems = [];
 
-    // Get user data including wallet balance
-    const user = await User.findById(userId).lean();
-    if (!user) {
-      req.flash('error', 'User not found');
-      return res.redirect('/cart');
+    // Process each item and calculate discounts
+    for (let item of cart.items) {
+      if (!item.product || item.product.isBlocked) continue;
+
+      const originalPrice = item.product.price;
+      const itemSubtotal = originalPrice * item.quantity;
+      cartTotal += itemSubtotal;
+
+      // Get and apply offer
+      const offer = await getBestOffer(item.product._id);
+      if (offer) {
+        const itemDiscount = Math.round((itemSubtotal * offer.discount) / 100);
+        totalDiscount += itemDiscount;
+        
+        processedItems.push({
+          ...item.toObject(),
+          product: {
+            ...item.product.toObject(),
+            bestOffer: offer,
+            originalPrice,
+            discountedPrice: originalPrice - (itemDiscount / item.quantity)
+          },
+          discountAmount: itemDiscount,
+          finalPrice: originalPrice - (itemDiscount / item.quantity),
+          offerName: offer.name,
+          offerDiscount: offer.discount
+        });
+      } else {
+        processedItems.push({
+          ...item.toObject(),
+          product: {
+            ...item.product.toObject(),
+            originalPrice,
+            discountedPrice: originalPrice
+          },
+          discountAmount: 0,
+          finalPrice: originalPrice,
+          offerName: null,
+          offerDiscount: 0
+        });
+      }
     }
 
-    // Ensure wallet object exists
-    if (!user.wallet) {
-      user.wallet = { balance: 0 };
-    }
+    // Calculate final amount
+    const finalAmount = cartTotal - totalDiscount;
 
-    res.render('user/checkout', { 
-      cart: cart,
-      addresses: addresses,
-      user: user
+    // Store checkout data in session
+    req.session.checkoutData = {
+      cartTotal,
+      totalDiscount,
+      finalAmount,
+      items: processedItems.map(item => ({
+        product: item.product._id,
+        quantity: item.quantity,
+        price: item.finalPrice,
+        originalPrice: item.product.originalPrice,
+        discountAmount: item.discountAmount,
+        size: item.size,
+        offerName: item.offerName,
+        offerDiscount: item.offerDiscount
+      }))
+    };
+
+    // Save session explicitly
+    await new Promise(resolve => req.session.save(resolve));
+
+    console.log('Checkout calculation:', {
+      cartTotal,
+      totalDiscount,
+      finalAmount,
+      items: processedItems.map(item => ({
+        name: item.product.name,
+        price: item.product.originalPrice,
+        discount: item.discountAmount,
+        final: item.finalPrice,
+        offer: item.offerName
+      }))
     });
+
+    res.render('user/checkout', {
+      cart: {
+        ...cart.toObject(),
+        items: processedItems,
+        subtotal: cartTotal,
+        discount: totalDiscount,
+        finalAmount,
+        hasOffer: totalDiscount > 0
+      },
+      addresses,
+      user: await User.findById(userId).lean()
+    });
+
   } catch (error) {
-    console.error('Error fetching addresses for checkout:', error);
+    console.error('Error in checkout:', error);
     req.flash('error', 'An error occurred while loading the checkout page.');
     res.redirect('/cart');
   }
@@ -2009,6 +2071,109 @@ export const getOrderFailure = async (req, res) => {
   }
 };
 
+// Create Razorpay order
+const createOrder = async (req, res) => {
+  try {
+    const { addressId } = req.body;
+    const userId = req.session.user._id;
+
+    // Get checkout data from session
+    const checkoutData = req.session.checkoutData;
+    if (!checkoutData) {
+      return res.status(400).json({
+        success: false,
+        message: 'Checkout data not found. Please try again.'
+      });
+    }
+
+    // Verify the amounts
+    const originalAmount = checkoutData.originalSubtotal;
+    const discountAmount = checkoutData.totalDiscount;
+    const finalAmount = originalAmount - discountAmount;
+
+    // Double check that the amounts match
+    if (finalAmount !== checkoutData.finalAmount) {
+      console.error('Amount mismatch:', {
+        calculated: finalAmount,
+        stored: checkoutData.finalAmount
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Amount verification failed'
+      });
+    }
+
+    // Create unique order ID
+    const orderID = `ORD-${Date.now()}-${nanoid(6)}`;
+    
+    // Convert final amount to paise
+    const amountInPaise = Math.round(finalAmount * 100);
+
+    console.log('Creating Razorpay order:', {
+      originalAmount,
+      discountAmount,
+      finalAmount,
+      amountInPaise
+    });
+
+    // Create Razorpay order with the discounted amount
+    const razorpayOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: orderID,
+      payment_capture: 1,
+      notes: {
+        originalAmount,
+        discountAmount,
+        finalAmount
+      }
+    });
+
+    // Store complete order data in session
+    req.session.pendingOrder = {
+      orderID,
+      razorpayOrderId: razorpayOrder.id,
+      totalAmount: finalAmount,
+      originalAmount,
+      discountAmount,
+      items: checkoutData.items,
+      shippingAddress: await Address.findById(addressId),
+      userId
+    };
+
+    // Save session explicitly
+    await new Promise(resolve => req.session.save(resolve));
+
+    // Log the final data being sent
+    console.log('Order created with amounts:', {
+      originalAmount,
+      discountAmount,
+      finalAmount,
+      amountInPaise,
+      razorpayOrderId: razorpayOrder.id
+    });
+
+    res.json({
+      success: true,
+      orderId: razorpayOrder.id,
+      amount: amountInPaise,
+      orderID,
+      summary: {
+        original: originalAmount,
+        discount: discountAmount,
+        final: finalAmount
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create order'
+    });
+  }
+};
+
 export {
   signUpPage,
   getLogin,
@@ -2036,6 +2201,7 @@ export {
   updateProfile,
   sendProfileOTP,
   verifyProfileOTP,
-  getProfileData
+  getProfileData,
+  createOrder
 };
 

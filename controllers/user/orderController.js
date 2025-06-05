@@ -142,7 +142,8 @@ export const placeOrder = async (req, res) => {
           Math.round(((item.product.price - item.price) / item.product.price) * 100) : null,
         size: item.size
       })),
-      totalAmount: cart.subtotal,
+      totalAmount: Number(req.body.finalAmount) || cart.subtotal,
+      discountAmount: Number(req.body.discountAmount) || 0,
       shippingAddress: {
         fullName: selectedAddress.fullName,
         address: selectedAddress.addressLine1 + (selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''),

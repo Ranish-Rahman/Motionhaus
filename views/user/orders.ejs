@@ -177,13 +177,28 @@
                                 </td>
                                 <td>
                                     <% 
-                                    // Calculate total based on actual paid prices
+                                    // Calculate total based on actual paid prices including discount
                                     const displayAmount = order.items.reduce((total, item) => {
-                                        // Use the price field which contains the actual paid price
-                                        return total + (item.price * item.quantity);
+                                        return total + (item.originalPrice * item.quantity);
                                     }, 0);
+                                    const finalAmount = order.totalAmount;
+                                    const discountAmount = order.discountAmount || 0;
                                     %>
-                                    ₹<%= displayAmount.toFixed(2) %>
+                                    <div>
+                                        <% if (discountAmount > 0) { %>
+                                            <div style="text-decoration: line-through; color: #999; font-size: 0.85em;">
+                                                ₹<%= displayAmount.toFixed(2) %>
+                                            </div>
+                                            <div style="color: #2ecc71; font-weight: 600;">
+                                                ₹<%= finalAmount.toFixed(2) %>
+                                                <span style="font-size: 0.85em; margin-left: 5px;">
+                                                    (Saved ₹<%= discountAmount.toFixed(2) %>)
+                                                </span>
+                                            </div>
+                                        <% } else { %>
+                                            ₹<%= finalAmount.toFixed(2) %>
+                                        <% } %>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="badge bg-<%= order.status === 'Pending' ? 'warning' : 

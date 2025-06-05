@@ -596,13 +596,30 @@
                                  <i class="bi bi-arrow-return-left"></i> Process Return
                                </button>` 
                               : item.returnRequest ? 
-                                `<span class="badge ${
-                                  item.returnRequest.status === 'pending' ? 'bg-warning' :
-                                  item.returnRequest.status === 'approved' ? 'bg-success' :
-                                  'bg-danger'
-                                }">
-                                  Return ${item.returnRequest.status}
-                                </span>` 
+                                `<div class="d-flex flex-column gap-2">
+                                  ${item.returnRequest.status === 'pending' ? 
+                                    `<span class="badge bg-warning px-3 py-2 text-center" style="font-size: 0.9rem; font-weight: 500;">RETURN PENDING</span>
+                                     <div class="d-flex gap-2 justify-content-center">
+                                       <button class="btn btn-success accept-item-return"
+                                               data-order-id="${order._id}"
+                                               data-item-id="${item._id}"
+                                               style="padding: 6px 20px; min-width: 100px;">
+                                         Accept
+                                       </button>
+                                       <button class="btn btn-danger deny-item-return"
+                                               data-order-id="${order._id}"
+                                               data-item-id="${item._id}"
+                                               style="padding: 6px 20px; min-width: 100px;">
+                                         Deny
+                                       </button>
+                                     </div>` 
+                                    : `<span class="badge ${
+                                      item.returnRequest.status === 'approved' ? 'bg-success' : 'bg-danger'
+                                    } px-3 py-2" style="font-size: 0.9rem; font-weight: 500;">
+                                      Return ${item.returnRequest.status ? item.returnRequest.status.toUpperCase() : 'PENDING'}
+                                    </span>`
+                                  }
+                                </div>` 
                               : ''
                             }
                           </td>
@@ -814,6 +831,51 @@
               }
             });
           });
+
+          // Add event listeners for item status changes
+          document.querySelectorAll('.item-status-select').forEach(select => {
+            select.addEventListener('change', async (e) => {
+              const orderId = e.target.dataset.orderId;
+              const itemId = e.target.dataset.itemId;
+              const newStatus = e.target.value;
+
+              try {
+                const response = await fetch(`/admin/orders/${orderId}/items/${itemId}/status`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ status: newStatus })
+                });
+
+                if (!response.ok) {
+                  throw new Error('Failed to update item status');
+                }
+
+                Swal.fire({
+                  icon: 'success',
+                  title: 'Success',
+                  text: 'Item status updated successfully',
+                  showConfirmButton: false,
+                  timer: 1500
+                }).then(() => {
+                  location.reload();
+                });
+              } catch (error) {
+                console.error('Error:', error);
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Error',
+                  text: error.message || 'Failed to update item status'
+                });
+                // Reset select to previous value
+                e.target.value = e.target.getAttribute('data-original-status');
+              }
+            });
+
+            // Store original status for rollback on error
+            select.setAttribute('data-original-status', select.value);
+          });
         } catch (error) {
           console.error('Error:', error);
           Swal.fire({
@@ -971,359 +1033,7 @@
           </td>
         </tr>
       `;
-
-      const search = encodeURIComponent(document.getElementById('searchInput').value.trim());
-      const status = encodeURIComponent(document.getElementById('statusFilter').value);
-      const sortBy = encodeURIComponent(document.getElementById('sortBy').value);
-      
-      // Get current page from URL or default to 1
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentPage = urlParams.get('page') || 1;
-
-      // Construct URL with all parameters
-      const queryParams = new URLSearchParams({
-        page: currentPage,
-        search: search,
-        status: status,
-        sortBy: sortBy
-      });
-
-      // Remove empty parameters
-      for (const [key, value] of queryParams.entries()) {
-        if (!value) {
-          queryParams.delete(key);
-        }
-      }
-
-      // Redirect with updated filters
-      window.location.href = `${window.location.pathname}?${queryParams.toString()}`;
     }
-
-    // Set initial filter values from URL parameters
-    window.addEventListener('load', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      const search = urlParams.get('search');
-      if (search) {
-        document.getElementById('searchInput').value = decodeURIComponent(search);
-      }
-      
-      const status = urlParams.get('status');
-      if (status) {
-        document.getElementById('statusFilter').value = decodeURIComponent(status);
-      }
-      
-      const sortBy = urlParams.get('sortBy');
-      if (sortBy) {
-        document.getElementById('sortBy').value = decodeURIComponent(sortBy);
-      }
-    });
-
-    // Accept return request
-    document.querySelectorAll('.accept-return').forEach(button => {
-      button.addEventListener('click', async (e) => {
-        const orderId = e.target.closest('button').dataset.orderId;
-        
-        try {
-          const result = await Swal.fire({
-            title: 'Accept Return Request',
-            text: 'Are you sure you want to accept this return request?',
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, accept return',
-            cancelButtonText: 'Cancel'
-          });
-
-          if (result.isConfirmed) {
-            const response = await fetch(`/admin/return-requests/${orderId}/approved`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                response: 'Return request approved'
-              })
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              console.log('Return request processed:', data);
-              
-              Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: 'Return request accepted successfully',
-                showConfirmButton: false,
-                timer: 1500
-              }).then(() => {
-                location.reload();
-              });
-            } else {
-              const error = await response.json();
-              throw new Error(error.message || 'Failed to accept return request');
-            }
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: error.message || 'Failed to accept return request'
-          });
-        }
-      });
-    });
-
-    // Deny return request
-    document.querySelectorAll('.deny-return').forEach(button => {
-      button.addEventListener('click', async (e) => {
-        const orderId = e.target.closest('button').dataset.orderId;
-        
-        try {
-          const { value: reason } = await Swal.fire({
-            title: 'Deny Return Request',
-            input: 'textarea',
-            inputLabel: 'Reason for denial',
-            inputPlaceholder: 'Please provide a reason for denying this return request...',
-            showCancelButton: true,
-            inputValidator: (value) => {
-              if (!value) {
-                return 'Please provide a reason for denial';
-              }
-            }
-          });
-
-          if (reason) {
-            const response = await fetch(`/admin/return-requests/${orderId}/denied`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                response: reason
-              })
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              console.log('Return request processed:', data);
-              
-              Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: 'Return request denied successfully',
-                showConfirmButton: false,
-                timer: 1500
-              }).then(() => {
-                location.reload();
-              });
-            } else {
-              const error = await response.json();
-              throw new Error(error.message || 'Failed to deny return request');
-            }
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: error.message || 'Failed to deny return request'
-          });
-        }
-      });
-    });
-
-    // Cancel item functionality
-    document.addEventListener('click', async (e) => {
-      if (e.target.closest('.cancel-item')) {
-        const button = e.target.closest('.cancel-item');
-        const orderId = button.dataset.orderId;
-        const itemId = button.dataset.itemId;
-        
-        const { value: reason } = await Swal.fire({
-          title: 'Cancel Item',
-          input: 'textarea',
-          inputLabel: 'Reason for Cancellation',
-          inputPlaceholder: 'Enter reason for cancellation...',
-          inputAttributes: {
-            'aria-label': 'Enter reason for cancellation'
-          },
-          showCancelButton: true,
-          confirmButtonText: 'Cancel Item',
-          confirmButtonColor: '#dc3545',
-          cancelButtonText: 'Close',
-          inputValidator: (value) => {
-            if (!value) {
-              return 'Please provide a reason for cancellation';
-            }
-          }
-        });
-
-        if (reason) {
-          try {
-            const response = await fetch(`/order/${orderId}/item/${itemId}/cancel`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ reason })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-              await Swal.fire({
-                title: 'Success!',
-                text: 'Item cancelled successfully',
-                icon: 'success',
-                timer: 2000,
-                showConfirmButton: false
-              });
-              location.reload();
-            } else {
-              throw new Error(data.message || 'Failed to cancel item');
-            }
-          } catch (error) {
-            console.error('Error:', error);
-            Swal.fire({
-              title: 'Error!',
-              text: error.message || 'Failed to cancel item. Please try again.',
-              icon: 'error',
-              confirmButtonColor: '#dc3545'
-            });
-          }
-        }
-      }
-    });
-
-    // Return request functionality
-    document.addEventListener('click', async (e) => {
-      if (e.target.closest('.request-return')) {
-        const button = e.target.closest('.request-return');
-        const orderId = button.dataset.orderId;
-        const itemId = button.dataset.itemId;
-        
-        const { value: reason } = await Swal.fire({
-          title: 'Request Return',
-          input: 'textarea',
-          inputLabel: 'Reason for Return',
-          inputPlaceholder: 'Enter reason for return...',
-          inputAttributes: {
-            'aria-label': 'Enter reason for return'
-          },
-          showCancelButton: true,
-          confirmButtonText: 'Submit Return Request',
-          confirmButtonColor: '#ffc107',
-          cancelButtonText: 'Close',
-          inputValidator: (value) => {
-            if (!value) {
-              return 'Please provide a reason for return';
-            }
-          }
-        });
-
-        if (reason) {
-          try {
-            const response = await fetch(`/order/${orderId}/item/${itemId}/return`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ reason })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-              await Swal.fire({
-                title: 'Success!',
-                text: 'Return request submitted successfully',
-                icon: 'success',
-                timer: 2000,
-                showConfirmButton: false
-              });
-              location.reload();
-            } else {
-              throw new Error(data.message || 'Failed to submit return request');
-            }
-          } catch (error) {
-            console.error('Error:', error);
-            Swal.fire({
-              title: 'Error!',
-              text: error.message || 'Failed to submit return request. Please try again.',
-              icon: 'error',
-              confirmButtonColor: '#dc3545'
-            });
-          }
-        }
-      }
-    });
-
-    // Add this JS after rendering the modal content
-    document.addEventListener('change', async (e) => {
-      if (e.target.classList.contains('item-status-select')) {
-        const orderId = e.target.dataset.orderId;
-        const itemId = e.target.dataset.itemId;
-        const status = e.target.value;
-        const currentStatus = e.target.querySelector('option:checked').getAttribute('data-current-status');
-
-        try {
-          // Check if trying to change from Delivered status
-          if (currentStatus === 'Delivered') {
-            Swal.fire({
-              icon: 'error',
-              title: 'Status Change Not Allowed',
-              text: 'Order status cannot be changed after delivery'
-            });
-            // Reset to Delivered status
-            e.target.value = 'Delivered';
-            return;
-          }
-
-          // Check if trying to change to a previous state from a more advanced state
-          const statusOrder = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered'];
-          const currentIndex = statusOrder.indexOf(currentStatus);
-          const newIndex = statusOrder.indexOf(status);
-
-          if (currentIndex > newIndex && currentStatus !== 'Cancelled' && currentStatus !== 'Returned') {
-            Swal.fire({
-              icon: 'error',
-              title: 'Invalid Status Change',
-              text: 'Cannot change to a previous status'
-            });
-            // Reset to current status
-            e.target.value = currentStatus;
-            return;
-          }
-
-          const response = await fetch(`/admin/orders/${orderId}/items/${itemId}/status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-          });
-
-          if (response.ok) {
-            Swal.fire({
-              icon: 'success',
-              title: 'Status Updated',
-              timer: 1000,
-              showConfirmButton: false
-            });
-          } else {
-            throw new Error('Failed to update item status');
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: error.message
-          });
-          // Reset to the previous status on error
-          e.target.value = currentStatus;
-        }
-      }
-    });
   </script>
 </body>
-</html> 
+</html>

@@ -1,5 +1,6 @@
 import Cart from '../../models/cartModel.js';
 import Product from '../../models/ProductModel.js';
+import Coupon from '../../models/couponModel.js';
 import { getBestOffer } from './productController.js';
 
 // Add to cart 
@@ -227,4 +228,136 @@ export const removeFromCart = async (req, res) => {
     console.error('Error removing from cart:', error);
     res.status(500).json({ success: false, message: 'Failed to remove item from cart' });
   }
+};
+
+// Apply coupon to cart
+export const applyCoupon = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Please login to apply coupon'
+            });
+        }
+
+        const userId = req.session.user._id;
+        const { code } = req.body;
+
+        if (!code) {
+            return res.status(400).json({
+                success: false,
+                message: 'Coupon code is required'
+            });
+        }
+
+        // Find cart
+        const cart = await Cart.findOne({ user: userId });
+        if (!cart || !cart.items.length) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cart is empty'
+            });
+        }
+
+        // Find coupon
+        const coupon = await Coupon.findOne({ code: code.toUpperCase() });
+        if (!coupon) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid coupon code'
+            });
+        }
+
+        // Validate coupon
+        if (!coupon.isValid()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Coupon is expired or inactive'
+            });
+        }
+
+        // Check minimum order amount
+        if (cart.subtotal < coupon.minAmount) {
+            return res.status(400).json({
+                success: false,
+                message: `Minimum order amount of ₹${coupon.minAmount} is required for this coupon`
+            });
+        }
+
+        // Apply coupon
+        await cart.applyCoupon(coupon);
+        await cart.save();
+
+        // Increment usage count
+        coupon.usageCount += 1;
+        await coupon.save();
+
+        // Populate cart items for response
+        await cart.populate('items.product');
+
+        res.json({
+            success: true,
+            message: 'Coupon applied successfully',
+            cart,
+            coupon,
+            discount: cart.discount
+        });
+    } catch (error) {
+        console.error('Error applying coupon:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to apply coupon'
+        });
+    }
+};
+
+// Remove coupon from cart
+export const removeCoupon = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Please login to remove coupon'
+            });
+        }
+
+        const userId = req.session.user._id;
+
+        // Find cart
+        const cart = await Cart.findOne({ user: userId });
+        if (!cart) {
+            return res.status(404).json({
+                success: false,
+                message: 'Cart not found'
+            });
+        }
+
+        // If there was a coupon, decrement its usage count
+        if (cart.coupon) {
+            const coupon = await Coupon.findById(cart.coupon);
+            if (coupon && coupon.usageCount > 0) {
+                coupon.usageCount -= 1;
+                await coupon.save();
+            }
+        }
+
+        // Remove coupon from cart
+        await cart.applyCoupon(null);
+        await cart.save();
+
+        // Populate cart items for response
+        await cart.populate('items.product');
+
+        res.json({
+            success: true,
+            message: 'Coupon removed successfully',
+            cart
+        });
+    } catch (error) {
+        console.error('Error removing coupon:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to remove coupon'
+        });
+    }
 }; 

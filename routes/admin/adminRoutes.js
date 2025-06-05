@@ -49,6 +49,9 @@ import {
 } from '../../controllers/admin/offerController.js';
 import { upload, processImages } from '../../middleware/imageUpload.js';
 import { isAdmin } from '../../middleware/authMiddleware.js';
+import couponRoutes from './couponRoutes.js';
+import salesReportRoutes from '../salesReport.js';
+import Coupon from '../../models/couponModel.js';
 
 const router = express.Router();
 
@@ -126,5 +129,52 @@ router.post('/orders/:orderId/items/:itemId/return', processItemReturn);
 router.post('/orders/:orderId/items/:itemId/return/approve', approveItemReturn);
 router.post('/orders/:orderId/items/:itemId/return/deny', denyItemReturn);
 router.post('/orders/:orderId/items/:itemId/status', updateOrderItemStatus);
+
+// Coupon management routes
+router.use('/coupons', couponRoutes);
+
+// Sales Report routes
+router.use('/sales-report', salesReportRoutes);
+
+// Add this route to render the coupon management page
+router.get('/coupon-management', isAdmin, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const query = {};
+        if (req.query.status) {
+            if (req.query.status === 'active') {
+                query.isActive = true;
+            } else if (req.query.status === 'inactive') {
+                query.isActive = false;
+            }
+        }
+
+        const [coupons, total] = await Promise.all([
+            Coupon.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Coupon.countDocuments(query)
+        ]);
+
+        res.render('admin/coupons', {
+            coupons,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            total,
+            path: '/admin/coupon-management'
+        });
+    } catch (error) {
+        console.error('Error in coupon management page:', error);
+        res.status(500).render('error', {
+            message: 'Failed to load coupon management page',
+            statusCode: 500,
+            error: error
+        });
+    }
+});
 
 export default router; 

@@ -5,10 +5,22 @@ import Offer from '../../models/OfferModel.js';
 // Helper function to get the best offer for a product
 export const getBestOffer = async (productId) => {
   try {
+    console.log('Starting getBestOffer for productId:', productId);
+    
     const product = await Product.findById(productId);
-    if (!product) return null;
+    if (!product) {
+      console.log('Product not found:', productId);
+      return null;
+    }
+
+    console.log('Found product:', {
+      id: product._id,
+      name: product.name,
+      category: product.category
+    });
 
     const now = new Date();
+    console.log('Current time:', now);
 
     // Get active product-specific offer
     const productOffer = await Offer.findOne({
@@ -19,12 +31,38 @@ export const getBestOffer = async (productId) => {
       endDate: { $gte: now }
     });
 
+    console.log('Product offer check:', {
+      productId,
+      hasOffer: !!productOffer,
+      offerDetails: productOffer ? {
+        name: productOffer.name,
+        discount: productOffer.discount,
+        type: productOffer.type,
+        startDate: productOffer.startDate,
+        endDate: productOffer.endDate
+      } : null
+    });
+
     // Find the category document to get its ID
-    const category = await Category.findOne({ name: product.category });
+    const category = await Category.findOne({ 
+      name: product.category,
+      isDeleted: false  // Only look for active categories
+    });
+    
+    console.log('Category check:', {
+      categoryName: product.category,
+      foundCategory: !!category,
+      categoryId: category?._id,
+      categoryDetails: category ? {
+        name: category.name,
+        isDeleted: category.isDeleted
+      } : null
+    });
     
     // Get active category offer if category exists
     let categoryOffer = null;
     if (category) {
+      // First try by category ID
       categoryOffer = await Offer.findOne({
         type: 'Category',
         target: category._id,
@@ -32,14 +70,76 @@ export const getBestOffer = async (productId) => {
         startDate: { $lte: now },
         endDate: { $gte: now }
       });
+
+      console.log('Category offer by ID check:', {
+        categoryId: category._id,
+        hasOffer: !!categoryOffer,
+        offerDetails: categoryOffer ? {
+          name: categoryOffer.name,
+          discount: categoryOffer.discount,
+          type: categoryOffer.type,
+          startDate: categoryOffer.startDate,
+          endDate: categoryOffer.endDate
+        } : null
+      });
+
+      // If no offer found by ID, try by category name
+      if (!categoryOffer) {
+        console.log('No offer found by category ID, trying by name...');
+        const categoryOffers = await Offer.find({
+          type: 'Category',
+          status: 'Active',
+          startDate: { $lte: now },
+          endDate: { $gte: now }
+        }).populate('target');
+
+        // Find an offer where the target category name matches
+        categoryOffer = categoryOffers.find(offer => 
+          offer.target && 
+          (offer.target.name === product.category || 
+           (typeof offer.target === 'string' && offer.target === product.category))
+        );
+
+        console.log('Category offer by name check:', {
+          categoryName: product.category,
+          foundOffers: categoryOffers.length,
+          hasMatchingOffer: !!categoryOffer,
+          offerDetails: categoryOffer ? {
+            name: categoryOffer.name,
+            discount: categoryOffer.discount,
+            type: categoryOffer.type,
+            startDate: categoryOffer.startDate,
+            endDate: categoryOffer.endDate,
+            target: categoryOffer.target
+          } : null
+        });
+      }
     }
 
     // Return the offer with the highest discount
-    if (!productOffer && !categoryOffer) return null;
-    if (!productOffer) return categoryOffer;
-    if (!categoryOffer) return productOffer;
+    if (!productOffer && !categoryOffer) {
+      console.log('No offers found for product');
+      return null;
+    }
+    if (!productOffer) {
+      console.log('Using category offer:', categoryOffer.name);
+      return categoryOffer;
+    }
+    if (!categoryOffer) {
+      console.log('Using product offer:', productOffer.name);
+      return productOffer;
+    }
     
-    return productOffer.discount > categoryOffer.discount ? productOffer : categoryOffer;
+    const bestOffer = productOffer.discount > categoryOffer.discount ? productOffer : categoryOffer;
+    console.log('Selected best offer:', {
+      name: bestOffer.name,
+      discount: bestOffer.discount,
+      type: bestOffer.type,
+      startDate: bestOffer.startDate,
+      endDate: bestOffer.endDate
+    });
+    
+    return bestOffer;
   } catch (error) {
     console.error('Error getting best offer:', error);
     return null;
