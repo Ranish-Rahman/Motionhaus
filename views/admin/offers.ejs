@@ -10,6 +10,394 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Add SweetAlert2 CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="application/json" id="offers-data">
+    <%- JSON.stringify(offers) %>
+  </script>
+  <script>
+    // Store offers data for editing
+    const offersData = JSON.parse(document.getElementById('offers-data').textContent);
+
+    // Wait for DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Add event listeners to edit buttons
+      document.querySelectorAll('.btn-edit').forEach(button => {
+        button.addEventListener('click', function() {
+          const offerId = this.dataset.offerId;
+          const offer = offersData.find(o => o._id === offerId);
+          if (!offer) return;
+
+          // Set form values
+          document.getElementById('editOfferId').value = offer._id;
+          document.getElementById('editOfferName').value = offer.name;
+          document.getElementById('editOfferType').value = offer.type;
+          document.getElementById('editOfferDiscount').value = offer.discount;
+          
+          // Format dates for input fields (YYYY-MM-DD)
+          const startDate = new Date(offer.startDate).toISOString().split('T')[0];
+          const endDate = new Date(offer.endDate).toISOString().split('T')[0];
+          document.getElementById('editOfferStartDate').value = startDate;
+          document.getElementById('editOfferEndDate').value = endDate;
+
+          // Show/hide and set target based on type
+          const productSelect = document.getElementById('editProductSelect');
+          const categorySelect = document.getElementById('editCategorySelect');
+          
+          if (offer.type === 'Product') {
+            if (productSelect) {
+              productSelect.style.display = 'block';
+              const productTarget = document.getElementById('editProductTarget');
+              if (productTarget) {
+                productTarget.value = offer.target;
+                productTarget.required = true;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'none';
+              const categoryTarget = document.getElementById('editCategoryTarget');
+              if (categoryTarget) {
+                categoryTarget.required = false;
+              }
+            }
+          } else {
+            if (productSelect) {
+              productSelect.style.display = 'none';
+              const productTarget = document.getElementById('editProductTarget');
+              if (productTarget) {
+                productTarget.required = false;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'block';
+              const categoryTarget = document.getElementById('editCategoryTarget');
+              if (categoryTarget) {
+                categoryTarget.value = offer.target;
+                categoryTarget.required = true;
+              }
+            }
+          }
+
+          // Show modal
+          const editModal = new bootstrap.Modal(document.getElementById('editOfferModal'));
+          editModal.show();
+        });
+      });
+
+      // Add form validation
+      const offerForm = document.getElementById('addOfferForm');
+      if (offerForm) {
+        const nameInput = offerForm.querySelector('input[name="name"]');
+        if (nameInput) {
+          nameInput.addEventListener('input', function() {
+            validateName(this);
+          });
+        }
+      }
+
+      // Handle offer type change in add form
+      const offerTypeSelect = document.getElementById('offerType');
+      if (offerTypeSelect) {
+        offerTypeSelect.addEventListener('change', function() {
+          const productSelect = document.getElementById('productSelect');
+          const categorySelect = document.getElementById('categorySelect');
+          
+          if (this.value === 'Product') {
+            if (productSelect) {
+              productSelect.style.display = 'block';
+              const productTarget = document.querySelector('select[name="productTarget"]');
+              if (productTarget) {
+                productTarget.required = true;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'none';
+              const categoryTarget = document.querySelector('select[name="categoryTarget"]');
+              if (categoryTarget) {
+                categoryTarget.required = false;
+              }
+            }
+          } else if (this.value === 'Category') {
+            if (productSelect) {
+              productSelect.style.display = 'none';
+              const productTarget = document.querySelector('select[name="productTarget"]');
+              if (productTarget) {
+                productTarget.required = false;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'block';
+              const categoryTarget = document.querySelector('select[name="categoryTarget"]');
+              if (categoryTarget) {
+                categoryTarget.required = true;
+              }
+            }
+          } else {
+            if (productSelect) {
+              productSelect.style.display = 'none';
+              const productTarget = document.querySelector('select[name="productTarget"]');
+              if (productTarget) {
+                productTarget.required = false;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'none';
+              const categoryTarget = document.querySelector('select[name="categoryTarget"]');
+              if (categoryTarget) {
+                categoryTarget.required = false;
+              }
+            }
+          }
+        });
+      }
+
+      // Handle offer type change in edit form
+      const editOfferType = document.getElementById('editOfferType');
+      if (editOfferType) {
+        editOfferType.addEventListener('change', function() {
+          const productSelect = document.getElementById('editProductSelect');
+          const categorySelect = document.getElementById('editCategorySelect');
+          
+          if (this.value === 'Product') {
+            if (productSelect) {
+              productSelect.style.display = 'block';
+              const productTarget = document.getElementById('editProductTarget');
+              if (productTarget) {
+                productTarget.required = true;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'none';
+              const categoryTarget = document.getElementById('editCategoryTarget');
+              if (categoryTarget) {
+                categoryTarget.required = false;
+              }
+            }
+          } else if (this.value === 'Category') {
+            if (productSelect) {
+              productSelect.style.display = 'none';
+              const productTarget = document.getElementById('editProductTarget');
+              if (productTarget) {
+                productTarget.required = false;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'block';
+              const categoryTarget = document.getElementById('editCategoryTarget');
+              if (categoryTarget) {
+                categoryTarget.required = true;
+              }
+            }
+          } else {
+            if (productSelect) {
+              productSelect.style.display = 'none';
+              const productTarget = document.getElementById('editProductTarget');
+              if (productTarget) {
+                productTarget.required = false;
+              }
+            }
+            if (categorySelect) {
+              categorySelect.style.display = 'none';
+              const categoryTarget = document.getElementById('editCategoryTarget');
+              if (categoryTarget) {
+                categoryTarget.required = false;
+              }
+            }
+          }
+        });
+      }
+
+      // Toggle offer status
+      document.querySelectorAll('.toggle-status').forEach(button => {
+        button.addEventListener('click', async function() {
+          const offerId = this.dataset.offerId;
+          const currentStatus = this.dataset.currentStatus === 'true';
+          const action = currentStatus ? 'deactivate' : 'activate';
+
+          try {
+            const result = await Swal.fire({
+              title: `${action.charAt(0).toUpperCase() + action.slice(1)} Offer?`,
+              text: `Are you sure you want to ${action} this offer?`,
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: currentStatus ? '#dc3545' : '#28a745',
+              cancelButtonColor: '#6c757d',
+              confirmButtonText: `Yes, ${action} it!`
+            });
+
+            if (result.isConfirmed) {
+              // Show loading state
+              Swal.fire({
+                title: `${action.charAt(0).toUpperCase() + action.slice(1)}ing Offer...`,
+                text: 'Please wait...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                  Swal.showLoading();
+                }
+              });
+
+              const response = await fetch(`/admin/offers/${offerId}/status`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                  status: currentStatus ? 'Inactive' : 'Active' 
+                })
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                await Swal.fire({
+                  title: 'Success!',
+                  text: data.message,
+                  icon: 'success',
+                  timer: 2000,
+                  showConfirmButton: false
+                });
+                location.reload();
+              } else {
+                throw new Error(data.message || `Failed to ${action} offer`);
+              }
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+              title: 'Error!',
+              text: error.message || `Failed to ${action} offer`,
+              icon: 'error'
+            });
+          }
+        });
+      });
+
+      document.getElementById('statusFilter').addEventListener('change', searchOffers);
+    });
+
+    function validateName(input) {
+      const name = input.value.trim();
+      const pattern = /^[A-Za-z0-9- ]{2,50}$/;
+      const isValid = pattern.test(name);
+      
+      if (isValid) {
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+      } else {
+        input.classList.remove('is-valid');
+        input.classList.add('is-invalid');
+      }
+      return isValid;
+    }
+
+    // Functions that don't depend on DOM elements
+    function searchOffers() {
+      const searchTerm = document.getElementById('searchOffers').value.toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+      const rows = document.querySelectorAll('tbody tr');
+
+      rows.forEach(row => {
+        const name = row.cells[1].textContent.toLowerCase();
+        const status = row.cells[5].textContent.trim().toLowerCase();
+        const matchesSearch = name.includes(searchTerm);
+        const matchesStatus = statusFilter === 'all' || status === statusFilter.toLowerCase();
+        
+        row.style.display = matchesSearch && matchesStatus ? '' : 'none';
+      });
+    }
+
+    async function submitOffer() {
+      const form = document.getElementById('addOfferForm');
+      if (!form) return;
+      
+      const nameInput = form.querySelector('input[name="name"]');
+      if (!nameInput) return;
+
+      // Validate all fields
+      if (!form.checkValidity() || !validateName(nameInput)) {
+        form.classList.add('was-validated');
+        return;
+      }
+
+      const formData = new FormData(form);
+      const type = formData.get('type');
+      
+      const data = {
+        name: formData.get('name').trim(),
+        type: type,
+        discount: parseFloat(formData.get('discount')),
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate'),
+        target: type === 'Product' ? formData.get('productTarget') : formData.get('categoryTarget'),
+        targetModel: type === 'Product' ? 'Product' : 'Category'
+      };
+
+      try {
+        const response = await fetch('/admin/offers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+          location.reload();
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Error creating offer');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error creating offer');
+      }
+    }
+
+    async function updateOffer() {
+      const form = document.getElementById('editOfferForm');
+      if (!form) return;
+      
+      // Validate form
+      if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+      }
+
+      const formData = new FormData(form);
+      const type = formData.get('type');
+      const offerId = formData.get('offerId');
+      
+      const data = {
+        name: formData.get('name').trim(),
+        type: type,
+        discount: parseFloat(formData.get('discount')),
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate'),
+        target: type === 'Product' ? formData.get('productTarget') : formData.get('categoryTarget'),
+        targetModel: type === 'Product' ? 'Product' : 'Category'
+      };
+
+      try {
+        const response = await fetch(`/admin/offers/${offerId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+          location.reload();
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Error updating offer');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error updating offer');
+      }
+    }
+  </script>
   <style>
     body {
       background-color: #f8f9fa;
@@ -322,7 +710,7 @@
                   </span>
                 </td>
                 <td>
-                  <button class="btn-action btn-edit" onclick="editOffer('<%= offer._id %>')">
+                  <button class="btn-action btn-edit" data-offer-id="<%= offer._id %>">
                     <i class="fas fa-edit"></i>
                   </button>
                   <button class="btn-action toggle-status <%= offer.status === 'Active' ? 'btn-deactivate' : 'btn-activate' %>"
@@ -498,292 +886,5 @@
       </div>
     </div>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Add SweetAlert2 JS -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script>
-    // Add form validation
-    const offerForm = document.getElementById('addOfferForm');
-    const nameInput = offerForm.querySelector('input[name="name"]');
-
-    // Validate name input
-    nameInput.addEventListener('input', function() {
-      validateName(this);
-    });
-
-    function validateName(input) {
-      const name = input.value.trim();
-      const pattern = /^[A-Za-z0-9- ]{2,50}$/;
-      const isValid = pattern.test(name);
-      
-      if (isValid) {
-        input.classList.remove('is-invalid');
-        input.classList.add('is-valid');
-      } else {
-        input.classList.remove('is-valid');
-        input.classList.add('is-invalid');
-      }
-      return isValid;
-    }
-
-    document.getElementById('offerType').addEventListener('change', function() {
-      const productSelect = document.getElementById('productSelect');
-      const categorySelect = document.getElementById('categorySelect');
-      
-      if (this.value === 'Product') {
-        productSelect.style.display = 'block';
-        categorySelect.style.display = 'none';
-        document.querySelector('select[name="productTarget"]').required = true;
-        document.querySelector('select[name="categoryTarget"]').required = false;
-      } else if (this.value === 'Category') {
-        productSelect.style.display = 'none';
-        categorySelect.style.display = 'block';
-        document.querySelector('select[name="productTarget"]').required = false;
-        document.querySelector('select[name="categoryTarget"]').required = true;
-      } else {
-        productSelect.style.display = 'none';
-        categorySelect.style.display = 'none';
-        document.querySelector('select[name="productTarget"]').required = false;
-        document.querySelector('select[name="categoryTarget"]').required = false;
-      }
-    });
-
-    async function submitOffer() {
-      const form = document.getElementById('addOfferForm');
-      
-      // Validate all fields
-      if (!form.checkValidity() || !validateName(nameInput)) {
-        form.classList.add('was-validated');
-        return;
-      }
-
-      const formData = new FormData(form);
-      const type = formData.get('type');
-      
-      const data = {
-        name: formData.get('name').trim(),
-        type: type,
-        discount: parseFloat(formData.get('discount')),
-        startDate: formData.get('startDate'),
-        endDate: formData.get('endDate'),
-        target: type === 'Product' ? formData.get('productTarget') : formData.get('categoryTarget'),
-        targetModel: type === 'Product' ? 'Product' : 'Category'
-      };
-
-      try {
-        const response = await fetch('/admin/offers', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-          location.reload();
-        } else {
-          const error = await response.json();
-          alert(error.error || 'Error creating offer');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Error creating offer');
-      }
-    }
-
-    // Toggle offer status
-    document.querySelectorAll('.toggle-status').forEach(button => {
-      button.addEventListener('click', async function() {
-        const offerId = this.dataset.offerId;
-        const currentStatus = this.dataset.currentStatus === 'true';
-        const action = currentStatus ? 'deactivate' : 'activate';
-
-        try {
-          const result = await Swal.fire({
-            title: `${action.charAt(0).toUpperCase() + action.slice(1)} Offer?`,
-            text: `Are you sure you want to ${action} this offer?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: currentStatus ? '#dc3545' : '#28a745',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: `Yes, ${action} it!`
-          });
-
-          if (result.isConfirmed) {
-            // Show loading state
-            Swal.fire({
-              title: `${action.charAt(0).toUpperCase() + action.slice(1)}ing Offer...`,
-              text: 'Please wait...',
-              allowOutsideClick: false,
-              didOpen: () => {
-                Swal.showLoading();
-              }
-            });
-
-            const response = await fetch(`/admin/offers/${offerId}/status`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ 
-                status: currentStatus ? 'Inactive' : 'Active' 
-              })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-              await Swal.fire({
-                title: 'Success!',
-                text: data.message,
-                icon: 'success',
-                timer: 2000,
-                showConfirmButton: false
-              });
-              location.reload();
-            } else {
-              throw new Error(data.message || `Failed to ${action} offer`);
-            }
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          Swal.fire({
-            title: 'Error!',
-            text: error.message || `Failed to ${action} offer`,
-            icon: 'error'
-          });
-        }
-      });
-    });
-
-    function searchOffers() {
-      const searchTerm = document.getElementById('searchOffers').value.toLowerCase();
-      const statusFilter = document.getElementById('statusFilter').value;
-      const rows = document.querySelectorAll('tbody tr');
-
-      rows.forEach(row => {
-        const name = row.cells[1].textContent.toLowerCase();
-        const status = row.cells[5].textContent.trim().toLowerCase();
-        const matchesSearch = name.includes(searchTerm);
-        const matchesStatus = statusFilter === 'all' || status === statusFilter.toLowerCase();
-        
-        row.style.display = matchesSearch && matchesStatus ? '' : 'none';
-      });
-    }
-
-    document.getElementById('statusFilter').addEventListener('change', searchOffers);
-
-    // Store offers data for editing
-    const offersData = JSON.parse('<%- JSON.stringify(offers) %>');
-
-    // Function to handle edit button click
-    async function editOffer(offerId) {
-      const offer = offersData.find(o => o._id === offerId);
-      if (!offer) return;
-
-      // Set form values
-      document.getElementById('editOfferId').value = offer._id;
-      document.getElementById('editOfferName').value = offer.name;
-      document.getElementById('editOfferType').value = offer.type;
-      document.getElementById('editOfferDiscount').value = offer.discount;
-      
-      // Format dates for input fields (YYYY-MM-DD)
-      const startDate = new Date(offer.startDate).toISOString().split('T')[0];
-      const endDate = new Date(offer.endDate).toISOString().split('T')[0];
-      document.getElementById('editOfferStartDate').value = startDate;
-      document.getElementById('editOfferEndDate').value = endDate;
-
-      // Show/hide and set target based on type
-      const productSelect = document.getElementById('editProductSelect');
-      const categorySelect = document.getElementById('editCategorySelect');
-      
-      if (offer.type === 'Product') {
-        productSelect.style.display = 'block';
-        categorySelect.style.display = 'none';
-        document.getElementById('editProductTarget').value = offer.target;
-        document.getElementById('editProductTarget').required = true;
-        document.getElementById('editCategoryTarget').required = false;
-      } else {
-        productSelect.style.display = 'none';
-        categorySelect.style.display = 'block';
-        document.getElementById('editCategoryTarget').value = offer.target;
-        document.getElementById('editCategoryTarget').required = true;
-        document.getElementById('editProductTarget').required = false;
-      }
-
-      // Show modal
-      const editModal = new bootstrap.Modal(document.getElementById('editOfferModal'));
-      editModal.show();
-    }
-
-    // Function to handle offer type change in edit modal
-    document.getElementById('editOfferType').addEventListener('change', function() {
-      const productSelect = document.getElementById('editProductSelect');
-      const categorySelect = document.getElementById('editCategorySelect');
-      
-      if (this.value === 'Product') {
-        productSelect.style.display = 'block';
-        categorySelect.style.display = 'none';
-        document.getElementById('editProductTarget').required = true;
-        document.getElementById('editCategoryTarget').required = false;
-      } else if (this.value === 'Category') {
-        productSelect.style.display = 'none';
-        categorySelect.style.display = 'block';
-        document.getElementById('editProductTarget').required = false;
-        document.getElementById('editCategoryTarget').required = true;
-      } else {
-        productSelect.style.display = 'none';
-        categorySelect.style.display = 'none';
-        document.getElementById('editProductTarget').required = false;
-        document.getElementById('editCategoryTarget').required = false;
-      }
-    });
-
-    // Function to update offer
-    async function updateOffer() {
-      const form = document.getElementById('editOfferForm');
-      
-      // Validate form
-      if (!form.checkValidity()) {
-        form.classList.add('was-validated');
-        return;
-      }
-
-      const formData = new FormData(form);
-      const type = formData.get('type');
-      const offerId = formData.get('offerId');
-      
-      const data = {
-        name: formData.get('name').trim(),
-        type: type,
-        discount: parseFloat(formData.get('discount')),
-        startDate: formData.get('startDate'),
-        endDate: formData.get('endDate'),
-        target: type === 'Product' ? formData.get('productTarget') : formData.get('categoryTarget'),
-        targetModel: type === 'Product' ? 'Product' : 'Category'
-      };
-
-      try {
-        const response = await fetch(`/admin/offers/${offerId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-          location.reload();
-        } else {
-          const error = await response.json();
-          alert(error.error || 'Error updating offer');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Error updating offer');
-      }
-    }
-  </script>
 </body>
 </html>

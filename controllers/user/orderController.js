@@ -16,10 +16,10 @@ export const placeOrder = async (req, res) => {
   
   try {
     const userId = req.session.user._id;
-    const { addressId, paymentMethod } = req.body;
+    const { addressId, paymentMethod, orderID } = req.body;
 
-    // Generate custom orderID first
-    const orderID = `ORD-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${nanoid(8).toUpperCase()}`;
+    // Use the provided orderID or generate a new one
+    const finalOrderID = orderID || `ORD-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${nanoid(8).toUpperCase()}`;
 
     // Get cart and validate items
     const cart = await Cart.findOne({ user: userId }).populate('items.product');
@@ -75,7 +75,7 @@ export const placeOrder = async (req, res) => {
           user: userId,
           type: 'debit',
           amount: cart.subtotal,
-          description: `Payment for order ${orderID}`,
+          description: `Payment for order ${finalOrderID}`,
           balance: newBalance,
           status: 'completed'
         });
@@ -131,7 +131,7 @@ export const placeOrder = async (req, res) => {
 
     // Create order
     const order = new Order({
-      orderID,
+      orderID: finalOrderID,
       user: userId,
       items: validItems.map(item => ({
         product: item.product._id,
@@ -143,7 +143,9 @@ export const placeOrder = async (req, res) => {
         size: item.size
       })),
       totalAmount: Number(req.body.finalAmount) || cart.subtotal,
+      originalAmount: cart.subtotal,
       discountAmount: Number(req.body.discountAmount) || 0,
+      coupon: cart.coupon || null,
       shippingAddress: {
         fullName: selectedAddress.fullName,
         address: selectedAddress.addressLine1 + (selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''),
@@ -152,68 +154,50 @@ export const placeOrder = async (req, res) => {
         postalCode: selectedAddress.zipCode,
         phone: selectedAddress.phone
       },
-      paymentMethod: paymentMethod === 'razorpay' ? 'razorpay' : 
-                    paymentMethod === 'wallet' ? 'wallet' : 'cod',
+      paymentMethod: paymentMethod,
       status: 'Pending',
-      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending'
+      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending',
+      paymentDetails: paymentMethod === 'razorpay' ? {
+        razorpayOrderId: null,
+        razorpayPaymentId: null,
+        razorpaySignature: null,
+        paymentAttempts: 0,
+        lastPaymentAttempt: null
+      } : undefined
     });
 
     await order.save();
-    console.log('Order created successfully:', orderID);
+    console.log('Order created successfully:', finalOrderID);
 
     // Decrease stock only for COD and wallet payments
     // For Razorpay, we'll decrease stock after payment confirmation
     if (paymentMethod !== 'razorpay') {
-    for (const item of validItems) {
-      const product = await Product.findById(item.product._id);
-      const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
-      sizeObj.quantity -= item.quantity;
-      await product.save();
+      for (const item of validItems) {
+        const product = await Product.findById(item.product._id);
+        const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
+        sizeObj.quantity -= item.quantity;
+        await product.save();
       }
     }
 
-    // Clear the cart
-    cart.items = [];
-    cart.subtotal = 0;
-    await cart.save();
+    // Clear the cart after successful order placement
+    await Cart.findOneAndUpdate(
+      { user: userId },
+      { $set: { items: [], couponCode: null, discount: 0 } }
+    );
 
-    console.log('Order process completed successfully');
-
-    if (req.xhr || req.headers.accept?.includes('application/json') || req.headers['content-type']?.includes('application/json')) {
-      return res.json({
-        success: true,
-        message: 'Order placed successfully',
-        order: {
-          _id: order._id,
-          orderID: order.orderID,
-          createdAt: order.createdAt,
-          total: order.totalAmount,
-          paymentMethod: order.paymentMethod,
-          status: order.status,
-          paymentStatus: order.paymentStatus
-        }
-      });
-    }
-
-    res.render('user/order-success', {
-      order: {
-        orderNumber: order.orderID,
-        createdAt: order.createdAt,
-        total: order.totalAmount,
-        paymentMethod: order.paymentMethod
-      }
+    res.json({
+      success: true,
+      orderID: finalOrderID,
+      message: 'Order placed successfully'
     });
-  } catch (err) {
-    console.error('Order placement failed:', err);
-    
-    if (req.xhr || req.headers.accept?.includes('application/json') || req.headers['content-type']?.includes('application/json')) {
-      return res.status(500).json({
-        success: false,
-        message: err.message
-      });
-    }
 
-    res.status(500).send('Error placing order: ' + err.message);
+  } catch (error) {
+    console.error('Error placing order:', error);
+    res.status(500).json({
+        success: false,
+      message: error.message || 'Failed to place order'
+      });
   }
 };
 

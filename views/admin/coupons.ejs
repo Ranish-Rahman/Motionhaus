@@ -530,12 +530,24 @@
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
+        // Client-side validation for code field
+        if (!data.code || data.code.trim() === '') {
+            Swal.fire({
+                title: 'Validation Error!',
+                text: 'Coupon Code is required.',
+                icon: 'error'
+            });
+            return;
+        }
+
         // Validate min and max amounts
         const minAmount = data.minAmount;
         const maxAmount = data.maxAmount;
         if (!validateAmounts(minAmount, maxAmount)) {
             return;
         }
+
+        console.log('Client-side: Data being sent for createCoupon:', data);
 
         try {
             const response = await fetch('/admin/coupons', {
@@ -611,6 +623,16 @@
         const couponId = formData.get('couponId');
         const data = Object.fromEntries(formData.entries());
         
+        // Client-side validation for code field (for safety, though it's readonly)
+        if (!data.code || data.code.trim() === '') {
+            Swal.fire({
+                title: 'Validation Error!',
+                text: 'Coupon Code is required.',
+                icon: 'error'
+            });
+            return;
+        }
+
         // Validate min and max amounts
         const minAmount = data.minAmount;
         const maxAmount = data.maxAmount;
@@ -618,8 +640,8 @@
             return;
         }
 
-        console.log('Updating coupon with ID:', couponId);
-        console.log('Update data:', data);
+        console.log('Client-side: Updating coupon with ID:', couponId);
+        console.log('Client-side: Update data:', data);
 
         if (!couponId) {
             Swal.fire({

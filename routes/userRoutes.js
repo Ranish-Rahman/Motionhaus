@@ -32,7 +32,8 @@ import {
   handlePaymentFailure,
   cancelRazorpayOrder,
   getOrderSuccess,
-  getOrderFailure
+  getOrderFailure,
+  createOrder
 } from '../controllers/user/userController.js';
 import { 
   requestReturn, 
@@ -136,6 +137,7 @@ router.get('/products/:id', getProductDetails);
 
 // Checkout and password routes
 router.get('/checkout', getCheckout);
+router.post('/checkout', createOrder);
 router.get('/profile/change-password', getChangePassword);
 router.post('/profile/change-password', postChangePassword);
 

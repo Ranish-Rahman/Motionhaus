@@ -876,6 +876,7 @@
 
               card.innerHTML = `
                 <div class="image-wrapper">
+                  ${product.bestOffer ? `<div class='offer-badge'>${product.bestOffer.discount}% OFF</div>` : ''}
                   <img src="${imageUrl}" alt="${product.name}" 
                        onerror="this.onerror=null; this.src='/images/placeholder.jpg'">
                   <div class="brand-logo">${brandName}</div>
@@ -883,7 +884,17 @@
                 <div class="product-info">
                   <div class="meta">Sneakers</div>
                   <div class="title">${product.name}</div>
-                  <div class="price">From Rs. ${price}</div>
+                  <div class="price">
+                    ${product.bestOffer
+                      ? `<span style='text-decoration: line-through; color: #999; font-size: 14px; margin-right: 8px;'>
+                          Rs. ${Number(product.price).toFixed(2)}
+                        </span>
+                        <span style='color: #000; font-weight: 600;'>
+                          Rs. ${Number(product.discountedPrice).toFixed(2)}
+                        </span>`
+                      : `From Rs. ${Number(product.price).toFixed(2)}`
+                    }
+                  </div>
                 </div>
               `;
 

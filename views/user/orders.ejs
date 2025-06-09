@@ -161,6 +161,14 @@
                                                      class="img-thumbnail me-2" style="width: 40px; height: 40px; object-fit: cover;">
                                                 <div>
                                                     <div class="small"><%= item.product.name %></div>
+                                                    <div class="small text-muted">Size: <%= item.size %></div>
+                                                    <% 
+                                                        const productSize = item.product.sizes.find(s => Number(s.size) === Number(item.size));
+                                                        const isOutOfStock = !productSize || productSize.quantity < item.quantity;
+                                                    %>
+                                                    <div class="small <%= isOutOfStock ? 'text-danger' : 'text-success' %>">
+                                                        <%= isOutOfStock ? 'Out of Stock' : 'In Stock (' + productSize.quantity + ' available)' %>
+                                                    </div>
                                                     <div class="small text-muted">
                                                         Status: 
                                                         <span class="badge bg-<%= item.status === 'Pending' ? 'warning' : 
@@ -178,7 +186,7 @@
                                 <td>
                                     <% 
                                     // Calculate total based on actual paid prices including discount
-                                    const displayAmount = order.items.reduce((total, item) => {
+                                    const displayAmount = order.originalAmount || order.items.reduce((total, item) => {
                                         return total + (item.originalPrice * item.quantity);
                                     }, 0);
                                     const finalAmount = order.totalAmount;

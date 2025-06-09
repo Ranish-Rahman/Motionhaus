@@ -71,12 +71,25 @@ couponSchema.pre('save', function(next) {
 // Method to check if coupon is valid
 couponSchema.methods.isValid = function() {
     const now = new Date();
-    return (
+    console.log('--- Coupon Validation Debug ---');
+    console.log('Current time:', now);
+    console.log('Valid from:', this.validFrom);
+    console.log('Valid until:', this.validUntil);
+    console.log('Is active:', this.isActive);
+    console.log('Usage count:', this.usageCount);
+    console.log('Usage limit:', this.usageLimit);
+    
+    const isValid = (
         this.isActive &&
         now >= this.validFrom &&
         now <= this.validUntil &&
         (!this.usageLimit || this.usageCount < this.usageLimit)
     );
+    
+    console.log('Is valid:', isValid);
+    console.log('---------------------------');
+    
+    return isValid;
 };
 
 // Method to calculate discount

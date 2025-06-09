@@ -10,7 +10,7 @@ export const getAllOffers = async (req, res) => {
             return res.redirect('/admin/login');
         }
 
-        // Get offers and populate target based on targetModel
+        // offers and populate target based on targetModel
         const offers = await OfferModel.find()
             .populate({
                 path: 'target',
@@ -18,7 +18,7 @@ export const getAllOffers = async (req, res) => {
             })
             .sort({ createdAt: -1 });
         
-        // Get only active products and categories, sorted by name
+        //  only active products and categories, sorted by name
         const products = await ProductModel.find({ 
             isDeleted: false,
             isBlocked: false

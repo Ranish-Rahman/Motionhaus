@@ -57,11 +57,34 @@ export const createCoupon = async (req, res) => {
         // Validate dates
         const fromDate = new Date(validFrom);
         const untilDate = new Date(validUntil);
+        const now = new Date();
         
+        // Normalize dates to start of day for accurate comparison
+        const fromDateOnly = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+        const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        console.log('--- Create Coupon Date Validation Debug ---');
+        console.log('Raw validFrom:', validFrom);
+        console.log('Raw validUntil:', validUntil);
+        console.log('Parsed fromDate:', fromDate);
+        console.log('Parsed untilDate:', untilDate);
+        console.log('Current Date (now):', now);
+        console.log('Normalized fromDateOnly:', fromDateOnly);
+        console.log('Normalized nowOnly:', nowOnly);
+        console.log('Comparison (fromDateOnly < nowOnly):', fromDateOnly < nowOnly);
+        console.log('-------------------------------------------');
+
         if (fromDate >= untilDate) {
             return res.status(400).json({
                 success: false,
                 message: 'Valid until date must be after valid from date'
+            });
+        }
+
+        if (fromDateOnly < nowOnly) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid from date cannot be in the past'
             });
         }
 
@@ -111,11 +134,34 @@ export const updateCoupon = async (req, res) => {
         if (updateData.validFrom && updateData.validUntil) {
             const fromDate = new Date(updateData.validFrom);
             const untilDate = new Date(updateData.validUntil);
+            const now = new Date();
+
+            // Normalize dates to start of day for accurate comparison
+            const fromDateOnly = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+            const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             
+            console.log('--- Update Coupon Date Validation Debug ---');
+            console.log('Raw validFrom:', updateData.validFrom);
+            console.log('Raw validUntil:', updateData.validUntil);
+            console.log('Parsed fromDate:', fromDate);
+            console.log('Parsed untilDate:', untilDate);
+            console.log('Current Date (now):', now);
+            console.log('Normalized fromDateOnly:', fromDateOnly);
+            console.log('Normalized nowOnly:', nowOnly);
+            console.log('Comparison (fromDateOnly < nowOnly):', fromDateOnly < nowOnly);
+            console.log('-------------------------------------------');
+
             if (fromDate >= untilDate) {
                 return res.status(400).json({
                     success: false,
                     message: 'Valid until date must be after valid from date'
+                });
+            }
+
+            if (fromDateOnly < nowOnly) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Valid from date cannot be in the past'
                 });
             }
         }

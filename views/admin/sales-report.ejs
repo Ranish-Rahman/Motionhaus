@@ -48,6 +48,89 @@
     .btn-custom { background: #343a40; color: #fff; border: none; }
     .btn-custom.active, .btn-custom:focus { background: #495057; }
     .date-range { background: #23272b; color: #fff; border: 1px solid #343a40; }
+
+    /* Add pagination styles */
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .pagination-info {
+      color: #a0aec0;
+      font-size: 14px;
+    }
+
+    .pagination-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #2b2d31;
+      color: #a0aec0;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .pagination-item:hover {
+      background: #36373d;
+      color: white;
+    }
+
+    .pagination-item.active {
+      background: #00a3ff;
+      color: white;
+    }
+
+    .pagination-item.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pagination-item.disabled:hover {
+      background: #2b2d31;
+      color: #a0aec0;
+    }
+
+    .d-flex {
+      display: flex;
+    }
+
+    .gap-2 {
+      gap: 8px;
+    }
+
+    .download-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .download-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #2b2d31;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+      background: #36373d;
+    }
+
+    .download-btn i {
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
@@ -58,6 +141,17 @@
       <div class="header">
         <h1>Sales Report</h1>
         <p>View and analyze your sales data</p>
+      </div>
+
+      <div class="download-buttons">
+        <button class="download-btn" id="downloadPdf">
+          <i class="bi bi-file-pdf"></i>
+          Download PDF
+        </button>
+        <button class="download-btn" id="downloadExcel">
+          <i class="bi bi-file-excel"></i>
+          Download Excel
+        </button>
       </div>
 
       <div class="mb-4 d-flex align-items-center gap-2">
@@ -71,7 +165,7 @@
       </div>
 
       <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-md-4">
           <div class="card text-center mb-3">
             <div class="card-body">
               <h5 class="card-title">Total Sales</h5>
@@ -79,7 +173,7 @@
             </div>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <div class="card text-center mb-3">
             <div class="card-body">
               <h5 class="card-title">Total Orders</h5>
@@ -87,19 +181,11 @@
             </div>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <div class="card text-center mb-3">
             <div class="card-body">
               <h5 class="card-title">Total Discount</h5>
               <p class="card-text fs-4" id="totalDiscount">₹0</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card text-center mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Products</h5>
-              <p class="card-text fs-4" id="totalProducts">0</p>
             </div>
           </div>
         </div>
@@ -117,14 +203,21 @@
                   <th>Customer</th>
                   <th>Total</th>
                   <th>Status</th>
-                  <th>Products</th>
                   <th>Coupon</th>
                 </tr>
               </thead>
               <tbody id="ordersTable">
-                <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                <tr><td colspan="6" class="text-center">Loading...</td></tr>
               </tbody>
             </table>
+          </div>
+          <div class="pagination">
+            <span class="pagination-info">
+              Showing <span id="showingStart">0</span> to <span id="showingEnd">0</span> of <span id="totalOrders">0</span> orders
+            </span>
+            <div id="paginationControls" class="d-flex gap-2">
+              <!-- Pagination buttons will be inserted here -->
+            </div>
           </div>
         </div>
       </div>
@@ -136,7 +229,6 @@
     const totalSales = document.getElementById('totalSales');
     const totalOrders = document.getElementById('totalOrders');
     const totalDiscount = document.getElementById('totalDiscount');
-    const totalProducts = document.getElementById('totalProducts');
     const ordersTable = document.getElementById('ordersTable');
     const dailyBtn = document.getElementById('dailyBtn');
     const weeklyBtn = document.getElementById('weeklyBtn');
@@ -144,30 +236,126 @@
     const customBtn = document.getElementById('customBtn');
     const startDate = document.getElementById('startDate');
     const endDate = document.getElementById('endDate');
+    const showingStart = document.getElementById('showingStart');
+    const showingEnd = document.getElementById('showingEnd');
+    const paginationControls = document.getElementById('paginationControls');
+    const downloadPdf = document.getElementById('downloadPdf');
+    const downloadExcel = document.getElementById('downloadExcel');
 
     let currentRange = 'daily';
+    let currentPage = 1;
+    const limit = 10;
+
+    function getDownloadUrl(format) {
+      let url = `/admin/sales-report/download/${format}?range=${currentRange}`;
+      if (currentRange === 'custom' && startDate.value && endDate.value) {
+        url += `&startDate=${startDate.value}&endDate=${endDate.value}`;
+      }
+      return url;
+    }
+
+    downloadPdf.onclick = () => {
+      const url = getDownloadUrl('pdf');
+      window.open(url, '_blank');
+    };
+
+    downloadExcel.onclick = () => {
+      const url = getDownloadUrl('excel');
+      window.open(url, '_blank');
+    };
 
     function setActive(btn) {
       [dailyBtn, weeklyBtn, yearlyBtn, customBtn].forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
-    async function fetchReport(range, sDate, eDate) {
-      let url = `/admin/sales-report/data?range=${range}`;
+    function createPaginationControls(pagination) {
+      let html = '';
+      
+      // Previous button
+      if (pagination.hasPrevPage) {
+        html += `
+          <a href="#" class="pagination-item" data-page="${pagination.currentPage - 1}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        `;
+      } else {
+        html += `
+          <span class="pagination-item disabled">
+            <i class="bi bi-chevron-left"></i>
+          </span>
+        `;
+      }
+
+      // Page numbers
+      for (let i = 1; i <= pagination.totalPages; i++) {
+        html += `
+          <a href="#" class="pagination-item ${i === pagination.currentPage ? 'active' : ''}" 
+             data-page="${i}">
+            ${i}
+          </a>
+        `;
+      }
+
+      // Next button
+      if (pagination.hasNextPage) {
+        html += `
+          <a href="#" class="pagination-item" data-page="${pagination.currentPage + 1}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        `;
+      } else {
+        html += `
+          <span class="pagination-item disabled">
+            <i class="bi bi-chevron-right"></i>
+          </span>
+        `;
+      }
+
+      paginationControls.innerHTML = html;
+
+      // Add click event listeners to pagination items
+      paginationControls.querySelectorAll('.pagination-item:not(.disabled)').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          const page = parseInt(item.dataset.page);
+          if (page) {
+            currentPage = page;
+            fetchReport(currentRange, startDate.value, endDate.value, currentPage);
+          }
+        });
+      });
+    }
+
+    function updatePaginationControls(pagination) {
+      // Update showing text
+      const start = ((pagination.currentPage - 1) * pagination.limit) + 1;
+      const end = Math.min(start + pagination.limit - 1, pagination.totalOrders);
+      showingStart.textContent = start;
+      showingEnd.textContent = end;
+      totalOrders.textContent = pagination.totalOrders;
+
+      // Create pagination controls
+      createPaginationControls(pagination);
+    }
+
+    async function fetchReport(range, sDate, eDate, page = 1) {
+      let url = `/admin/sales-report/data?range=${range}&page=${page}&limit=${limit}`;
       if (range === 'custom' && sDate && eDate) {
         url += `&startDate=${sDate}&endDate=${eDate}`;
       }
-      ordersTable.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
+      ordersTable.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
       try {
         const res = await fetch(url);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        totalSales.textContent = `₹${data.summary.totalSales}`;
+        
+        totalSales.textContent = `₹${Number(data.summary.totalSales).toFixed(2)}`;
         totalOrders.textContent = data.summary.totalOrders;
-        totalDiscount.textContent = `₹${data.summary.totalDiscount}`;
-        totalProducts.textContent = data.summary.totalProducts;
+        totalDiscount.textContent = `₹${Number(data.summary.totalDiscount).toFixed(2)}`;
+        
         if (data.tableData.length === 0) {
-          ordersTable.innerHTML = '<tr><td colspan="7" class="text-center">No orders found.</td></tr>';
+          ordersTable.innerHTML = '<tr><td colspan="6" class="text-center">No orders found.</td></tr>';
         } else {
           ordersTable.innerHTML = data.tableData.map(order => `
             <tr>
@@ -176,31 +364,52 @@
               <td>${order.customer}</td>
               <td>₹${order.total}</td>
               <td>${order.status}</td>
-              <td>${order.products}</td>
               <td>${order.coupon}</td>
             </tr>
           `).join('');
         }
+
+        // Update pagination controls
+        updatePaginationControls(data.pagination);
       } catch (err) {
-        ordersTable.innerHTML = `<tr><td colspan="7" class="text-danger text-center">Error: ${err.message}</td></tr>`;
+        ordersTable.innerHTML = `<tr><td colspan="6" class="text-danger text-center">Error: ${err.message}</td></tr>`;
       }
     }
 
-    dailyBtn.onclick = () => { setActive(dailyBtn); currentRange = 'daily'; fetchReport('daily'); };
-    weeklyBtn.onclick = () => { setActive(weeklyBtn); currentRange = 'weekly'; fetchReport('weekly'); };
-    yearlyBtn.onclick = () => { setActive(yearlyBtn); currentRange = 'yearly'; fetchReport('yearly'); };
+    dailyBtn.onclick = () => { 
+      setActive(dailyBtn); 
+      currentRange = 'daily'; 
+      currentPage = 1;
+      fetchReport('daily', null, null, currentPage); 
+    };
+    
+    weeklyBtn.onclick = () => { 
+      setActive(weeklyBtn); 
+      currentRange = 'weekly'; 
+      currentPage = 1;
+      fetchReport('weekly', null, null, currentPage); 
+    };
+    
+    yearlyBtn.onclick = () => { 
+      setActive(yearlyBtn); 
+      currentRange = 'yearly'; 
+      currentPage = 1;
+      fetchReport('yearly', null, null, currentPage); 
+    };
+    
     customBtn.onclick = () => {
       if (startDate.value && endDate.value) {
         setActive(customBtn);
         currentRange = 'custom';
-        fetchReport('custom', startDate.value, endDate.value);
+        currentPage = 1;
+        fetchReport('custom', startDate.value, endDate.value, currentPage);
       }
     };
 
     // Fetch daily report on load
     window.onload = () => {
       setActive(dailyBtn);
-      fetchReport('daily');
+      fetchReport('daily', null, null, currentPage);
     };
   </script>
 </body>

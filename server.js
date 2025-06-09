@@ -19,6 +19,7 @@ import productRoutes from './routes/productRoutes.js';
 import wishlistRoutes from './routes/wishlistRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import walletRoutes from './routes/user/walletRoutes.js';
+import salesReportRoutes from './routes/admin/sales-report.js';
 
 // Suppress deprecation warnings
 process.removeAllListeners('warning');
@@ -92,6 +93,7 @@ app.use('/categories', categoryRoutes);
 app.use('/products', productRoutes);
 app.use('/wishlist', wishlistRoutes);
 app.use(['/wallet', '/profile/wallet'], walletRoutes);
+app.use('/admin/sales-report', salesReportRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

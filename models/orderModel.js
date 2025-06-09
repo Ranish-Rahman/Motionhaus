@@ -56,11 +56,23 @@ const orderSchema = new mongoose.Schema({
   }],
   totalAmount: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
+  },
+  originalAmount: {
+    type: Number,
+    required: true,
+    min: 0
   },
   discountAmount: {
     type: Number,
-    default: 0
+    default: 0,
+    min: 0
+  },
+  coupon: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Coupon',
+    default: null
   },
   status: {
     type: String,
@@ -72,19 +84,33 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'paid', 'failed', 'refunded'],
     default: 'pending'
   },
-  paymentMethod: String,
+  paymentMethod: {
+    type: String,
+    enum: ['cod', 'razorpay', 'wallet'],
+    required: true
+  },
   paymentDetails: {
     razorpayOrderId: {
       type: String,
       required: false
     },
-    razorpayPaymentId:{
+    razorpayPaymentId: {
       type: String,
       required: false
     },
     razorpaySignature: {
       type: String,
       required: false
+    },
+    previousRazorpayOrderIds: [{
+      type: String
+    }],
+    paymentAttempts: {
+      type: Number,
+      default: 0
+    },
+    lastPaymentAttempt: {
+      type: Date
     }
   },
   cancellationReason: String,
@@ -115,7 +141,6 @@ const orderSchema = new mongoose.Schema({
       required: true
     }
   },
-  paymentMethod: String,
   orderDate: {
     type: Date,
     default: Date.now
@@ -140,7 +165,12 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add index for return requests
+// Add indexes for common queries
+orderSchema.index({ orderID: 1 });
+orderSchema.index({ user: 1 });
+orderSchema.index({ 'paymentDetails.razorpayOrderId': 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ 'returnRequest.status': 1 });
 
 // Method to update overall order status based on item statuses
@@ -174,6 +204,12 @@ orderSchema.pre('save', function(next) {
   this.updateOrderStatus();
   next();
 });
+
+// Method to track payment attempts
+orderSchema.methods.trackPaymentAttempt = function() {
+  this.paymentDetails.paymentAttempts = (this.paymentDetails.paymentAttempts || 0) + 1;
+  this.paymentDetails.lastPaymentAttempt = new Date();
+};
 
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

@@ -268,11 +268,44 @@ export const applyCoupon = async (req, res) => {
             });
         }
 
+        // Debug logs before validation
+        console.log('--- Before Coupon Validation ---');
+        console.log('Cart subtotal:', cart.subtotal);
+        console.log('Coupon:', coupon);
+        console.log('Current time:', new Date());
+        console.log('Valid from:', coupon.validFrom);
+        console.log('Valid until:', coupon.validUntil);
+        console.log('Is active:', coupon.isActive);
+        console.log('Usage count:', coupon.usageCount);
+        console.log('Usage limit:', coupon.usageLimit);
+
         // Validate coupon
-        if (!coupon.isValid()) {
+        if (!coupon.isActive) {
             return res.status(400).json({
                 success: false,
-                message: 'Coupon is expired or inactive'
+                message: 'Coupon is inactive'
+            });
+        }
+
+        const now = new Date();
+        if (now < coupon.validFrom) {
+            return res.status(400).json({
+                success: false,
+                message: `Coupon is not valid until ${coupon.validFrom.toLocaleDateString()}`
+            });
+        }
+
+        if (now > coupon.validUntil) {
+            return res.status(400).json({
+                success: false,
+                message: 'Coupon has expired'
+            });
+        }
+
+        if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+            return res.status(400).json({
+                success: false,
+                message: 'Coupon usage limit reached'
             });
         }
 
@@ -288,18 +321,40 @@ export const applyCoupon = async (req, res) => {
         await cart.applyCoupon(coupon);
         await cart.save();
 
+        // Debug logs
+        console.log('--- After Coupon Application ---');
+        console.log('Cart subtotal:', cart.subtotal);
+        console.log('Coupon:', coupon);
+        console.log('Cart discount after applying coupon:', cart.discount);
+        console.log('Cart couponCode:', cart.couponCode);
+        console.log('--------------------');
+
         // Increment usage count
         coupon.usageCount += 1;
         await coupon.save();
 
-        // Populate cart items for response
+        // Populate cart items and coupon for response
         await cart.populate('items.product');
+        await cart.populate('coupon');
+
+        // Calculate final amount
+        const finalAmount = cart.subtotal - cart.discount;
 
         res.json({
             success: true,
             message: 'Coupon applied successfully',
-            cart,
-            coupon,
+            cart: {
+                ...cart.toObject(),
+                couponDiscount: cart.discount,
+                couponCode: cart.couponCode,
+                finalAmount
+            },
+            coupon: {
+                code: coupon.code,
+                type: coupon.type,
+                value: coupon.value,
+                description: coupon.description
+            },
             discount: cart.discount
         });
     } catch (error) {
@@ -332,6 +387,13 @@ export const removeCoupon = async (req, res) => {
             });
         }
 
+        // Debug logs before removal
+        console.log('--- Before Coupon Removal ---');
+        console.log('Cart ID:', cart._id);
+        console.log('Current coupon:', cart.coupon);
+        console.log('Current discount:', cart.discount);
+        console.log('Current couponCode:', cart.couponCode);
+
         // If there was a coupon, decrement its usage count
         if (cart.coupon) {
             const coupon = await Coupon.findById(cart.coupon);
@@ -342,8 +404,17 @@ export const removeCoupon = async (req, res) => {
         }
 
         // Remove coupon from cart
-        await cart.applyCoupon(null);
+        cart.coupon = null;
+        cart.discount = 0;
+        cart.couponCode = null;
         await cart.save();
+
+        // Debug logs after removal
+        console.log('--- After Coupon Removal ---');
+        console.log('Cart ID:', cart._id);
+        console.log('Coupon removed:', cart.coupon === null);
+        console.log('Discount reset:', cart.discount === 0);
+        console.log('CouponCode cleared:', cart.couponCode === null);
 
         // Populate cart items for response
         await cart.populate('items.product');
@@ -351,7 +422,11 @@ export const removeCoupon = async (req, res) => {
         res.json({
             success: true,
             message: 'Coupon removed successfully',
-            cart
+            cart: {
+                ...cart.toObject(),
+                discount: 0,
+                couponCode: null
+            }
         });
     } catch (error) {
         console.error('Error removing coupon:', error);

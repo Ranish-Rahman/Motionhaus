@@ -40,6 +40,9 @@ const cartSchema = new mongoose.Schema({
   discount: {
     type: Number,
     default: 0
+  },
+  couponCode: {
+    type: String
   }
 }, {
   timestamps: true
@@ -55,20 +58,48 @@ cartSchema.methods.calculateSubtotal = function() {
 // Method to apply coupon
 cartSchema.methods.applyCoupon = async function(coupon) {
   if (!coupon) {
+    // Clear all coupon-related fields
     this.coupon = null;
     this.discount = 0;
+    this.couponCode = null;
+    return;
+  }
+
+  // Check minimum order amount
+  if (this.subtotal < coupon.minAmount) {
+    // Clear all coupon-related fields if minimum amount not met
+    this.coupon = null;
+    this.discount = 0;
+    this.couponCode = null;
     return;
   }
 
   // Calculate discount
-  const discount = coupon.calculateDiscount(this.subtotal);
+  let discount = 0;
+  if (coupon.type === 'Percentage') {
+    // For percentage discount
+    discount = (this.subtotal * coupon.value) / 100;
+    // Apply maximum amount limit if set
+    if (coupon.maxAmount) {
+      discount = Math.min(discount, coupon.maxAmount);
+    }
+  } else {
+    // For fixed amount discount
+    discount = coupon.value;
+  }
+  
+  // Ensure discount doesn't exceed subtotal
+  discount = Math.min(discount, this.subtotal);
   
   if (discount > 0) {
     this.coupon = coupon._id;
     this.discount = discount;
+    this.couponCode = coupon.code;
   } else {
+    // Clear all coupon-related fields if no valid discount
     this.coupon = null;
     this.discount = 0;
+    this.couponCode = null;
   }
 };
 

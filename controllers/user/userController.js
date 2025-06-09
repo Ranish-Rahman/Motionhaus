@@ -475,6 +475,25 @@ const liveSearch = async (req, res) => {
     .skip(skip)
     .limit(parseInt(limit));
 
+    // Get best offers for all products
+    const productsWithOffers = await Promise.all(products.map(async (product) => {
+      const bestOffer = await getBestOffer(product._id);
+      let discountedPrice = product.price;
+      if (bestOffer) {
+        const discountAmount = (product.price * bestOffer.discount) / 100;
+        discountedPrice = product.price - discountAmount;
+      }
+      return {
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        images: product.images,
+        brand: product.brand || 'MotionHaus',
+        bestOffer,
+        discountedPrice
+      };
+    }));
+
     // Calculate pagination info
     const totalPages = Math.ceil(totalProducts / parseInt(limit));
     const pagination = {
@@ -487,17 +506,8 @@ const liveSearch = async (req, res) => {
       totalItems: totalProducts
     };
 
-    // Format products
-    const formattedProducts = products.map(product => ({
-      _id: product._id,
-      name: product.name,
-      price: product.price,
-      images: product.images,
-      brand: product.brand || 'MotionHaus'
-    }));
-
     res.json({
-      products: formattedProducts,
+      products: productsWithOffers,
       pagination
     });
   } catch (error) {
@@ -921,7 +931,7 @@ export const getOrders = async (req, res) => {
     
     const orders = await Order.find({ user: userId })
       .select('_id orderID orderDate totalAmount status returnRequest items')
-      .populate('items.product', 'name price images')
+      .populate('items.product', 'name price images sizes')
       .sort({ orderDate: -1 })
       .skip(skip)
       .limit(limit);
@@ -955,7 +965,7 @@ const getOrderDetails = async (req, res) => {
 
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
-      .populate('items.product', 'name price images')
+      .populate('items.product', 'name price images sizes')
       .select('+shippingAddress +returnRequest');  // Explicitly select shippingAddress and returnRequest
 
     if (!order) {
@@ -1119,7 +1129,9 @@ const getCheckout = async (req, res) => {
   try {
     const userId = req.session.user._id || req.session.user.id;
     const addresses = await Address.find({ userId });
-    let cart = await Cart.findOne({ user: userId }).populate('items.product');
+    let cart = await Cart.findOne({ user: userId })
+      .populate('items.product')
+      .populate('coupon');
     
     if (!cart || !cart.items || cart.items.length === 0) {
       req.flash('error', 'Your cart is empty. Please add items before proceeding to checkout.');
@@ -1129,7 +1141,7 @@ const getCheckout = async (req, res) => {
     // Calculate cart totals and apply discounts
     let cartTotal = 0;
     let totalDiscount = 0;
-    const processedItems = [];
+    let processedItems = [];
 
     // Process each item and calculate discounts
     for (let item of cart.items) {
@@ -1141,46 +1153,61 @@ const getCheckout = async (req, res) => {
 
       // Get and apply offer
       const offer = await getBestOffer(item.product._id);
+      let itemDiscount = 0;
+      let finalPrice = originalPrice;
+
       if (offer) {
-        const itemDiscount = Math.round((itemSubtotal * offer.discount) / 100);
+        itemDiscount = Math.round((itemSubtotal * offer.discount) / 100);
         totalDiscount += itemDiscount;
-        
-        processedItems.push({
-          ...item.toObject(),
-          product: {
-            ...item.product.toObject(),
-            bestOffer: offer,
-            originalPrice,
-            discountedPrice: originalPrice - (itemDiscount / item.quantity)
-          },
-          discountAmount: itemDiscount,
-          finalPrice: originalPrice - (itemDiscount / item.quantity),
-          offerName: offer.name,
-          offerDiscount: offer.discount
-        });
-      } else {
-        processedItems.push({
-          ...item.toObject(),
-          product: {
-            ...item.product.toObject(),
-            originalPrice,
-            discountedPrice: originalPrice
-          },
-          discountAmount: 0,
-          finalPrice: originalPrice,
-          offerName: null,
-          offerDiscount: 0
-        });
+        finalPrice = originalPrice - (itemDiscount / item.quantity);
       }
+      
+      processedItems.push({
+        ...item.toObject(),
+        product: {
+          ...item.product.toObject(),
+          bestOffer: offer,
+          originalPrice,
+          discountedPrice: finalPrice
+        },
+        discountAmount: itemDiscount,
+        finalPrice: finalPrice,
+        offerName: offer ? offer.name : null,
+        offerDiscount: offer ? offer.discount : 0
+      });
     }
 
-    // Calculate final amount
-    const finalAmount = cartTotal - totalDiscount;
+    // Calculate final amount with both offer and coupon discounts
+    const couponDiscount = cart.discount || 0; // This is the total coupon discount already applied to cart
+    
+    // Distribute coupon discount proportionally across items
+    if (couponDiscount > 0) {
+      const discountRatio = couponDiscount / cartTotal;
+      processedItems = processedItems.map(item => {
+        const itemSubtotal = item.product.originalPrice * item.quantity;
+        // Ensure itemCouponDiscount is rounded to 2 decimal places
+        const couponItemDiscount = parseFloat((itemSubtotal * discountRatio).toFixed(2));
+        const totalItemDiscount = item.discountAmount + couponItemDiscount;
+        const finalItemPrice = item.product.originalPrice - (totalItemDiscount / item.quantity);
+        
+        return {
+          ...item,
+          discountAmount: parseFloat(totalItemDiscount.toFixed(2)), // Ensure rounded
+          finalPrice: parseFloat(finalItemPrice.toFixed(2)), // Ensure rounded
+          couponDiscount: couponItemDiscount
+        };
+      });
+    }
+
+    // Calculate finalAmount by summing up the final prices of processed items
+    // This ensures consistency with Razorpay order creation
+    const finalAmount = parseFloat(processedItems.reduce((total, item) => total + item.finalPrice, 0).toFixed(2));
+    const totalDiscountAmount = parseFloat((cartTotal - finalAmount).toFixed(2));
 
     // Store checkout data in session
     req.session.checkoutData = {
       cartTotal,
-      totalDiscount,
+      totalDiscount: totalDiscountAmount,
       finalAmount,
       items: processedItems.map(item => ({
         product: item.product._id,
@@ -1190,8 +1217,11 @@ const getCheckout = async (req, res) => {
         discountAmount: item.discountAmount,
         size: item.size,
         offerName: item.offerName,
-        offerDiscount: item.offerDiscount
-      }))
+        offerDiscount: item.offerDiscount,
+        couponDiscount: item.couponDiscount || 0
+      })),
+      couponCode: cart.couponCode,
+      couponDiscount: couponDiscount
     };
 
     // Save session explicitly
@@ -1199,12 +1229,16 @@ const getCheckout = async (req, res) => {
 
     console.log('Checkout calculation:', {
       cartTotal,
-      totalDiscount,
+      offerDiscount: totalDiscount,
+      couponDiscount,
+      totalDiscount: totalDiscountAmount,
       finalAmount,
       items: processedItems.map(item => ({
         name: item.product.name,
         price: item.product.originalPrice,
-        discount: item.discountAmount,
+        offerDiscount: item.discountAmount - (item.couponDiscount || 0),
+        couponDiscount: item.couponDiscount || 0,
+        totalDiscount: item.discountAmount,
         final: item.finalPrice,
         offer: item.offerName
       }))
@@ -1215,9 +1249,11 @@ const getCheckout = async (req, res) => {
         ...cart.toObject(),
         items: processedItems,
         subtotal: cartTotal,
-        discount: totalDiscount,
+        discount: totalDiscountAmount,
+        offerDiscount: totalDiscount,
+        couponDiscount: couponDiscount,
         finalAmount,
-        hasOffer: totalDiscount > 0
+        hasOffer: totalDiscount > 0 || couponDiscount > 0
       },
       addresses,
       user: await User.findById(userId).lean()
@@ -2074,8 +2110,19 @@ export const getOrderFailure = async (req, res) => {
 // Create Razorpay order
 const createOrder = async (req, res) => {
   try {
-    const { addressId } = req.body;
+    const { addressId, finalAmount, paymentMethod } = req.body;
     const userId = req.session.user._id;
+
+    console.log('Received addressId in createOrder:', addressId);
+
+    // Check if addressId is provided and is a valid ObjectId format (optional but good practice)
+    if (!addressId) {
+      console.error('addressId is empty');
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a delivery address.'
+      });
+    }
 
     // Get checkout data from session
     const checkoutData = req.session.checkoutData;
@@ -2086,16 +2133,13 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Verify the amounts
-    const originalAmount = checkoutData.originalSubtotal;
-    const discountAmount = checkoutData.totalDiscount;
-    const finalAmount = originalAmount - discountAmount;
-
-    // Double check that the amounts match
-    if (finalAmount !== checkoutData.finalAmount) {
+    // Verify the amounts by comparing frontend amount with session amount
+    // Use a small tolerance for floating point comparison
+    const tolerance = 0.01;
+    if (Math.abs(parseFloat(finalAmount) - checkoutData.finalAmount) > tolerance) {
       console.error('Amount mismatch:', {
-        calculated: finalAmount,
-        stored: checkoutData.finalAmount
+        frontend: parseFloat(finalAmount),
+        session: checkoutData.finalAmount
       });
       return res.status(400).json({
         success: false,
@@ -2103,67 +2147,82 @@ const createOrder = async (req, res) => {
       });
     }
 
+    // Use the final amount from checkoutData for order creation
+    const originalAmount = checkoutData.cartTotal;
+    const discountAmount = checkoutData.cartTotal - checkoutData.finalAmount; // Calculate the actual total discount (offer + coupon)
+    const verifiedFinalAmount = checkoutData.finalAmount;
+
     // Create unique order ID
     const orderID = `ORD-${Date.now()}-${nanoid(6)}`;
-    
-    // Convert final amount to paise
-    const amountInPaise = Math.round(finalAmount * 100);
 
-    console.log('Creating Razorpay order:', {
-      originalAmount,
-      discountAmount,
-      finalAmount,
-      amountInPaise
-    });
+    if (paymentMethod === 'razorpay') {
+      // Convert verified final amount to paise
+      const amountInPaise = Math.round(verifiedFinalAmount * 100);
 
-    // Create Razorpay order with the discounted amount
-    const razorpayOrder = await razorpay.orders.create({
-      amount: amountInPaise,
-      currency: 'INR',
-      receipt: orderID,
-      payment_capture: 1,
-      notes: {
+      console.log('Creating Razorpay order:', {
         originalAmount,
         discountAmount,
-        finalAmount
-      }
-    });
+        verifiedFinalAmount,
+        amountInPaise
+      });
 
-    // Store complete order data in session
-    req.session.pendingOrder = {
-      orderID,
-      razorpayOrderId: razorpayOrder.id,
-      totalAmount: finalAmount,
-      originalAmount,
-      discountAmount,
-      items: checkoutData.items,
-      shippingAddress: await Address.findById(addressId),
-      userId
-    };
+      // Create Razorpay order with the verified final amount
+      const razorpayOrder = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: 'INR',
+        receipt: orderID,
+        payment_capture: 1,
+        notes: {
+          originalAmount,
+          discountAmount,
+          verifiedFinalAmount
+        }
+      });
 
-    // Save session explicitly
-    await new Promise(resolve => req.session.save(resolve));
+      // Store complete order data in session
+      req.session.pendingOrder = {
+        orderID,
+        razorpayOrderId: razorpayOrder.id,
+        totalAmount: verifiedFinalAmount,
+        originalAmount,
+        discountAmount,
+        items: checkoutData.items,
+        shippingAddress: addressId ? await Address.findById(addressId) : null,
+        userId
+      };
 
-    // Log the final data being sent
-    console.log('Order created with amounts:', {
-      originalAmount,
-      discountAmount,
-      finalAmount,
-      amountInPaise,
-      razorpayOrderId: razorpayOrder.id
-    });
+      // Save session explicitly
+      await new Promise(resolve => req.session.save(resolve));
 
-    res.json({
-      success: true,
-      orderId: razorpayOrder.id,
-      amount: amountInPaise,
-      orderID,
-      summary: {
-        original: originalAmount,
-        discount: discountAmount,
-        final: finalAmount
-      }
-    });
+      // Log the final data being sent
+      console.log('Razorpay order created with amounts:', {
+        originalAmount,
+        discountAmount,
+        verifiedFinalAmount,
+        amountInPaise,
+        razorpayOrderId: razorpayOrder.id
+      });
+
+      res.json({
+        success: true,
+        orderId: razorpayOrder.id,
+        amount: amountInPaise,
+        orderID,
+        summary: {
+          original: originalAmount,
+          discount: discountAmount,
+          final: verifiedFinalAmount
+        }
+      });
+    } else {
+      // For COD or wallet payments, redirect to placeOrder endpoint
+      res.json({
+        success: true,
+        redirect: true,
+        orderID,
+        paymentMethod
+      });
+    }
 
   } catch (error) {
     console.error('Error creating order:', error);

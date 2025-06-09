@@ -50,7 +50,7 @@ import {
 import { upload, processImages } from '../../middleware/imageUpload.js';
 import { isAdmin } from '../../middleware/authMiddleware.js';
 import couponRoutes from './couponRoutes.js';
-import salesReportRoutes from '../salesReport.js';
+import salesReportRoutes from './sales-report.js';
 import Coupon from '../../models/couponModel.js';
 
 const router = express.Router();
