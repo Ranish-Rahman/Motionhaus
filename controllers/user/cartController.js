@@ -2,6 +2,7 @@ import Cart from '../../models/cartModel.js';
 import Product from '../../models/ProductModel.js';
 import Coupon from '../../models/couponModel.js';
 import { getBestOffer } from './productController.js';
+import { calculateCartTotals } from '../../utils/cartHelper.js';
 
 // Add to cart 
 export const addToCart = async (req, res) => {
@@ -101,6 +102,49 @@ export const addToCart = async (req, res) => {
   }
 };
 
+/**
+ * Checks if a coupon applied to the cart is still valid after a cart modification.
+ * If the coupon is no longer valid, it is removed from the cart.
+ *
+ * @param {object} cart - The user's cart object, populated with coupon details.
+ * @returns {string|null} A message if the coupon was removed, otherwise null.
+ */
+const checkAndUpdateCoupon = async (cart) => {
+  if (!cart.coupon) {
+    return null; // No coupon to check
+  }
+
+  // Ensure coupon details are populated
+  if (!cart.populated('coupon')) {
+    await cart.populate('coupon');
+  }
+
+  const coupon = cart.coupon;
+  const subtotal = cart.subtotal; // Subtotal is already recalculated by the pre-save hook
+
+  let removalReason = null;
+
+  if (subtotal < coupon.minAmount) {
+    removalReason = `The previously applied coupon was removed because your order total is now below the minimum requirement of ₹${coupon.minAmount}.`;
+  }
+
+  if (removalReason) {
+    // Revert coupon usage stats
+    await Coupon.findByIdAndUpdate(coupon._id, {
+      $pull: { usedBy: cart.user }, // Remove user from the usedBy list
+      $inc: { usageCount: -1 } // Decrement the usage count
+    });
+
+    // Remove coupon from cart
+    cart.coupon = null;
+    cart.couponCode = null;
+
+    return removalReason;
+  }
+
+  return null; // Coupon is still valid
+};
+
 // Update cart item quantity
 export const updateCartItem = async (req, res) => {
   try {
@@ -173,13 +217,20 @@ export const updateCartItem = async (req, res) => {
     // Save cart (pre-save hook will calculate subtotal)
     await cart.save();
 
-    // Populate product details for response
-    await cart.populate('items.product');
+    // After saving, check if the applied coupon is still valid
+    const couponRemovalMessage = await checkAndUpdateCoupon(cart);
+    if (couponRemovalMessage) {
+      await cart.save(); // Save again to persist coupon removal
+    }
+
+    // Recalculate final totals with the helper
+    const updatedCartData = await calculateCartTotals(cart);
 
     res.json({
       success: true,
       message: 'Cart updated',
-      cart
+      couponMessage: couponRemovalMessage, // Send removal message to frontend
+      cart: updatedCartData
     });
   } catch (error) {
     console.error('Error updating cart:', error);
@@ -215,14 +266,21 @@ export const removeFromCart = async (req, res) => {
 
     // Save cart (pre-save hook will calculate subtotal)
     await cart.save();
+    
+    // After saving, check if the applied coupon is still valid
+    const couponRemovalMessage = await checkAndUpdateCoupon(cart);
+    if (couponRemovalMessage) {
+      await cart.save(); // Save again to persist coupon removal
+    }
 
-    // Populate product details for response
-    await cart.populate('items.product');
+    // Recalculate final totals with the helper
+    const updatedCartData = await calculateCartTotals(cart);
 
     res.json({
       success: true,
       message: 'Item removed from cart',
-      cart
+      couponMessage: couponRemovalMessage, // Send removal message to frontend
+      cart: updatedCartData
     });
   } catch (error) {
     console.error('Error removing from cart:', error);
@@ -236,7 +294,7 @@ export const applyCoupon = async (req, res) => {
         if (!req.session.user) {
             return res.status(401).json({
                 success: false,
-                message: 'Please login to apply coupon'
+                message: 'Please login to apply a coupon.'
             });
         }
 
@@ -246,193 +304,232 @@ export const applyCoupon = async (req, res) => {
         if (!code) {
             return res.status(400).json({
                 success: false,
-                message: 'Coupon code is required'
+                message: 'Please enter a coupon code.'
             });
         }
 
-        // Find cart
+        // Find cart and check if a coupon is already applied
         const cart = await Cart.findOne({ user: userId });
         if (!cart || !cart.items.length) {
             return res.status(400).json({
                 success: false,
-                message: 'Cart is empty'
+                message: 'Your cart is empty. Add items to apply a coupon.'
             });
         }
-
-        // Find coupon
-        const coupon = await Coupon.findOne({ code: code.toUpperCase() });
-        if (!coupon) {
+        if (cart.coupon) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid coupon code'
+                message: 'A coupon has already been applied. Please remove it first to apply a new one.'
             });
         }
 
-        // Debug logs before validation
-        console.log('--- Before Coupon Validation ---');
-        console.log('Cart subtotal:', cart.subtotal);
-        console.log('Coupon:', coupon);
-        console.log('Current time:', new Date());
-        console.log('Valid from:', coupon.validFrom);
-        console.log('Valid until:', coupon.validUntil);
-        console.log('Is active:', coupon.isActive);
-        console.log('Usage count:', coupon.usageCount);
-        console.log('Usage limit:', coupon.usageLimit);
+        // Find the coupon
+        const coupon = await Coupon.findOne({ code: code.toUpperCase() });
+        if (!coupon) {
+            return res.status(404).json({
+                success: false,
+                message: 'Coupon code not found. Please check the code and try again.'
+            });
+        }
 
-        // Validate coupon
+        // --- Start Advanced Validation ---
+
+        // 1. Check if coupon is active
         if (!coupon.isActive) {
             return res.status(400).json({
                 success: false,
-                message: 'Coupon is inactive'
+                message: 'This coupon is currently inactive.'
             });
         }
 
+        // 2. Check date validity
         const now = new Date();
         if (now < coupon.validFrom) {
             return res.status(400).json({
                 success: false,
-                message: `Coupon is not valid until ${coupon.validFrom.toLocaleDateString()}`
+                message: `This coupon is not valid until ${coupon.validFrom.toLocaleDateString()}.`
             });
         }
-
         if (now > coupon.validUntil) {
             return res.status(400).json({
                 success: false,
-                message: 'Coupon has expired'
+                message: 'This coupon has expired.'
             });
         }
 
+        // 3. Check usage limits (total and per user)
         if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
             return res.status(400).json({
                 success: false,
-                message: 'Coupon usage limit reached'
+                message: 'This coupon has reached its maximum usage limit.'
             });
         }
 
-        // Check minimum order amount
-        if (cart.subtotal < coupon.minAmount) {
+        // 4. Check if coupon has been used by this user before
+        if (coupon.usedBy.includes(userId)) {
             return res.status(400).json({
                 success: false,
-                message: `Minimum order amount of ₹${coupon.minAmount} is required for this coupon`
+                message: 'You have already redeemed this coupon.'
             });
         }
 
-        // Apply coupon
-        await cart.applyCoupon(coupon);
-        await cart.save();
+        // 5. Check minimum purchase amount
+        const subtotal = cart.subtotal;
+        if (subtotal < coupon.minAmount) {
+            return res.status(400).json({
+                success: false,
+                message: `Your order must be at least ₹${coupon.minAmount} to use this coupon. Your current total is ₹${subtotal.toFixed(2)}.`
+            });
+        }
 
-        // Debug logs
-        console.log('--- After Coupon Application ---');
-        console.log('Cart subtotal:', cart.subtotal);
-        console.log('Coupon:', coupon);
-        console.log('Cart discount after applying coupon:', cart.discount);
-        console.log('Cart couponCode:', cart.couponCode);
-        console.log('--------------------');
+        // --- End Advanced Validation ---
 
-        // Increment usage count
+        // If all checks pass, apply the coupon
+        cart.coupon = coupon._id;
+        cart.couponCode = coupon.code; // Store for display purposes
+        
+        // IMPORTANT: Increment usage count and add user to usedBy list
         coupon.usageCount += 1;
-        await coupon.save();
+        coupon.usedBy.push(userId);
+        
+        await Promise.all([cart.save(), coupon.save()]);
 
-        // Populate cart items and coupon for response
-        await cart.populate('items.product');
-        await cart.populate('coupon');
+        // Repopulate the cart to include the new coupon details
+        const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
 
-        // Calculate final amount
-        const finalAmount = cart.subtotal - cart.discount;
+        // Recalculate cart totals with the new coupon
+        const updatedCartData = await calculateCartTotals(populatedCart);
 
         res.json({
             success: true,
-            message: 'Coupon applied successfully',
-            cart: {
-                ...cart.toObject(),
-                couponDiscount: cart.discount,
-                couponCode: cart.couponCode,
-                finalAmount
-            },
-            coupon: {
-                code: coupon.code,
-                type: coupon.type,
-                value: coupon.value,
-                description: coupon.description
-            },
-            discount: cart.discount
+            message: 'Coupon applied successfully!',
+            cart: updatedCartData
         });
     } catch (error) {
         console.error('Error applying coupon:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to apply coupon'
+            message: 'An unexpected error occurred while applying the coupon. Please try again.'
         });
     }
 };
 
 // Remove coupon from cart
 export const removeCoupon = async (req, res) => {
-    try {
-        if (!req.session.user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Please login to remove coupon'
-            });
-        }
+  try {
+    const userId = req.session.user._id;
+    const cart = await Cart.findOne({ user: userId });
 
-        const userId = req.session.user._id;
-
-        // Find cart
-        const cart = await Cart.findOne({ user: userId });
-        if (!cart) {
-            return res.status(404).json({
-                success: false,
-                message: 'Cart not found'
-            });
-        }
-
-        // Debug logs before removal
-        console.log('--- Before Coupon Removal ---');
-        console.log('Cart ID:', cart._id);
-        console.log('Current coupon:', cart.coupon);
-        console.log('Current discount:', cart.discount);
-        console.log('Current couponCode:', cart.couponCode);
-
-        // If there was a coupon, decrement its usage count
-        if (cart.coupon) {
-            const coupon = await Coupon.findById(cart.coupon);
-            if (coupon && coupon.usageCount > 0) {
-                coupon.usageCount -= 1;
-                await coupon.save();
-            }
-        }
-
-        // Remove coupon from cart
-        cart.coupon = null;
-        cart.discount = 0;
-        cart.couponCode = null;
-        await cart.save();
-
-        // Debug logs after removal
-        console.log('--- After Coupon Removal ---');
-        console.log('Cart ID:', cart._id);
-        console.log('Coupon removed:', cart.coupon === null);
-        console.log('Discount reset:', cart.discount === 0);
-        console.log('CouponCode cleared:', cart.couponCode === null);
-
-        // Populate cart items for response
-        await cart.populate('items.product');
-
-        res.json({
-            success: true,
-            message: 'Coupon removed successfully',
-            cart: {
-                ...cart.toObject(),
-                discount: 0,
-                couponCode: null
-            }
-        });
-    } catch (error) {
-        console.error('Error removing coupon:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to remove coupon'
-        });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found.' });
     }
+
+    if (!cart.coupon) {
+      return res.status(400).json({ success: false, message: 'No coupon to remove.' });
+    }
+
+    // Clear coupon from cart
+    cart.coupon = null;
+    cart.couponCode = null;
+    await cart.save();
+    
+    // IMPORTANT: Repopulate the cart to get item details
+    const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
+
+    // Recalculate totals without the coupon
+    const updatedCartData = await calculateCartTotals(populatedCart);
+
+    res.json({ 
+      success: true, 
+      message: 'Coupon removed successfully!',
+      cart: updatedCartData
+    });
+  } catch (error) {
+    console.error('Error removing coupon:', error);
+    res.status(500).json({ success: false, message: 'Server error while removing coupon.' });
+  }
+};
+
+// Validate stock availability for all items in cart
+export const validateStock = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ success: false, message: 'Please login to validate stock' });
+    }
+
+    const userId = req.session.user._id || req.session.user.id;
+
+    // Find cart
+    const cart = await Cart.findOne({ user: userId });
+    if (!cart || !cart.items || cart.items.length === 0) {
+      return res.json({
+        isValid: true,
+        issues: []
+      });
+    }
+
+    // Populate product details
+    await cart.populate('items.product');
+
+    const issues = [];
+    let hasStockIssues = false;
+
+    // Check each item in cart
+    for (const item of cart.items) {
+      if (!item.product || item.product.isBlocked) {
+        hasStockIssues = true;
+        issues.push({
+          name: item.product ? item.product.name : 'Unknown Product',
+          size: item.size,
+          requested: item.quantity,
+          available: 0,
+          reason: 'Product is no longer available'
+        });
+        continue;
+      }
+
+      // Find the size object for stock check
+      const sizeObj = item.product.sizes.find(s => s.size === parseInt(item.size));
+      if (!sizeObj) {
+        hasStockIssues = true;
+        issues.push({
+          name: item.product.name,
+          size: item.size,
+          requested: item.quantity,
+          available: 0,
+          reason: 'Size no longer available'
+        });
+        continue;
+      }
+
+      const stockAvailable = sizeObj.quantity;
+      if (stockAvailable < item.quantity) {
+        hasStockIssues = true;
+        issues.push({
+          name: item.product.name,
+          size: item.size,
+          requested: item.quantity,
+          available: stockAvailable,
+          reason: 'Insufficient stock'
+        });
+      }
+    }
+
+    res.json({
+      isValid: !hasStockIssues,
+      issues: issues
+    });
+  } catch (error) {
+    console.error('Error validating stock:', error);
+    res.status(500).json({ 
+      isValid: false, 
+      issues: [{
+        name: 'Unknown Product',
+        size: 'Unknown',
+        requested: 0,
+        available: 0,
+        reason: 'Error checking stock'
+      }]
+    });
+  }
 }; 

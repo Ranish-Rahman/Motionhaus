@@ -11,31 +11,27 @@ import { addRefund } from './walletController.js';
 
 // Place Order function
 export const placeOrder = async (req, res) => {
-  console.log('=== ORDER PLACEMENT STARTED ===');
-  console.log('Request body:', req.body);
-  
+  console.log('=== COD/WALLET ORDER PLACEMENT STARTED ===');
+
   try {
     const userId = req.session.user._id;
-    const { addressId, paymentMethod, orderID } = req.body;
+    const { addressId, paymentMethod } = req.body;
 
-    // Use the provided orderID or generate a new one
-    const finalOrderID = orderID || `ORD-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${nanoid(8).toUpperCase()}`;
-
-    // Get cart and validate items
-    const cart = await Cart.findOne({ user: userId }).populate('items.product');
-    if (!cart || !cart.items || cart.items.length === 0) {
+    // 1. Get checkout data from session - THIS IS THE SINGLE SOURCE OF TRUTH
+    const checkoutData = req.session.checkoutData;
+    if (!checkoutData) {
       return res.status(400).json({
         success: false,
-        message: 'Cart is empty'
+        message: 'Your session has expired. Please return to checkout and try again.'
       });
     }
 
-    // Get selected address
-    const selectedAddress = await Address.findOne({
-      userId: userId,
-      _id: addressId
-    });
+    // Use the verified amounts from the session
+    const { finalAmount, cartTotal, totalDiscount, items: checkoutItems, couponCode } = checkoutData;
+    const orderID = `ORD-${Date.now()}-${nanoid(6)}`;
 
+    // Get selected address
+    const selectedAddress = await Address.findById(addressId).lean();
     if (!selectedAddress) {
       return res.status(400).json({
         success: false,
@@ -43,109 +39,64 @@ export const placeOrder = async (req, res) => {
       });
     }
 
-    // Filter out any items where the product doesn't exist
-    const validItems = cart.items.filter(item => item.product != null);
-    if (validItems.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid items in cart'
-      });
+    // 2. STOCK VALIDATION: Use items from checkoutData for validation
+    for (const item of checkoutItems) {
+      const product = await Product.findById(item.product);
+      if (!product) {
+        throw new Error(`Product with ID ${item.product} not found.`);
+      }
+      const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
+      if (!sizeObj) {
+        throw new Error(`Size ${item.size} not available for ${product.name}`);
+      }
+      if (sizeObj.quantity < item.quantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${product.name} (Size: ${item.size}). Only ${sizeObj.quantity} left.`,
+          outOfStock: true
+        });
+      }
     }
 
-    // Handle wallet payment
+    // 3. Handle wallet payment using the verified finalAmount
     if (paymentMethod === 'wallet') {
       const user = await User.findById(userId);
-      if (!user.wallet || !user.wallet.balance || user.wallet.balance < cart.subtotal) {
+      const walletBalance = user.wallet?.balance || 0;
+      if (walletBalance < finalAmount) {
         return res.status(400).json({
           success: false,
           message: 'Insufficient wallet balance'
         });
       }
 
-      try {
-        // Deduct amount from wallet
-        const currentBalance = typeof user.wallet === 'number' ? user.wallet : user.wallet.balance;
-        const newBalance = Number(currentBalance) - Number(cart.subtotal);
-        
-        user.wallet = { balance: newBalance };
-        await user.save();
-
-        // Create wallet transaction record
-        const transaction = new Transaction({
-          user: userId,
-          type: 'debit',
-          amount: cart.subtotal,
-          description: `Payment for order ${finalOrderID}`,
-          balance: newBalance,
-          status: 'completed'
-        });
-        await transaction.save();
-
-      } catch (error) {
-        console.error('Wallet payment error:', error);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to process wallet payment'
-        });
-      }
-    }
-
-    // For Razorpay payments, we'll create the order only after payment verification
-    if (paymentMethod === 'razorpay') {
-      const options = {
-        amount: cart.subtotal * 100, // Amount in paise
-        currency: 'INR',
-        receipt: `ORD-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${nanoid(8).toUpperCase()}`,
-        payment_capture: 1 
-      };
-
-      const razorpayOrder = await razorpay.orders.create(options);
-      
-      return res.json({
-        success: true,
-        isRazorpay: true,
-        razorpayOrder: {
-          id: razorpayOrder.id,
-          amount: razorpayOrder.amount,
-          currency: razorpayOrder.currency
-        }
+      // Deduct from wallet and record transaction
+      user.wallet.balance -= finalAmount;
+      const transaction = new Transaction({
+        user: userId,
+        type: 'debit',
+        amount: finalAmount,
+        description: `Payment for order ${orderID}`,
+        balance: user.wallet.balance,
+        status: 'completed'
       });
+      await Promise.all([user.save(), transaction.save()]);
     }
 
-    // Check stock availability for each item
-    for (const item of validItems) {
-      const product = await Product.findById(item.product._id);
-      if (!product) {
-        throw new Error(`Product not found: ${item.product.name}`);
-      }
-
-      const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
-      if (!sizeObj) {
-        throw new Error(`Size ${item.size} not available for ${product.name}`);
-      }
-
-      if (sizeObj.quantity < item.quantity) {
-        throw new Error(`Insufficient stock for ${product.name} in size ${item.size}`);
-      }
-    }
-
-    // Create order
+    // 4. Create the new order using checkoutData from session
     const order = new Order({
-      orderID: finalOrderID,
+      orderID,
       user: userId,
-      items: validItems.map(item => ({
-        product: item.product._id,
+      items: checkoutItems.map(item => ({
+        product: item.product,
         quantity: item.quantity,
         price: item.price,
-        originalPrice: item.product.price,
-        discountApplied: item.product.price > item.price ? 
-          Math.round(((item.product.price - item.price) / item.product.price) * 100) : null,
+        originalPrice: item.originalPrice,
         size: item.size
       })),
-      totalAmount: Number(req.body.finalAmount) || cart.subtotal,
-      originalAmount: cart.subtotal,
-      discountAmount: Number(req.body.discountAmount) || 0,
-      coupon: cart.coupon || null,
+      totalAmount: finalAmount,
+      originalAmount: cartTotal,
+      discountAmount: totalDiscount,
+      coupon: couponCode, // Store the coupon code used
       shippingAddress: {
         fullName: selectedAddress.fullName,
         address: selectedAddress.addressLine1 + (selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''),
@@ -154,50 +105,44 @@ export const placeOrder = async (req, res) => {
         postalCode: selectedAddress.zipCode,
         phone: selectedAddress.phone
       },
-      paymentMethod: paymentMethod,
-      status: 'Pending',
-      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending',
-      paymentDetails: paymentMethod === 'razorpay' ? {
-        razorpayOrderId: null,
-        razorpayPaymentId: null,
-        razorpaySignature: null,
-        paymentAttempts: 0,
-        lastPaymentAttempt: null
-      } : undefined
+      paymentMethod,
+      status: 'pending', // Initial status
+      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending'
     });
 
     await order.save();
-    console.log('Order created successfully:', finalOrderID);
+    console.log('Order created successfully with unified calculation:', orderID);
 
-    // Decrease stock only for COD and wallet payments
-    // For Razorpay, we'll decrease stock after payment confirmation
-    if (paymentMethod !== 'razorpay') {
-      for (const item of validItems) {
-        const product = await Product.findById(item.product._id);
-        const sizeObj = product.sizes.find(s => Number(s.size) === Number(item.size));
-        sizeObj.quantity -= item.quantity;
-        await product.save();
-      }
+    // 5. Decrease stock after successful order creation
+    for (const item of checkoutItems) {
+      await Product.updateOne({
+        _id: item.product,
+        'sizes.size': item.size
+      }, {
+        $inc: {
+          'sizes.$.quantity': -item.quantity
+        }
+      });
     }
 
-    // Clear the cart after successful order placement
-    await Cart.findOneAndUpdate(
-      { user: userId },
-      { $set: { items: [], couponCode: null, discount: 0 } }
-    );
+    // 6. Clear user cart and session data
+    await Cart.findOneAndDelete({ user: userId });
+    delete req.session.checkoutData;
+    delete req.session.pendingOrder; // Also clear any pending razorpay orders
+    await req.session.save();
 
     res.json({
       success: true,
-      orderID: finalOrderID,
+      orderID: order.orderID, // Use the ID from the created order document
       message: 'Order placed successfully'
     });
 
   } catch (error) {
     console.error('Error placing order:', error);
     res.status(500).json({
-        success: false,
+      success: false,
       message: error.message || 'Failed to place order'
-      });
+    });
   }
 };
 

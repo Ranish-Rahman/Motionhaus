@@ -406,7 +406,7 @@
             <span>Delivery Fee</span>
             <span style="color: #2ecc71; font-weight: 600;">Free</span>
           </div>
-          <div id="couponDiscount" class="coupon-discount <%= cart.couponCode ? '' : 'hidden' %>">
+          <div id="couponDiscount" class="coupon-discount <%= (cart.couponCode && cart.discount > 0) ? '' : 'hidden' %>">
             <span>Coupon Discount</span>
             <span style="color: #2ecc71; font-weight: 600;">-₹<span id="discountAmount"><%= cart.discount ? cart.discount.toFixed(2) : '0.00' %></span></span>
           </div>
@@ -414,19 +414,7 @@
             <span>Total</span>
             <span>₹<%= (cart.subtotal - (cart.discount || 0)).toFixed(2) %></span>
           </div>
-          <div style="display: flex; gap: 8px; margin-bottom: 18px;">
-            <input type="text" 
-                   id="couponCode" 
-                   placeholder="Enter coupon code" 
-                   value="<%= cart.couponCode || '' %>"
-                   <%= cart.couponCode ? 'disabled' : '' %>
-                   style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #eee; font-size: 15px; text-transform: uppercase;">
-            <button id="couponButton"
-                    style="padding: 12px 22px; border-radius: 8px; background: #000; color: white; border: none; font-weight: 600; cursor: pointer;">
-              <%= cart.couponCode ? 'Remove' : 'Apply' %>
-            </button>
-          </div>
-          <div id="appliedCoupon" class="applied-coupon <%= cart.couponCode ? '' : 'hidden' %>">
+          <div id="appliedCoupon" class="applied-coupon <%= (cart.couponCode && cart.discount > 0) ? '' : 'hidden' %>">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-weight: 600; color: #155724;" id="appliedCouponCode"><%= cart.couponCode || '' %></div>
@@ -502,7 +490,7 @@
     }
 
     function updateQuantity(itemId, change) {
-      const input = event.target.parentElement.querySelector('.quantity-input');
+      const input = event.target.parentElement.querySelector('.q  tity-input');
       const currentValue = parseInt(input.value);
       const maxStock = parseInt(input.getAttribute('max'));
       const maxLimit = 3; // Maximum limit per product
@@ -521,6 +509,17 @@
           if (data.success) {
             input.value = newValue;
             updateCartSummary(data.cart);
+
+            // Notify user if coupon was removed
+            if (data.couponMessage) {
+              Swal.fire({
+                title: 'Coupon Removed',
+                text: data.couponMessage,
+                icon: 'info',
+                confirmButtonColor: '#000'
+              });
+            }
+
             // Update stock status display
             const stockStatus = input.closest('.cart-item').querySelector('.stock-status');
             if (stockStatus) {
@@ -578,6 +577,15 @@
                   location.reload();
                 } else {
                   updateCartSummary(data.cart);
+                  // Notify user if coupon was removed
+                  if (data.couponMessage) {
+                    Swal.fire({
+                      title: 'Coupon Removed',
+                      text: data.couponMessage,
+                      icon: 'info',
+                      confirmButtonColor: '#000'
+                    });
+                  }
                 }
               }
               Swal.fire({
@@ -609,79 +617,6 @@
     }
 
     let appliedCoupon = null;
-
-    async function applyCoupon() {
-        const couponCode = document.getElementById('couponCode').value.trim().toUpperCase();
-        if (!couponCode) {
-            Swal.fire({
-                title: 'Error!',
-                text: 'Please enter a coupon code',
-                icon: 'error',
-                confirmButtonColor: '#000'
-            });
-            return;
-        }
-
-        try {
-            const response = await fetch('/cart/apply-coupon', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ code: couponCode })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                appliedCoupon = data.coupon;
-                // Show success message
-                Swal.fire({
-                    title: 'Success!',
-                    text: data.message || 'Coupon applied successfully!',
-                    icon: 'success',
-                    confirmButtonColor: '#000'
-                });
-                // Update UI with null checks
-                const couponDiscount = document.getElementById('couponDiscount');
-                const discountAmount = document.getElementById('discountAmount');
-                const appliedCouponDiv = document.getElementById('appliedCoupon');
-                const appliedCouponCode = document.getElementById('appliedCouponCode');
-                const couponDescription = document.getElementById('couponDescription');
-                if (couponDiscount) couponDiscount.classList.remove('hidden');
-                if (discountAmount) discountAmount.textContent = data.discount.toFixed(2);
-                if (appliedCouponDiv) {
-                    appliedCouponDiv.classList.remove('hidden');
-                    if (appliedCouponCode) appliedCouponCode.textContent = couponCode;
-                    if (couponDescription) {
-                        couponDescription.textContent = `${data.coupon.type === 'Percentage' ? data.coupon.value + '% OFF' : '₹' + data.coupon.value + ' OFF'}`;
-                    }
-                }
-                // Clear input
-                const couponInput = document.getElementById('couponCode');
-                if (couponInput) couponInput.value = '';
-                // Update cart summary
-                updateCartSummary(data.cart);
-            } else {
-                // Show SweetAlert error and do NOT update UI
-                Swal.fire({
-                    title: 'Error!',
-                    text: data.message || 'Invalid coupon code',
-                    icon: 'error',
-                    confirmButtonColor: '#000'
-                });
-                // Optionally, reset coupon input/button here if needed
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            Swal.fire({
-                title: 'Error!',
-                text: 'Failed to apply coupon',
-                icon: 'error',
-                confirmButtonColor: '#000'
-            });
-        }
-    }
 
     async function removeCoupon() {
         try {
@@ -738,8 +673,6 @@
         const appliedCouponDiv = document.getElementById('appliedCoupon');
         const appliedCouponCode = document.getElementById('appliedCouponCode');
         const couponDescription = document.getElementById('couponDescription');
-        const couponInput = document.getElementById('couponCode');
-        const couponButton = document.getElementById('couponButton');
         
         if (subtotalElement && totalElement) {
             subtotalElement.textContent = `₹${cart.subtotal.toFixed(2)}`;
@@ -755,24 +688,10 @@
                         ? `${cart.coupon.value}% OFF` 
                         : `₹${cart.discount} OFF`;
                 }
-                if (couponInput) {
-                    couponInput.value = cart.couponCode;
-                    couponInput.disabled = true;
-                }
-                if (couponButton) {
-                    couponButton.textContent = 'Remove';
-                }
                 totalElement.textContent = `₹${(cart.subtotal - cart.discount).toFixed(2)}`;
             } else {
                 if (couponDiscount) couponDiscount.classList.add('hidden');
                 if (appliedCouponDiv) appliedCouponDiv.classList.add('hidden');
-                if (couponInput) {
-                    couponInput.value = '';
-                    couponInput.disabled = false;
-                }
-                if (couponButton) {
-                    couponButton.textContent = 'Apply';
-                }
                 totalElement.textContent = `₹${cart.subtotal.toFixed(2)}`;
             }
         } else {
@@ -811,14 +730,6 @@
 
       window.location.href = '/checkout';
     }
-
-    document.getElementById('couponButton').addEventListener('click', function() {
-        if ('<%= cart.couponCode %>') {
-            removeCoupon();
-        } else {
-            applyCoupon();
-        }
-    });
   </script>
 </body>
 </html> 

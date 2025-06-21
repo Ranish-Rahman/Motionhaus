@@ -160,7 +160,13 @@
                 </div>
             <% } %>
 
-            <button onclick="retryPayment()" class="action-button">Try again</button>
+            <% if (shippingAddress && shippingAddress.fullName) { %>
+                <button onclick="retryPayment()" class="action-button">Try again</button>
+            <% } else { %>
+                <div style="margin: 20px 0; padding: 16px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; color: #856404;">
+                    <strong>Retry not available:</strong> Shipping address information is missing. Please place a new order.
+                </div>
+            <% } %>
 
             <div class="secondary-links">
                 <a href="/profile/orders" class="secondary-link">View Orders</a>
@@ -205,8 +211,17 @@
                     }
                 });
 
+                // Get shipping address from the failed order
+                const shippingAddress = JSON.parse('<%- JSON.stringify(shippingAddress || {}) %>');
+                console.log('[Debug] Shipping address for retry:', shippingAddress);
+                
+                if (!shippingAddress || !shippingAddress.fullName) {
+                    throw new Error('Shipping address not found. Please try placing your order again.');
+                }
+                
                 // Create new Razorpay order for retry
                 console.log('[Debug] Creating Razorpay order for retry...');
+                
                 const response = await fetch('/order/create-razorpay-order', {
                     method: 'POST',
                     headers: {
@@ -215,7 +230,9 @@
                     },
                     body: JSON.stringify({
                         retryOrderId: orderId,
-                        isRetry: true
+                        isRetry: true,
+                        addressId: shippingAddress._id, // Include the address ID
+                        shippingAddress: shippingAddress // Include full address data as fallback
                     }),
                     credentials: 'same-origin'
                 });
@@ -294,7 +311,7 @@
                             console.log('[Debug] Verification response:', verifyData);
 
                             if (verifyData.success) {
-                                window.location.href = `/order/success/${verifyData.orderId}`;
+                                window.location.href = `/order/success/${verifyData.orderID}`;
                             } else {
                                 throw new Error(verifyData.message || 'Payment verification failed');
                             }

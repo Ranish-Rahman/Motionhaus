@@ -12,6 +12,7 @@ import ejs from 'ejs';
 import razorpay from '../../utils/razorpay.js';
 import { nanoid } from 'nanoid';
 import { getBestOffer } from './productController.js';
+import { calculateCartTotals } from '../../utils/cartHelper.js';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -966,6 +967,7 @@ const getOrderDetails = async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
       .populate('items.product', 'name price images sizes')
+      .populate('coupon', 'code discountType discountValue')
       .select('+shippingAddress +returnRequest');  // Explicitly select shippingAddress and returnRequest
 
     if (!order) {
@@ -1138,130 +1140,40 @@ const getCheckout = async (req, res) => {
       return res.redirect('/cart');
     }
 
-    // Calculate cart totals and apply discounts
-    let cartTotal = 0;
-    let totalDiscount = 0;
-    let processedItems = [];
-
-    // Process each item and calculate discounts
-    for (let item of cart.items) {
-      if (!item.product || item.product.isBlocked) continue;
-
-      const originalPrice = item.product.price;
-      const itemSubtotal = originalPrice * item.quantity;
-      cartTotal += itemSubtotal;
-
-      // Get and apply offer
-      const offer = await getBestOffer(item.product._id);
-      let itemDiscount = 0;
-      let finalPrice = originalPrice;
-
-      if (offer) {
-        itemDiscount = Math.round((itemSubtotal * offer.discount) / 100);
-        totalDiscount += itemDiscount;
-        finalPrice = originalPrice - (itemDiscount / item.quantity);
-      }
-      
-      processedItems.push({
-        ...item.toObject(),
-        product: {
-          ...item.product.toObject(),
-          bestOffer: offer,
-          originalPrice,
-          discountedPrice: finalPrice
-        },
-        discountAmount: itemDiscount,
-        finalPrice: finalPrice,
-        offerName: offer ? offer.name : null,
-        offerDiscount: offer ? offer.discount : 0
-      });
-    }
-
-    // Calculate final amount with both offer and coupon discounts
-    const couponDiscount = cart.discount || 0; // This is the total coupon discount already applied to cart
-    
-    // Distribute coupon discount proportionally across items
-    if (couponDiscount > 0) {
-      const discountRatio = couponDiscount / cartTotal;
-      processedItems = processedItems.map(item => {
-        const itemSubtotal = item.product.originalPrice * item.quantity;
-        // Ensure itemCouponDiscount is rounded to 2 decimal places
-        const couponItemDiscount = parseFloat((itemSubtotal * discountRatio).toFixed(2));
-        const totalItemDiscount = item.discountAmount + couponItemDiscount;
-        const finalItemPrice = item.product.originalPrice - (totalItemDiscount / item.quantity);
-        
-        return {
-          ...item,
-          discountAmount: parseFloat(totalItemDiscount.toFixed(2)), // Ensure rounded
-          finalPrice: parseFloat(finalItemPrice.toFixed(2)), // Ensure rounded
-          couponDiscount: couponItemDiscount
-        };
-      });
-    }
-
-    // Calculate finalAmount by summing up the final prices of processed items
-    // This ensures consistency with Razorpay order creation
-    const finalAmount = parseFloat(processedItems.reduce((total, item) => total + item.finalPrice, 0).toFixed(2));
-    const totalDiscountAmount = parseFloat((cartTotal - finalAmount).toFixed(2));
+    // Use the centralized calculator to get all totals
+    // IMPORTANT: Ensure the cart is fully populated before calculating
+    const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
+    const cartData = await calculateCartTotals(populatedCart);
 
     // Store checkout data in session
     req.session.checkoutData = {
-      cartTotal,
-      totalDiscount: totalDiscountAmount,
-      finalAmount,
-      items: processedItems.map(item => ({
+      cartTotal: cartData.subtotal,
+      totalDiscount: cartData.totalDiscount,
+      finalAmount: cartData.finalAmount,
+      items: cartData.items.map(item => ({
         product: item.product._id,
         quantity: item.quantity,
         price: item.finalPrice,
-        originalPrice: item.product.originalPrice,
-        discountAmount: item.discountAmount,
+        originalPrice: item.product.price,
+        discountAmount: item.offerDiscount,
         size: item.size,
-        offerName: item.offerName,
-        offerDiscount: item.offerDiscount,
-        couponDiscount: item.couponDiscount || 0
       })),
-      couponCode: cart.couponCode,
-      couponDiscount: couponDiscount
+      couponCode: cartData.couponCode,
+      couponDiscount: cartData.couponDiscount
     };
-
-    // Save session explicitly
-    await new Promise(resolve => req.session.save(resolve));
-
-    console.log('Checkout calculation:', {
-      cartTotal,
-      offerDiscount: totalDiscount,
-      couponDiscount,
-      totalDiscount: totalDiscountAmount,
-      finalAmount,
-      items: processedItems.map(item => ({
-        name: item.product.name,
-        price: item.product.originalPrice,
-        offerDiscount: item.discountAmount - (item.couponDiscount || 0),
-        couponDiscount: item.couponDiscount || 0,
-        totalDiscount: item.discountAmount,
-        final: item.finalPrice,
-        offer: item.offerName
-      }))
-    });
+    await req.session.save();
 
     res.render('user/checkout', {
       cart: {
-        ...cart.toObject(),
-        items: processedItems,
-        subtotal: cartTotal,
-        discount: totalDiscountAmount,
-        offerDiscount: totalDiscount,
-        couponDiscount: couponDiscount,
-        finalAmount,
-        hasOffer: totalDiscount > 0 || couponDiscount > 0
+        ...populatedCart.toObject(),
+        ...cartData
       },
       addresses,
       user: await User.findById(userId).lean()
     });
-
   } catch (error) {
-    console.error('Error in checkout:', error);
-    req.flash('error', 'An error occurred while loading the checkout page.');
+    console.error('Error getting checkout page:', error);
+    req.flash('error', 'Could not load checkout page.');
     res.redirect('/cart');
   }
 };
@@ -1603,7 +1515,8 @@ export const generateInvoice = async (req, res) => {
 
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
-      .populate('items.product', 'name price images');
+      .populate('items.product', 'name price images')
+      .populate('coupon', 'code discountType discountValue');
 
     if (!order) {
       req.flash('error', 'Order not found');
@@ -1844,51 +1757,29 @@ export const cancelRazorpayOrder = async (req, res) => {
       });
 
       if (existingOrder) {
+        // Use existing order data
         orderData = {
           orderID: existingOrder.orderID,
-          items: existingOrder.items,
+          items: existingOrder.items.map(item => ({
+            product: item.product,
+            quantity: item.quantity,
+            size: item.size,
+            price: item.price,
+            originalPrice: item.originalPrice
+          })),
           totalAmount: existingOrder.totalAmount,
+          originalAmount: existingOrder.originalAmount,
           shippingAddress: existingOrder.shippingAddress,
           userId: userId,
           razorpayOrderId: razorpayOrderId
         };
       } else {
-        // If no existing order and no session data, get user's default address
-        const defaultAddress = await Address.findOne({ 
-          userId: userId,
-          isDefault: true 
+        // If no existing order and no session data, this is an error case
+        console.error('[Debug] No order data found for cancellation - this should not happen');
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found. Please try placing your order again.'
         });
-
-        if (!defaultAddress) {
-          return res.status(400).json({
-            success: false,
-            message: 'No shipping address found. Please add a shipping address and try again.'
-          });
-        }
-
-        // Get cart data for minimal order
-        const cart = await Cart.findOne({ user: userId }).populate('items.product');
-        const orderItems = cart?.items || [];
-        const orderAmount = cart?.items.reduce((total, item) => 
-          total + (item.product.price * item.quantity), 0
-        ) || 0;
-
-        orderData = {
-          orderID: `ORD-${Date.now()}-${nanoid(8).toUpperCase()}`,
-          items: orderItems,
-          totalAmount: orderAmount,
-          shippingAddress: {
-            fullName: defaultAddress.fullName,
-            phone: defaultAddress.phone,
-            address: defaultAddress.addressLine1,
-            city: defaultAddress.city,
-            state: defaultAddress.state,
-            postalCode: defaultAddress.zipCode,
-            country: defaultAddress.country
-          },
-          userId: userId,
-          razorpayOrderId: razorpayOrderId
-        };
       }
     }
 
@@ -1903,12 +1794,35 @@ export const cancelRazorpayOrder = async (req, res) => {
 
       if (!order) {
         console.log('[Debug] Creating new order for cancelled payment');
+        
+        // Map shipping address from session data to order format
+        const shippingAddress = orderData.shippingAddress ? {
+          fullName: orderData.shippingAddress.fullName,
+          phone: orderData.shippingAddress.phone,
+          address: orderData.shippingAddress.addressLine1 + 
+            (orderData.shippingAddress.addressLine2 ? ', ' + orderData.shippingAddress.addressLine2 : ''),
+          city: orderData.shippingAddress.city,
+          state: orderData.shippingAddress.state,
+          postalCode: orderData.shippingAddress.zipCode,
+          country: orderData.shippingAddress.country
+        } : null;
+
+        if (!shippingAddress) {
+          console.error('[Debug] No shipping address found in order data');
+          return res.status(400).json({
+            success: false,
+            message: 'Shipping address not found. Please try placing your order again.'
+          });
+        }
+
         order = new Order({
           orderID: orderData.orderID,
           user: userId,
           items: orderData.items || [],
           totalAmount: orderData.totalAmount || 0,
-          shippingAddress: orderData.shippingAddress,
+          originalAmount: orderData.originalAmount || orderData.totalAmount || 0,
+          discountAmount: orderData.discountAmount || 0,
+          shippingAddress: shippingAddress,
           paymentMethod: 'razorpay',
           status: 'payment-failed',
           paymentStatus: 'failed',
@@ -1945,15 +1859,10 @@ export const cancelRazorpayOrder = async (req, res) => {
         // We continue even if Razorpay cancellation fails
       }
 
-      // Keep the order data in session for retry
-      req.session.pendingOrder = {
-        ...orderData,
-        orderID: order.orderID, // Use the saved order ID
-        razorpayOrderId: razorpayOrderId || orderData.razorpayOrderId
-      };
-
+      // Clear the pending order from session
+      req.session.pendingOrder = null;
       await new Promise((resolve) => req.session.save(resolve));
-      console.log('[Debug] Updated session with order data:', req.session.pendingOrder);
+      console.log('[Debug] Cleared pending order from session');
 
       res.json({
         success: true,
@@ -2023,16 +1932,30 @@ async function handleOrderCleanup(userId, session) {
 // Handle order success page
 export const getOrderSuccess = async (req, res) => {
   try {
-    // Try to find by _id first, then by orderID if not found
-    let order = await Order.findById(req.params.id);
-    if (!order) {
-      order = await Order.findOne({ orderID: req.params.id });
+    console.log('[Debug] getOrderSuccess - Looking for order with ID:', req.params.id);
+    
+    let order;
+    
+    // First try to find by orderID (string)
+    order = await Order.findOne({ orderID: req.params.id });
+    
+    // If not found by orderID, try _id as fallback (if it's a valid ObjectId)
+    if (!order && req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findById(req.params.id);
     }
     
     if (!order) {
+      console.log('[Debug] Order not found:', req.params.id);
       req.flash('error', 'Order not found');
       return res.redirect('/profile/orders');
     }
+
+    console.log('[Debug] Found order:', {
+      orderID: order.orderID,
+      _id: order._id,
+      status: order.status,
+      paymentStatus: order.paymentStatus
+    });
 
     res.render('user/order-success', {
       order: {
@@ -2071,7 +1994,9 @@ export const getOrderFailure = async (req, res) => {
       console.log('Order not found but error present:', error);
       return res.render('user/order-failed', {
         orderId: req.params.id,
-        error: error
+        error: error,
+        order: null,
+        shippingAddress: null
       });
     }
 
@@ -2080,7 +2005,9 @@ export const getOrderFailure = async (req, res) => {
       console.log('Order not found and no error message:', req.params.id);
       return res.render('user/order-failed', {
         orderId: req.params.id,
-        error: 'Order not found or has been removed'
+        error: 'Order not found or has been removed',
+        order: null,
+        shippingAddress: null
       });
     }
 
@@ -2096,13 +2023,17 @@ export const getOrderFailure = async (req, res) => {
 
     res.render('user/order-failed', {
       orderId: order.orderID || req.params.id, // Fallback to passed ID if no order
-      error: displayError
+      error: displayError,
+      order: order, // Pass the full order object to access shipping address
+      shippingAddress: order.shippingAddress // Pass shipping address specifically
     });
   } catch (error) {
     console.error('Error fetching failed order:', error);
     res.render('user/order-failed', {
       orderId: req.params.id,
-      error: 'Failed to load order details'
+      error: 'Failed to load order details',
+      order: null,
+      shippingAddress: null
     });
   }
 };

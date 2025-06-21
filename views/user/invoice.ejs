@@ -149,7 +149,13 @@
                             <td><%= item.product.name %></td>
                             <td>UK <%= item.size %></td>
                             <td><%= item.quantity %></td>
-                            <td>₹<%= item.price.toFixed(2) %></td>
+                            <td>
+                                ₹<%= item.price.toFixed(2) %>
+                                <% if (item.originalPrice && item.originalPrice > item.price) { %>
+                                    <br><small style="text-decoration: line-through; color: #666;">₹<%= item.originalPrice.toFixed(2) %></small>
+                                    <br><small style="color: #28a745;">-₹<%= (item.originalPrice - item.price).toFixed(2) %></small>
+                                <% } %>
+                            </td>
                             <td>₹<%= (item.price * item.quantity).toFixed(2) %></td>
                             <td>
                                 <span class="status-badge status-<%= item.status.toLowerCase() %>">
@@ -167,11 +173,35 @@
                         .filter(item => item.status === 'Delivered' || item.status === 'Completed')
                         .reduce((total, item) => total + (item.price * item.quantity), 0)
                         .toFixed(2) %></p>
+                    <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
+                    <p>Original Amount: ₹<%= order.originalAmount.toFixed(2) %></p>
+                    <% } %>
+                    <% if (order.coupon) { %>
+                    <p>Coupon Applied: <%= order.coupon.code %>
+                        <% if (order.coupon.discountType === 'percentage') { %>
+                            (<%= order.coupon.discountValue %>% off)
+                        <% } else { %>
+                            (₹<%= order.coupon.discountValue %> off)
+                        <% } %>
+                    </p>
+                    <% } %>
+                    <% 
+                    // Calculate offer discounts from individual items
+                    let totalOfferDiscount = 0;
+                    order.items.forEach(item => {
+                        if (item.originalPrice && item.originalPrice > item.price) {
+                            totalOfferDiscount += (item.originalPrice - item.price) * item.quantity;
+                        }
+                    });
+                    %>
+                    <% if (totalOfferDiscount > 0) { %>
+                    <p>Offer Discounts: -₹<%= totalOfferDiscount.toFixed(2) %></p>
+                    <% } %>
+                    <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
+                    <p>Total Discount: -₹<%= (order.originalAmount - order.totalAmount).toFixed(2) %></p>
+                    <% } %>
                     <p>Shipping: Free</p>
-                    <p>Total: ₹<%= order.items
-                        .filter(item => item.status === 'Delivered' || item.status === 'Completed')
-                        .reduce((total, item) => total + (item.price * item.quantity), 0)
-                        .toFixed(2) %></p>
+                    <p>Total: ₹<%= order.totalAmount.toFixed(2) %></p>
                 </div>
                 <div style="margin-top: 10px; font-size: 12px; color: #666;">
                     <p>* This invoice includes all items in the order, regardless of their current status.</p>

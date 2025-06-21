@@ -508,6 +508,11 @@
                 <p><strong>Status:</strong> ${order.status}</p>
                 <p><strong>Payment Status:</strong> ${order.paymentStatus}</p>
                 <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
+                ${order.originalAmount && order.originalAmount > order.totalAmount ? 
+                  `<p><strong>Original Amount:</strong> <span class="text-decoration-line-through">₹${order.originalAmount.toFixed(2)}</span></p>
+                   <p><strong>Discount Applied:</strong> <span class="text-success">-₹${(order.originalAmount - order.totalAmount).toFixed(2)}</span></p>` 
+                  : ''
+                }
               </div>
               <div class="col-md-6">
                 <h6>Customer Information</h6>

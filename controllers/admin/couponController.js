@@ -88,6 +88,14 @@ export const createCoupon = async (req, res) => {
             });
         }
 
+        // Validate fixed amount coupon value against minimum amount
+        if (type === 'Fixed' && Number(value) >= Number(minAmount)) {
+            return res.status(400).json({
+                success: false,
+                message: 'For a fixed discount, the value must be less than the minimum purchase amount.'
+            });
+        }
+
         // Check if coupon code already exists
         const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
         if (existingCoupon) {
@@ -162,6 +170,21 @@ export const updateCoupon = async (req, res) => {
                 return res.status(400).json({
                     success: false,
                     message: 'Valid from date cannot be in the past'
+                });
+            }
+        }
+
+        // Validate fixed amount coupon value on update
+        const currentCoupon = await Coupon.findById(id);
+        if (currentCoupon) {
+            const newType = updateData.type || currentCoupon.type;
+            const newValue = updateData.value || currentCoupon.value;
+            const newMinAmount = updateData.minAmount || currentCoupon.minAmount;
+
+            if (newType === 'Fixed' && Number(newValue) >= Number(newMinAmount)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'For a fixed discount, the value must be less than the minimum purchase amount.'
                 });
             }
         }

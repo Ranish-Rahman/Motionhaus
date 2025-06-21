@@ -171,6 +171,57 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .place-order-btn:hover {
+      background: #333;
+      transform: translateY(-1px);
+    }
+    .place-order-btn:disabled {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .place-order-btn:disabled:hover {
+      background: #ccc;
+      transform: none;
+    }
+    .stock-warning {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      color: #856404;
+    }
+    .stock-warning h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .stock-warning ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+    .stock-warning li {
+      margin-bottom: 4px;
+    }
+    .out-of-stock-item {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+      color: #721c24;
+    }
+    .low-stock-item {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+      color: #856404;
     }
     .payment-section {
       background: #fff;
@@ -334,27 +385,6 @@
     }
     .payment-methods input[type="radio"] {
       margin: 0;
-    }
-    .place-order-btn {
-      width: 100%;
-      padding: 16px;
-      background: #000;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 17px;
-      font-weight: 700;
-      margin-top: 24px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-    }
-    .place-order-btn:hover {
-      background: #333;
-      transform: translateY(-1px);
     }
     .edit-form {
       display: none;
@@ -764,9 +794,86 @@
           <input type="hidden" name="addressId" id="selectedAddressId" value="<%= addresses.find(addr => addr.isDefault)?._id || '' %>">
           <input type="hidden" name="finalAmount" id="finalAmountInput" value="<%= (cart.subtotal - (cart.discount || 0)).toFixed(2) %>">
           <input type="hidden" name="discountAmount" id="discountAmountInput" value="<%= (cart.discount || 0).toFixed(2) %>">
+          
+          <!-- Stock Validation Section -->
+          <% 
+            let hasStockIssues = false;
+            let outOfStockItems = [];
+            let lowStockItems = [];
+            
+            if (cart && cart.items && cart.items.length > 0) {
+              cart.items.forEach(item => {
+                if (item.product && !item.product.isBlocked) {
+                  const stockAvailable = item.product.sizes.find(s => s.size === parseInt(item.size))?.quantity || 0;
+                  if (stockAvailable < item.quantity) {
+                    hasStockIssues = true;
+                    outOfStockItems.push({
+                      name: item.product.name,
+                      size: item.size,
+                      requested: item.quantity,
+                      available: stockAvailable
+                    });
+                  } else if (stockAvailable <= item.quantity + 2) { // Low stock warning if only 2 or fewer items left after this order
+                    lowStockItems.push({
+                      name: item.product.name,
+                      size: item.size,
+                      requested: item.quantity,
+                      available: stockAvailable
+                    });
+                  }
+                }
+              });
+            }
+          %>
+          
+          <% if (hasStockIssues) { %>
+            <div class="stock-warning">
+              <h4><i class="bi bi-exclamation-triangle"></i> Stock Issues Detected</h4>
+              <p>Some items in your cart are out of stock or have insufficient quantity. Please review and update your cart before proceeding.</p>
+              <% if (outOfStockItems.length > 0) { %>
+                <div class="out-of-stock-items">
+                  <h5 style="color: #721c24; margin: 12px 0 8px 0;">Out of Stock Items:</h5>
+                  <ul>
+                    <% outOfStockItems.forEach(item => { %>
+                      <li>
+                        <strong><%= item.name %></strong> (Size: <%= item.size %>) - 
+                        Requested: <%= item.requested %>, Available: <%= item.available %>
+                      </li>
+                    <% }) %>
+                  </ul>
+                </div>
+              <% } %>
+              <% if (lowStockItems.length > 0) { %>
+                <div class="low-stock-items">
+                  <h5 style="color: #856404; margin: 12px 0 8px 0;">Low Stock Items:</h5>
+                  <ul>
+                    <% lowStockItems.forEach(item => { %>
+                      <li>
+                        <strong><%= item.name %></strong> (Size: <%= item.size %>) - 
+                        Requested: <%= item.requested %>, Available: <%= item.available %>
+                      </li>
+                    <% }) %>
+                  </ul>
+                </div>
+              <% } %>
+              <div style="margin-top: 16px;">
+                <a href="/cart" class="btn btn-warning" style="background: #ffc107; color: #000; padding: 8px 16px; border-radius: 4px; text-decoration: none; margin-right: 12px;">
+                  <i class="bi bi-cart"></i> Update Cart
+                </a>
+                <a href="/products" class="btn btn-primary" style="background: #007bff; color: #fff; padding: 8px 16px; border-radius: 4px; text-decoration: none;">
+                  <i class="bi bi-shop"></i> Continue Shopping
+                </a>
+              </div>
+            </div>
+          <% } %>
+          
           <% if (cart && cart.items && cart.items.length > 0) { %>
-            <button type="button" class="place-order-btn" id="placeOrderBtn">
-              Place Order (Cash on Delivery) <span style="font-size: 20px;">→</span>
+            <button type="button" class="place-order-btn" id="placeOrderBtn" <%= hasStockIssues ? 'disabled' : '' %>>
+              <% if (hasStockIssues) { %>
+                Cannot Place Order - Stock Issues <span style="font-size: 20px;">⚠️</span>
+              <% } else { %>
+                Place Order (Cash on Delivery) <span style="font-size: 20px;">→</span>
+              <% } %>
             </button>
           <% } else { %>
             <div class="empty-cart-message" style="text-align: center; padding: 20px; background: #f8f8f8; border-radius: 8px; margin-top: 20px;">
@@ -794,9 +901,6 @@
                   <% 
                     const stockAvailable = item.product.sizes.find(s => s.size === parseInt(item.size))?.quantity || 0;
                     const isOutOfStock = stockAvailable < item.quantity;
-                    const originalTotal = item.product.originalPrice * item.quantity;
-                    const discountedTotal = item.product.discountedPrice * item.quantity;
-                    const hasOffer = item.product.bestOffer;
                   %>
                   <div class="stock-status <%= isOutOfStock ? 'out-of-stock' : 'in-stock' %>">
                     <% if (isOutOfStock) { %>
@@ -806,14 +910,15 @@
                     <% } %>
                   </div>
                   <div class="price">
-                    <% if (hasOffer) { %>
-                      <span style="text-decoration: line-through; color: #999; margin-right: 8px;">₹<%= originalTotal.toFixed(2) %></span>
-                      <span style="color: #2ecc71;">₹<%= discountedTotal.toFixed(2) %></span>
-                      <div style="font-size: 0.9em; color: #2ecc71;">
-                        (<%= item.product.bestOffer.discount %>% off - <%= item.product.bestOffer.name %>)
-                      </div>
+                    <% if (item.offerDiscount > 0) { %>
+                      <span style="text-decoration: line-through; color: #999; margin-right: 8px;">
+                        ₹<%= (item.product.price * item.quantity).toFixed(2) %>
+                      </span>
+                      <span style="color: #2ecc71;">
+                        ₹<%= (item.finalPrice * item.quantity).toFixed(2) %>
+                      </span>
                     <% } else { %>
-                      ₹<%= originalTotal.toFixed(2) %>
+                      <span>₹<%= (item.product.price * item.quantity).toFixed(2) %></span>
                     <% } %>
                   </div>
                 </div>
@@ -841,31 +946,31 @@
           <div id="couponMessage" style="font-size: 14px; margin-bottom: 16px; display: none;"></div>
         </div>
 
-        <div class="summary-row">
+        <div class="summary-row" id="subtotal-row">
           <span>Subtotal</span>
-          <span>
+          <span id="subtotal-amount">
               ₹<%= cart.subtotal.toFixed(2) %>
           </span>
         </div>
-        <% if (cart.offerDiscount && cart.offerDiscount > 0) { %>
-          <div class="summary-row">
+        <% if (cart.offerDiscount > 0) { %>
+          <div class="summary-row" id="offer-discount-row">
             <span>Offer Discount</span>
-            <span style="color: #2ecc71;">-₹<%= cart.offerDiscount.toFixed(2) %></span>
+            <span id="offer-discount-amount" style="color: #2ecc71;">-₹<%= cart.offerDiscount.toFixed(2) %></span>
           </div>
         <% } %>
-        <% if (cart.couponCode && cart.couponDiscount && cart.couponDiscount > 0) { %>
-          <div class="summary-row">
+        <% if (cart.couponDiscount > 0) { %>
+          <div class="summary-row" id="coupon-discount-row">
             <span>Coupon Discount</span>
-            <span style="color: #2ecc71;">-₹<%= cart.couponDiscount.toFixed(2) %></span>
+            <span id="coupon-discount-amount" style="color: #2ecc71;">-₹<%= cart.couponDiscount.toFixed(2) %></span>
           </div>
         <% } %>
-        <div class="summary-row">
+        <div class="summary-row" id="delivery-fee-row">
           <span>Delivery Fee</span>
           <span style="color: #2ecc71; font-weight: 500;">Free</span>
         </div>
-        <div class="summary-row total">
+        <div class="summary-row total" id="total-row">
           <span>Total</span>
-          <span>₹<%= cart.finalAmount.toFixed(2) %></span>
+          <span id="total-amount">₹<%= cart.finalAmount.toFixed(2) %></span>
         </div>
       <% } %>
     </div>
@@ -884,7 +989,122 @@
       discount: Number('<%= cart.discount || 0 %>')
     };
 
+    // Function to validate stock availability
+    async function validateStockAvailability() {
+      try {
+        const response = await fetch('/cart/validate-stock', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'same-origin'
+        });
+
+        const result = await response.json();
+        return result;
+      } catch (error) {
+        console.error('Error validating stock:', error);
+        return {
+          isValid: false,
+          issues: [{
+            name: 'Unknown Product',
+            size: 'Unknown',
+            requested: 0,
+            available: 0
+          }]
+        };
+      }
+    }
+
+    // Function to update UI based on stock validation
+    async function updateStockValidationUI() {
+      try {
+        const stockValidationResult = await validateStockAvailability();
+        const placeOrderBtn = document.getElementById('placeOrderBtn');
+        const stockWarningDiv = document.querySelector('.stock-warning');
+        
+        if (!stockValidationResult.isValid) {
+          // Disable place order button
+          if (placeOrderBtn) {
+            placeOrderBtn.disabled = true;
+            placeOrderBtn.innerHTML = 'Cannot Place Order - Stock Issues <span style="font-size: 20px;">⚠️</span>';
+          }
+          
+          // Show or update stock warning
+          if (!stockWarningDiv) {
+            const paymentSection = document.querySelector('.payment-section');
+            if (paymentSection) {
+              const warningHTML = `
+                <div class="stock-warning">
+                  <h4><i class="bi bi-exclamation-triangle"></i> Stock Issues Detected</h4>
+                  <p>Some items in your cart are out of stock or have insufficient quantity. Please review and update your cart before proceeding.</p>
+                  <div class="out-of-stock-items">
+                    <h5 style="color: #721c24; margin: 12px 0 8px 0;">Out of Stock Items:</h5>
+                    <ul>
+                      ${stockValidationResult.issues.map(issue => 
+                        `<li><strong>${issue.name}</strong> (Size: ${issue.size}) - Requested: ${issue.requested}, Available: ${issue.available}</li>`
+                      ).join('')}
+                    </ul>
+                  </div>
+                  <div style="margin-top: 16px;">
+                    <a href="/cart" class="btn btn-warning" style="background: #ffc107; color: #000; padding: 8px 16px; border-radius: 4px; text-decoration: none; margin-right: 12px;">
+                      <i class="bi bi-cart"></i> Update Cart
+                    </a>
+                    <a href="/products" class="btn btn-primary" style="background: #007bff; color: #fff; padding: 8px 16px; border-radius: 4px; text-decoration: none;">
+                      <i class="bi bi-shop"></i> Continue Shopping
+                    </a>
+                  </div>
+                </div>
+              `;
+              paymentSection.insertAdjacentHTML('afterbegin', warningHTML);
+            }
+          }
+        } else {
+          // Enable place order button
+          if (placeOrderBtn) {
+            placeOrderBtn.disabled = false;
+            updatePlaceOrderButton();
+          }
+          
+          // Remove stock warning if it exists
+          if (stockWarningDiv) {
+            stockWarningDiv.remove();
+          }
+        }
+      } catch (error) {
+        console.error('Error updating stock validation UI:', error);
+      }
+    }
+
+    // Function to update place order button text based on payment method
+    function updatePlaceOrderButton() {
+      const placeOrderBtn = document.getElementById('placeOrderBtn');
+      if (!placeOrderBtn) return;
+      
+      const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
+      
+      // Check if button is disabled due to stock issues
+      if (placeOrderBtn.disabled) {
+        placeOrderBtn.innerHTML = 'Cannot Place Order - Stock Issues <span style="font-size: 20px;">⚠️</span>';
+        return;
+      }
+      
+      if (selectedMethod === 'cod') {
+        placeOrderBtn.innerHTML = 'Place Order (Cash on Delivery) <span style="font-size: 20px;">→</span>';
+      } else if (selectedMethod === 'razorpay') {
+        placeOrderBtn.innerHTML = 'Pay with Razorpay <span style="font-size: 20px;">→</span>';
+      } else if (selectedMethod === 'wallet') {
+        placeOrderBtn.innerHTML = 'Pay with Wallet <span style="font-size: 20px;">→</span>';
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+      // Check stock availability on page load
+      updateStockValidationUI();
+      
+      // Set up periodic stock validation check (every 30 seconds)
+      setInterval(updateStockValidationUI, 30000);
+      
       // Handle address selection click
       const addressOptions = document.querySelectorAll('.address-option');
       addressOptions.forEach(option => {
@@ -903,20 +1123,9 @@
         });
       });
 
-      // Update place order button text based on payment method
+      // Update button text when payment method changes
       const paymentMethodInputs = document.querySelectorAll('input[name="paymentMethod"]');
       const placeOrderBtn = document.getElementById('placeOrderBtn');
-
-      function updatePlaceOrderButton() {
-        const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
-        if (selectedMethod === 'cod') {
-          placeOrderBtn.innerHTML = 'Place Order (Cash on Delivery) <span style="font-size: 20px;">→</span>';
-        } else if (selectedMethod === 'razorpay') {
-          placeOrderBtn.innerHTML = 'Pay with Razorpay <span style="font-size: 20px;">→</span>';
-        } else if (selectedMethod === 'wallet') {
-          placeOrderBtn.innerHTML = 'Pay with Wallet <span style="font-size: 20px;">→</span>';
-        }
-      }
 
       // Initial update of button text
       updatePlaceOrderButton();
@@ -928,6 +1137,57 @@
 
       // Handle place order button click
       placeOrderBtn.addEventListener('click', async function() {
+        // Check if button is disabled due to stock issues
+        if (placeOrderBtn.disabled) {
+          Swal.fire({
+            title: 'Cannot Place Order',
+            text: 'Some items in your cart are out of stock or have insufficient quantity. Please update your cart before proceeding.',
+            icon: 'warning',
+            confirmButtonColor: '#000',
+            confirmButtonText: 'Update Cart',
+            showCancelButton: true,
+            cancelButtonText: 'Continue Shopping'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              window.location.href = '/cart';
+            } else {
+              window.location.href = '/products';
+            }
+          });
+          return;
+        }
+
+        // Validate stock availability before proceeding
+        const stockValidationResult = await validateStockAvailability();
+        if (!stockValidationResult.isValid) {
+          Swal.fire({
+            title: 'Stock Issues Detected',
+            html: `
+              <div style="text-align: left;">
+                <p>Some items in your cart are no longer available in the requested quantity:</p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                  ${stockValidationResult.issues.map(issue => 
+                    `<li><strong>${issue.name}</strong> (Size: ${issue.size}) - Requested: ${issue.requested}, Available: ${issue.available}</li>`
+                  ).join('')}
+                </ul>
+                <p>Please update your cart before proceeding.</p>
+              </div>
+            `,
+            icon: 'warning',
+            confirmButtonColor: '#000',
+            confirmButtonText: 'Update Cart',
+            showCancelButton: true,
+            cancelButtonText: 'Continue Shopping'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              window.location.href = '/cart';
+            } else {
+              window.location.href = '/products';
+            }
+          });
+          return;
+        }
+
         // Get selected address
         const selectedAddressOption = document.querySelector('.address-option.selected');
         if (!selectedAddressOption) {
@@ -1071,6 +1331,14 @@
                 },
                 handler: async function(response) {
                   console.log('[Debug] Razorpay handler response:', response);
+                  console.log('[Debug] Response keys:', Object.keys(response));
+                  console.log('[Debug] Response values:', {
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature,
+                    orderID: razorpayOrder.orderID
+                  });
+                  
                   try {
                     // Show processing message
                     Swal.fire({
@@ -1084,12 +1352,17 @@
                       }
                     });
 
+                    // Handle different possible response structures
+                    const razorpayOrderId = response.razorpay_order_id || response.order_id || razorpayOrder.order.id;
+                    
                     const verificationData = {
-                      razorpay_order_id: response.razorpay_order_id,
-                      razorpay_payment_id: response.razorpay_payment_id,
-                      razorpay_signature: response.razorpay_signature,
+                      razorpay_order_id: razorpayOrderId,
+                      razorpay_payment_id: response.razorpay_payment_id || response.payment_id,
+                      razorpay_signature: response.razorpay_signature || response.signature,
                       orderID: razorpayOrder.orderID
                     };
+                    
+                    console.log('[Debug] Sending verification data:', verificationData);
                     
                     const verifyResponse = await fetch('/order/verify-payment', {
                       method: 'POST',
@@ -1101,6 +1374,8 @@
                     });
 
                     const result = await verifyResponse.json();
+                    console.log('[Debug] Verification result:', result);
+                    
                     if (!verifyResponse.ok || !result.success) {
                       throw new Error(result.message || 'Payment verification failed');
                     }
@@ -1310,78 +1585,56 @@
       const discountAmount = document.getElementById('discountAmount');
       const finalTotal = document.getElementById('finalTotal');
       const originalTotal = Number('<%= cart?.subtotal || 0 %>');
+      const originalDiscount = Number('<%= cart?.offerDiscount || 0 %>');
       const sessionData = JSON.parse('<%- JSON.stringify(locals.checkoutData || {}) %>');
 
       if (applyCouponBtn) {
         applyCouponBtn.addEventListener('click', async function() {
-          // Check if it's a remove action
-          if (this.classList.contains('remove-coupon')) {
-            try {
-              const response = await fetch('/cart/remove-coupon', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              });
+          const isRemoving = this.classList.contains('remove-coupon');
+          let endpoint = '/cart/apply-coupon';
+          let payload = {}; // Default to empty payload
 
-              const data = await response.json();
-
-              if (data.success) {
-                showCouponMessage('Coupon removed successfully', 'success');
-                resetCouponUI();
-                // Update totals without reload
-                updateTotals(0);
-              } else {
-                showCouponMessage(data.message || 'Failed to remove coupon', 'error');
-              }
-            } catch (error) {
-              console.error('Error removing coupon:', error);
-              showCouponMessage('Failed to remove coupon. Please try again.', 'error');
+          if (isRemoving) {
+            endpoint = '/cart/remove-coupon';
+          } else {
+            const code = couponInput.value.trim().toUpperCase();
+            if (!code) {
+              showCouponMessage('Please enter a coupon code', 'error');
+              return;
             }
-            return;
-          }
-
-          // Apply coupon logic
-          const code = couponInput.value.trim().toUpperCase();
-          if (!code) {
-            showCouponMessage('Please enter a coupon code', 'error');
-            return;
+            payload = { code };
           }
 
           try {
-            console.log('Applying coupon:', code);
-            const response = await fetch('/cart/apply-coupon', {
+            const response = await fetch(endpoint, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ code })
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
             });
 
             const data = await response.json();
-            console.log('Coupon response:', data);
-            console.log('data.success value:', data.success, typeof data.success);
 
-            if (data.success === true) {
-              try {
-                showCouponMessage(data.message || 'Coupon applied successfully', 'success');
-                // Pass the entire updated cart object to updateTotals
-                updateTotals(data.cart);
-                applyCouponBtn.textContent = 'Remove';
-                applyCouponBtn.classList.add('remove-coupon');
+            if (data.success) {
+              showCouponMessage(data.message, 'success');
+              updateTotals(data.cart); // Always update with server's response
+
+              // Update button state
+              if (isRemoving) {
+                couponInput.value = '';
+                couponInput.disabled = false;
+                this.textContent = 'Apply';
+                this.classList.remove('remove-coupon');
+              } else {
+                this.textContent = 'Remove';
+                this.classList.add('remove-coupon');
                 couponInput.disabled = true;
-              } catch (uiUpdateError) {
-                console.error('Error updating UI after successful coupon application:', uiUpdateError);
-                showCouponMessage('An error occurred while updating the display. Please refresh the page.', 'error');
               }
             } else {
-              showCouponMessage(data.message || 'Failed to apply coupon', 'error');
-              resetCouponUI();
+              showCouponMessage(data.message, 'error');
             }
           } catch (error) {
-            console.error('Error applying coupon:', error);
-            showCouponMessage('Failed to apply coupon. Please try again.', 'error');
-            resetCouponUI();
+            console.error('Coupon fetch error:', error);
+            showCouponMessage('A network error occurred. Please try again.', 'error');
           }
         });
       }
@@ -1395,96 +1648,56 @@
         }, 3000);
       }
 
-      function updateTotals(updatedCart) {
-        console.log('--- updateTotals called with cart:', updatedCart);
+      function updateTotals(cart) {
+        // --- Subtotal ---
+        const subtotalEl = document.getElementById('subtotal-amount');
+        if (subtotalEl) subtotalEl.textContent = `₹${(parseFloat(cart.subtotal) || 0).toFixed(2)}`;
 
-        // Update Subtotal display
-        const subtotalElement = document.querySelector('.summary-row:first-child span:last-child');
-        console.log('Subtotal element:', subtotalElement);
-        if (subtotalElement) {
-            subtotalElement.textContent = `₹${updatedCart.subtotal.toFixed(2)}`;
-            console.log('Subtotal updated to:', updatedCart.subtotal.toFixed(2));
+        // --- Offer Discount ---
+        let offerRow = document.getElementById('offer-discount-row');
+        if (cart.offerDiscount > 0) {
+          if (!offerRow) {
+            offerRow = document.createElement('div');
+            offerRow.className = 'summary-row';
+            offerRow.id = 'offer-discount-row';
+            document.getElementById('subtotal-row').after(offerRow);
+          }
+          offerRow.innerHTML = `
+            <span>Offer Discount</span>
+            <span style="color: #2ecc71;">-₹${(parseFloat(cart.offerDiscount) || 0).toFixed(2)}</span>
+          `;
+        } else if (offerRow) {
+          offerRow.remove();
         }
 
-        // Update Offer Discount display (assuming it's the second summary-row)
-        const offerDiscountRow = document.querySelector('.summary-row:nth-child(2)');
-        const offerDiscountSpan = offerDiscountRow ? offerDiscountRow.querySelector('span:last-child') : null;
-        console.log('Offer Discount Row:', offerDiscountRow, 'Span:', offerDiscountSpan);
-        if (updatedCart.offerDiscount > 0) {
-            if (offerDiscountRow) offerDiscountRow.classList.remove('hidden');
-            if (offerDiscountSpan) offerDiscountSpan.textContent = `-₹${updatedCart.offerDiscount.toFixed(2)}`;
-            console.log('Offer Discount updated to:', updatedCart.offerDiscount.toFixed(2));
-        } else {
-            if (offerDiscountRow) offerDiscountRow.classList.add('hidden');
-            console.log('Offer Discount hidden');
+        // --- Coupon Discount ---
+        let couponRow = document.getElementById('coupon-discount-row');
+        if (cart.couponDiscount > 0) {
+          if (!couponRow) {
+            couponRow = document.createElement('div');
+            couponRow.className = 'summary-row';
+            couponRow.id = 'coupon-discount-row';
+            const anchor = document.getElementById('offer-discount-row') || document.getElementById('subtotal-row');
+            anchor.after(couponRow);
+          }
+          couponRow.innerHTML = `
+            <span>Coupon Discount</span>
+            <span style="color: #2ecc71;">-₹${(parseFloat(cart.couponDiscount) || 0).toFixed(2)}</span>
+          `;
+        } else if (couponRow) {
+          couponRow.remove();
         }
 
-        // Update Coupon Discount display (assuming it's the third summary-row)
-        const couponDiscountRow = document.querySelector('.summary-row:nth-child(3)');
-        const couponDiscountSpan = couponDiscountRow ? couponDiscountRow.querySelector('span:last-child') : null;
-        console.log('Coupon Discount Row:', couponDiscountRow, 'Span:', couponDiscountSpan);
-        if (updatedCart.couponDiscount > 0) {
-            if (couponDiscountRow) couponDiscountRow.classList.remove('hidden');
-            if (couponDiscountSpan) couponDiscountSpan.textContent = `-₹${updatedCart.couponDiscount.toFixed(2)}`;
-            console.log('Coupon Discount updated to:', updatedCart.couponDiscount.toFixed(2));
-        } else {
-            if (couponDiscountRow) couponDiscountRow.classList.add('hidden');
-            console.log('Coupon Discount hidden');
-        }
+        // --- Total ---
+        const totalEl = document.getElementById('total-amount');
+        if (totalEl) totalEl.textContent = `₹${(parseFloat(cart.finalAmount) || 0).toFixed(2)}`;
 
-        // Update Delivery Fee display (assuming it's the fourth summary-row)
-        const deliveryFeeRow = document.querySelector('.summary-row:nth-child(4)');
-        console.log('Delivery Fee Row:', deliveryFeeRow);
-        // No change in logic for delivery fee as it's always free in this context
-
-        // Update Final Total display
-        const finalTotalElement = document.querySelector('.summary-row.total span:last-child');
-        console.log('Final Total element:', finalTotalElement);
-        if (finalTotalElement) {
-            finalTotalElement.textContent = `₹${updatedCart.finalAmount.toFixed(2)}`;
-            console.log('Final Total updated to:', updatedCart.finalAmount.toFixed(2));
-        }
-
-        // Update hidden inputs for final amount and discount amount
+        // --- Hidden Inputs ---
         const finalAmountInput = document.getElementById('finalAmountInput');
-        const discountAmountInput = document.getElementById('discountAmountInput');
-        console.log('Hidden finalAmountInput:', finalAmountInput, 'Hidden discountAmountInput:', discountAmountInput);
-        if (finalAmountInput) finalAmountInput.value = updatedCart.finalAmount.toFixed(2);
-        if (discountAmountInput) discountAmountInput.value = updatedCart.discount.toFixed(2);
-        console.log('Hidden inputs updated');
-
-        // Update coupon input and button state
-        console.log('Updating coupon input and button state. couponCode:', updatedCart.couponCode);
-        if (updatedCart.couponCode) {
-            applyCouponBtn.textContent = 'Remove';
-            applyCouponBtn.classList.add('remove-coupon');
-            couponInput.value = updatedCart.couponCode; // Set the code in the input
-            couponInput.disabled = true;
-            console.log('Coupon input set to disabled and text to Remove');
-        } else {
-            applyCouponBtn.textContent = 'Apply';
-            applyCouponBtn.classList.remove('remove-coupon');
-            couponInput.value = ''; // Clear the input
-            couponInput.disabled = false;
-            console.log('Coupon input set to enabled and text to Apply');
-        }
-        console.log('--- updateTotals finished ---');
-      }
-
-      function resetCouponUI() {
-        console.log('--- resetCouponUI called ---');
-        couponInput.value = '';
-        couponInput.disabled = false;
-        applyCouponBtn.textContent = 'Apply';
-        applyCouponBtn.classList.remove('remove-coupon');
-        couponDiscount.classList.add('hidden');
-        finalTotal.textContent = originalTotal.toFixed(2);
-        // Reset hidden inputs
-        document.getElementById('finalAmountInput').value = originalTotal.toFixed(2);
-        document.getElementById('discountAmountInput').value = '0.00';
-        // Ensure coupon code in input is cleared when UI is reset.
-        couponInput.value = '';
-        console.log('--- resetCouponUI finished ---');
+        if (finalAmountInput) finalAmountInput.value = (parseFloat(cart.finalAmount) || 0).toFixed(2);
+        
+        const totalDiscountInput = document.getElementById('discountAmountInput');
+        if (totalDiscountInput) totalDiscountInput.value = (parseFloat(cart.totalDiscount) || 0).toFixed(2);
       }
     });
   </script>

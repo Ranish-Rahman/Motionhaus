@@ -286,7 +286,15 @@
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td>₹<%= item.price.toFixed(2) %></td>
+                                            <td>
+                                                <div>
+                                                    ₹<%= item.price.toFixed(2) %>
+                                                    <% if (item.originalPrice && item.originalPrice > item.price) { %>
+                                                        <br><small class="text-decoration-line-through text-muted">₹<%= item.originalPrice.toFixed(2) %></small>
+                                                        <br><small class="text-success">-₹<%= (item.originalPrice - item.price).toFixed(2) %></small>
+                                                    <% } %>
+                                                </div>
+                                            </td>
                                             <td>₹<%= (item.price * item.quantity).toFixed(2) %></td>
                                             <td>
                                                 <span class="badge bg-<%= 
@@ -393,6 +401,46 @@
                                 .reduce((total, item) => total + (item.price * item.quantity), 0)
                                 .toFixed(2) %></span>
                         </div>
+                        <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Original Amount:</span>
+                            <span class="text-decoration-line-through">₹<%= order.originalAmount.toFixed(2) %></span>
+                        </div>
+                        <% } %>
+                        <% if (order.coupon) { %>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Coupon Applied:</span>
+                            <span class="text-success">
+                                <%= order.coupon.code %>
+                                <% if (order.coupon.discountType === 'percentage') { %>
+                                    (<%= order.coupon.discountValue %>% off)
+                                <% } else { %>
+                                    (₹<%= order.coupon.discountValue %> off)
+                                <% } %>
+                            </span>
+                        </div>
+                        <% } %>
+                        <% 
+                        // Calculate offer discounts from individual items
+                        let totalOfferDiscount = 0;
+                        order.items.forEach(item => {
+                            if (item.originalPrice && item.originalPrice > item.price) {
+                                totalOfferDiscount += (item.originalPrice - item.price) * item.quantity;
+                            }
+                        });
+                        %>
+                        <% if (totalOfferDiscount > 0) { %>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Offer Discounts:</span>
+                            <span class="text-success">-₹<%= totalOfferDiscount.toFixed(2) %></span>
+                        </div>
+                        <% } %>
+                        <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Total Discount:</span>
+                            <span class="text-success">-₹<%= (order.originalAmount - order.totalAmount).toFixed(2) %></span>
+                        </div>
+                        <% } %>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Shipping:</span>
                             <span>Free</span>
@@ -400,10 +448,7 @@
                         <hr>
                         <div class="d-flex justify-content-between mb-0">
                             <span class="fw-bold">Total:</span>
-                            <span class="fw-bold">₹<%= order.items
-                                .filter(item => item.status !== 'Cancelled' && item.status !== 'Returned')
-                                .reduce((total, item) => total + (item.price * item.quantity), 0)
-                                .toFixed(2) %></span>
+                            <span class="fw-bold">₹<%= order.totalAmount.toFixed(2) %></span>
                         </div>
                     </div>
                 </div>

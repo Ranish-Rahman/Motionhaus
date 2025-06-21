@@ -46,7 +46,7 @@ import {
   verifyPayment
 } from '../controllers/user/orderController.js';
 import { listProducts, getProductDetails } from '../controllers/user/productController.js';
-import { addToCart, updateCartItem, removeFromCart, applyCoupon, removeCoupon } from '../controllers/user/cartController.js';
+import { addToCart, updateCartItem, removeFromCart, applyCoupon, removeCoupon, validateStock } from '../controllers/user/cartController.js';
 import { getWishlist, addToWishlist, removeFromWishlist, clearWishlist, moveToCart } from '../controllers/user/wishlistController.js';
 import { sessionCheck } from '../middleware/sessionMiddleware.js';
 import { getPasswordRules } from '../utils/passwordValidation.js';
@@ -103,6 +103,7 @@ router.post('/cart/update/:itemId', updateCartItem);
 router.post('/cart/remove/:itemId', removeFromCart);
 router.post('/cart/apply-coupon', applyCoupon);
 router.post('/cart/remove-coupon', removeCoupon);
+router.post('/cart/validate-stock', validateStock);
 
 // Wishlist routes
 router.get('/wishlist', getWishlist);

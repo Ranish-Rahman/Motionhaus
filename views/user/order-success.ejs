@@ -161,6 +161,16 @@
           <div class="info-label">Total Amount</div>
           <div class="info-value">₹<%= order.totalAmount.toFixed(2) %></div>
         </div>
+        <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
+        <div class="info-item">
+          <div class="info-label">Original Amount</div>
+          <div class="info-value" style="text-decoration: line-through;">₹<%= order.originalAmount.toFixed(2) %></div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Discount Applied</div>
+          <div class="info-value" style="color: #28a745;">-₹<%= (order.originalAmount - order.totalAmount).toFixed(2) %></div>
+        </div>
+        <% } %>
         <div class="info-item">
           <div class="info-label">Payment Method</div>
           <div class="info-value"><%= order.paymentMethod === 'razorpay' ? 'Razorpay' : 'Cash on Delivery' %></div>
