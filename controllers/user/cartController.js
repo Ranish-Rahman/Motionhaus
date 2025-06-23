@@ -223,8 +223,11 @@ export const updateCartItem = async (req, res) => {
       await cart.save(); // Save again to persist coupon removal
     }
 
+    // Repopulate after all saves to ensure data is fresh before calculation
+    await cart.populate(['items.product', 'coupon']);
+
     // Recalculate final totals with the helper
-    const updatedCartData = await calculateCartTotals(cart);
+    const updatedCartData = await calculateCartTotals(cart, getBestOffer);
 
     res.json({
       success: true,
@@ -273,8 +276,11 @@ export const removeFromCart = async (req, res) => {
       await cart.save(); // Save again to persist coupon removal
     }
 
+    // Repopulate after all saves to ensure data is fresh before calculation
+    await cart.populate(['items.product', 'coupon']);
+
     // Recalculate final totals with the helper
-    const updatedCartData = await calculateCartTotals(cart);
+    const updatedCartData = await calculateCartTotals(cart, getBestOffer);
 
     res.json({
       success: true,
@@ -323,7 +329,7 @@ export const applyCoupon = async (req, res) => {
             });
         }
 
-        // Find the coupon
+        // Find the coupon and ensure it is fully populated
         const coupon = await Coupon.findOne({ code: code.toUpperCase() });
         if (!coupon) {
             return res.status(404).json({
@@ -366,7 +372,7 @@ export const applyCoupon = async (req, res) => {
         }
 
         // 4. Check if coupon has been used by this user before
-        if (coupon.usedBy.includes(userId)) {
+        if (coupon.usedBy && coupon.usedBy.includes(userId)) {
             return res.status(400).json({
                 success: false,
                 message: 'You have already redeemed this coupon.'
@@ -390,15 +396,43 @@ export const applyCoupon = async (req, res) => {
         
         // IMPORTANT: Increment usage count and add user to usedBy list
         coupon.usageCount += 1;
+        if (!coupon.usedBy) {
+            coupon.usedBy = [];
+        }
         coupon.usedBy.push(userId);
         
         await Promise.all([cart.save(), coupon.save()]);
 
-        // Repopulate the cart to include the new coupon details
-        const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
+        // We must re-populate the cart object to get the latest data with relations
+        await cart.populate(['items.product', 'coupon']);
 
-        // Recalculate cart totals with the new coupon
-        const updatedCartData = await calculateCartTotals(populatedCart);
+        // Recalculate cart totals to reflect the change
+        const updatedCartData = await calculateCartTotals(cart, getBestOffer);
+
+        // Update session checkoutData so payment flows use the correct discounted amount
+        req.session.checkoutData = {
+          cartTotal: updatedCartData.subtotal,
+          totalDiscount: updatedCartData.totalDiscount,
+          finalAmount: updatedCartData.finalAmount,
+          items: updatedCartData.items.map(item => ({
+            product: item.product._id,
+            quantity: item.quantity,
+            price: item.finalPrice,
+            originalPrice: item.product.price,
+            discountAmount: item.offerDiscount,
+            size: item.size,
+          })),
+          couponCode: updatedCartData.couponCode,
+          couponDiscount: updatedCartData.couponDiscount
+        };
+        // Also update pendingOrder if it exists (for Razorpay flow)
+        if (req.session.pendingOrder) {
+          req.session.pendingOrder.couponCode = updatedCartData.couponCode;
+          req.session.pendingOrder.discountAmount = updatedCartData.totalDiscount;
+          req.session.pendingOrder.totalAmount = updatedCartData.finalAmount;
+          req.session.pendingOrder.originalAmount = updatedCartData.subtotal;
+        }
+        await req.session.save();
 
         res.json({
             success: true,
@@ -437,7 +471,7 @@ export const removeCoupon = async (req, res) => {
     const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
 
     // Recalculate totals without the coupon
-    const updatedCartData = await calculateCartTotals(populatedCart);
+    const updatedCartData = await calculateCartTotals(populatedCart, getBestOffer);
 
     res.json({ 
       success: true, 

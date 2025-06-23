@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid';
 import Address from '../../models/addressModel.js';
 import razorpay from '../../utils/razorpay.js';
 import { getBestOffer } from './productController.js';
+import Coupon from '../../models/couponModel.js';
 
 // Generate unique order ID
 const generateOrderId = () => {
@@ -220,6 +221,7 @@ export const createRazorpayOrder = async (req, res) => {
             userId: userId,
             isRetry: isRetry || false,
             couponCode: checkoutData.couponCode || null,
+            couponDiscount: checkoutData.couponDiscount || 0,
             paymentMethod: 'razorpay'
         };
 
@@ -404,6 +406,15 @@ export const verifyPayment = async (req, res) => {
             }
         }
 
+        // Look up coupon by code and set coupon field
+        let couponId = null;
+        if (pendingOrder.couponCode) {
+            const coupon = await Coupon.findOne({ code: pendingOrder.couponCode });
+            if (coupon) {
+                couponId = coupon._id;
+            }
+        }
+
         // Check if this is a retry payment by looking for existing order
         const existingOrder = await Order.findOne({ 
             orderID: orderIdToSearch,
@@ -449,6 +460,8 @@ export const verifyPayment = async (req, res) => {
                 totalAmount: pendingOrder.totalAmount,
                 originalAmount: pendingOrder.originalAmount,
                 discountAmount: pendingOrder.discountAmount,
+                coupon: couponId,
+                couponDiscount: pendingOrder.couponDiscount,
                 shippingAddress: {
                     fullName: pendingOrder.shippingAddress.fullName || 'N/A',
                     address: (pendingOrder.shippingAddress.addressLine1 || 'N/A') + 

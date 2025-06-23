@@ -979,15 +979,25 @@
   <%- include('../partials/footer') %>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Store server-side data safely in a JSON script tag -->
+  <script id="checkout-data" type="application/json">
+    <%- JSON.stringify({
+        items: cart.items || [],
+        subtotal: cart.subtotal || 0,
+        discount: cart.discount || 0,
+        couponCode: cart.couponCode || null,
+        couponDiscount: cart.couponDiscount || 0,
+        finalAmount: cart.finalAmount !== undefined ? cart.finalAmount : cart.subtotal
+    }) %>
+  </script>
+
   <script>
     console.log('DEBUG: checkout.ejs script loaded and running.');
 
-    // Initialize cart data
-    window.CART_DATA = {
-      items: JSON.parse('<%- JSON.stringify(cart.items || []) %>'),
-      subtotal: Number('<%= cart.subtotal || 0 %>'),
-      discount: Number('<%= cart.discount || 0 %>')
-    };
+    // Parse the data from the JSON script tag
+    const checkoutDataString = document.getElementById('checkout-data').textContent;
+    window.CART_DATA = JSON.parse(checkoutDataString);
 
     // Function to validate stock availability
     async function validateStockAvailability() {
@@ -1640,12 +1650,13 @@
       }
 
       function showCouponMessage(message, type) {
-        couponMessage.textContent = message;
-        couponMessage.style.display = 'block';
-        couponMessage.style.color = type === 'error' ? '#e74c3c' : '#2ecc71';
-        setTimeout(() => {
-          couponMessage.style.display = 'none';
-        }, 3000);
+        Swal.fire({
+            title: type === 'error' ? 'Coupon Error' : 'Success!',
+            html: message,
+            icon: type,
+            confirmButtonColor: '#000',
+            timer: type === 'success' ? 2000 : null
+        });
       }
 
       function updateTotals(cart) {

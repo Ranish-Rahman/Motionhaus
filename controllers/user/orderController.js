@@ -8,6 +8,7 @@ import User from '../../models/userModel.js';
 import razorpay from '../../utils/razorpay.js';
 import Transaction from '../../models/transactionModel.js';
 import { addRefund } from './walletController.js';
+import Coupon from '../../models/couponModel.js';
 
 // Place Order function
 export const placeOrder = async (req, res) => {
@@ -16,26 +17,43 @@ export const placeOrder = async (req, res) => {
   try {
     const userId = req.session.user._id;
     const { addressId, paymentMethod } = req.body;
+    console.log('Received addressId:', addressId);
 
     // 1. Get checkout data from session - THIS IS THE SINGLE SOURCE OF TRUTH
     const checkoutData = req.session.checkoutData;
     if (!checkoutData) {
-      return res.status(400).json({
-        success: false,
-        message: 'Your session has expired. Please return to checkout and try again.'
-      });
+      console.error('Checkout data is missing from session.');
+      return res.status(400).json({ success: false, message: 'Your session has expired. Please try again.' });
+    }
+
+    // For COD and Wallet, data comes from checkoutData
+    // For Razorpay, it comes from pendingOrder after verification
+    const sourceData = req.session.pendingOrder || req.session.checkoutData;
+    
+    if (!sourceData) {
+        console.error('Source data for order creation is missing.');
+        return res.status(400).json({ success: false, message: 'Your session has expired. Please try again.' });
     }
 
     // Use the verified amounts from the session
-    const { finalAmount, cartTotal, totalDiscount, items: checkoutItems, couponCode } = checkoutData;
-    const orderID = `ORD-${Date.now()}-${nanoid(6)}`;
+    const { finalAmount, cartTotal, totalDiscount, items: checkoutItems, couponCode } = sourceData;
+    const orderID = sourceData.orderID || `MH-${Date.now()}`;
 
     // Get selected address
     const selectedAddress = await Address.findById(addressId).lean();
-    if (!selectedAddress) {
+    console.log('Selected address:', selectedAddress);
+    console.log('SourceData shippingAddress:', sourceData.shippingAddress);
+    const shippingAddress = selectedAddress || sourceData.shippingAddress;
+    // Map addressLine1 -> address and zipCode -> postalCode for validation and saving
+    const mappedShippingAddress = {
+      ...shippingAddress,
+      address: shippingAddress.address || shippingAddress.addressLine1,
+      postalCode: shippingAddress.postalCode || shippingAddress.zipCode,
+    };
+    if (!mappedShippingAddress.address || !mappedShippingAddress.postalCode) {
       return res.status(400).json({
         success: false,
-        message: 'Shipping address not found'
+        message: 'Shipping address is incomplete. Please select or provide a valid address.'
       });
     }
 
@@ -82,6 +100,15 @@ export const placeOrder = async (req, res) => {
       await Promise.all([user.save(), transaction.save()]);
     }
 
+    // Ensure we have the full coupon object ID if a code is present
+    let couponId = null;
+    if (sourceData.couponCode) {
+        const coupon = await Coupon.findOne({ code: sourceData.couponCode });
+        if (coupon) {
+            couponId = coupon._id;
+        }
+    }
+
     // 4. Create the new order using checkoutData from session
     const order = new Order({
       orderID,
@@ -93,50 +120,61 @@ export const placeOrder = async (req, res) => {
         originalPrice: item.originalPrice,
         size: item.size
       })),
-      totalAmount: finalAmount,
-      originalAmount: cartTotal,
-      discountAmount: totalDiscount,
-      coupon: couponCode, // Store the coupon code used
-      shippingAddress: {
-        fullName: selectedAddress.fullName,
-        address: selectedAddress.addressLine1 + (selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''),
-        city: selectedAddress.city,
-        state: selectedAddress.state,
-        postalCode: selectedAddress.zipCode,
-        phone: selectedAddress.phone
-      },
+      totalAmount: sourceData.totalAmount || sourceData.finalAmount,
+      originalAmount: sourceData.originalAmount || sourceData.cartTotal,
+      discountAmount: sourceData.discountAmount || sourceData.totalDiscount,
+      coupon: couponId,
+      shippingAddress: mappedShippingAddress,
       paymentMethod,
-      status: 'pending', // Initial status
-      paymentStatus: paymentMethod === 'wallet' ? 'paid' : 'pending'
+      paymentStatus: 'pending',
+      status: 'Pending'
     });
 
-    await order.save();
-    console.log('Order created successfully with unified calculation:', orderID);
-
-    // 5. Decrease stock after successful order creation
-    for (const item of checkoutItems) {
-      await Product.updateOne({
-        _id: item.product,
-        'sizes.size': item.size
-      }, {
-        $inc: {
-          'sizes.$.quantity': -item.quantity
-        }
-      });
+    // If payment was with Razorpay, add payment details and update status
+    if (paymentMethod === 'razorpay') {
+        order.paymentDetails = {
+            razorpayOrderId: sourceData.razorpayOrderId,
+            razorpayPaymentId: sourceData.razorpayPaymentId,
+            razorpaySignature: sourceData.razorpaySignature
+        };
+        order.paymentStatus = 'paid';
     }
 
-    // 6. Clear user cart and session data
-    await Cart.findOneAndDelete({ user: userId });
-    delete req.session.checkoutData;
-    delete req.session.pendingOrder; // Also clear any pending razorpay orders
-    await req.session.save();
+    try {
+        const savedOrder = await order.save();
+        req.session.orderId = savedOrder._id; // Store new order ID in session
+        console.log('Order created successfully with unified calculation:', orderID);
 
-    res.json({
-      success: true,
-      orderID: order.orderID, // Use the ID from the created order document
-      message: 'Order placed successfully'
-    });
+        // 5. Decrease stock after successful order creation
+        for (const item of checkoutItems) {
+          await Product.updateOne({
+            _id: item.product,
+            'sizes.size': item.size
+          }, {
+            $inc: {
+              'sizes.$.quantity': -item.quantity
+            }
+          });
+        }
 
+        // 6. Clear user cart and session data
+        await Cart.findOneAndDelete({ user: userId });
+        delete req.session.checkoutData;
+        delete req.session.pendingOrder; // Also clear any pending razorpay orders
+        await req.session.save();
+
+        res.json({
+          success: true,
+          orderID: order.orderID, // Use the ID from the created order document
+          message: 'Order placed successfully'
+        });
+    } catch (error) {
+        console.error('Error placing order:', error);
+        res.status(500).json({
+          success: false,
+          message: error.message || 'Failed to place order'
+        });
+    }
   } catch (error) {
     console.error('Error placing order:', error);
     res.status(500).json({

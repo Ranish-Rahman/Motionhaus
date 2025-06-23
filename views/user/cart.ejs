@@ -406,20 +406,20 @@
             <span>Delivery Fee</span>
             <span style="color: #2ecc71; font-weight: 600;">Free</span>
           </div>
-          <div id="couponDiscount" class="coupon-discount <%= (cart.couponCode && cart.discount > 0) ? '' : 'hidden' %>">
+          <div id="couponDiscount" class="coupon-discount <%= (cart.couponCode && cart.couponDiscount > 0) ? '' : 'hidden' %>">
             <span>Coupon Discount</span>
-            <span style="color: #2ecc71; font-weight: 600;">-₹<span id="discountAmount"><%= cart.discount ? cart.discount.toFixed(2) : '0.00' %></span></span>
+            <span style="color: #2ecc71; font-weight: 600;">-₹<span id="discountAmount"><%= cart.couponDiscount ? cart.couponDiscount.toFixed(2) : '0.00' %></span></span>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 700; margin: 24px 0 28px;">
             <span>Total</span>
-            <span>₹<%= (cart.subtotal - (cart.discount || 0)).toFixed(2) %></span>
+            <span>₹<%= (cart.finalAmount !== undefined ? cart.finalAmount : cart.subtotal).toFixed(2) %></span>
           </div>
-          <div id="appliedCoupon" class="applied-coupon <%= (cart.couponCode && cart.discount > 0) ? '' : 'hidden' %>">
+          <div id="appliedCoupon" class="applied-coupon <%= (cart.couponCode && cart.couponDiscount > 0) ? '' : 'hidden' %>">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-weight: 600; color: #155724;" id="appliedCouponCode"><%= cart.couponCode || '' %></div>
                 <div style="font-size: 13px; color: #2ecc71;" id="couponDescription">
-                  <%= cart.coupon && cart.coupon.type === 'Percentage' ? cart.coupon.value + '% OFF' : '₹' + (cart.discount || 0) + ' OFF' %>
+                  <%= cart.coupon && cart.coupon.type === 'Percentage' ? cart.coupon.value + '% OFF' : '₹' + (cart.couponDiscount || 0) + ' OFF' %>
                 </div>
               </div>
               <button onclick="removeCoupon()" 
@@ -490,7 +490,7 @@
     }
 
     function updateQuantity(itemId, change) {
-      const input = event.target.parentElement.querySelector('.q  tity-input');
+      const input = event.target.parentElement.querySelector('.quantity-input');
       const currentValue = parseInt(input.value);
       const maxStock = parseInt(input.getAttribute('max'));
       const maxLimit = 3; // Maximum limit per product
@@ -665,37 +665,39 @@
     }
 
     function updateCartSummary(cart) {
-        // Find the elements in the order summary section
-        const subtotalElement = document.querySelector('div[style*="display: flex; justify-content: space-between; margin-bottom: 16px; color: #222; font-size: 16px;"] span:last-child');
-        const totalElement = document.querySelector('div[style*="display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 700; margin: 24px 0 28px;"] span:last-child');
-        const couponDiscount = document.getElementById('couponDiscount');
-        const discountAmount = document.getElementById('discountAmount');
+        console.log('Cart data received for summary update:', cart);
+
+        const subtotalElement = document.querySelector('div[style*="justify-content: space-between; margin-bottom: 16px;"] span:last-child');
+        const totalElement = document.querySelector('div[style*="font-size: 20px; font-weight: 700;"] span:last-child');
+        const couponDiscountEl = document.getElementById('couponDiscount');
+        const discountAmountEl = document.getElementById('discountAmount');
         const appliedCouponDiv = document.getElementById('appliedCoupon');
-        const appliedCouponCode = document.getElementById('appliedCouponCode');
-        const couponDescription = document.getElementById('couponDescription');
-        
-        if (subtotalElement && totalElement) {
-            subtotalElement.textContent = `₹${cart.subtotal.toFixed(2)}`;
-            
-            // Update coupon section
-            if (cart.couponCode && cart.discount > 0) {
-                if (couponDiscount) couponDiscount.classList.remove('hidden');
-                if (discountAmount) discountAmount.textContent = cart.discount.toFixed(2);
-                if (appliedCouponDiv) appliedCouponDiv.classList.remove('hidden');
-                if (appliedCouponCode) appliedCouponCode.textContent = cart.couponCode;
-                if (couponDescription) {
-                    couponDescription.textContent = cart.coupon && cart.coupon.type === 'Percentage' 
-                        ? `${cart.coupon.value}% OFF` 
-                        : `₹${cart.discount} OFF`;
+        const appliedCouponCodeEl = document.getElementById('appliedCouponCode');
+        const couponDescriptionEl = document.getElementById('couponDescription');
+
+        if (subtotalElement && totalElement && couponDiscountEl) {
+            subtotalElement.textContent = `₹${(cart.subtotal || 0).toFixed(2)}`;
+            totalElement.textContent = `₹${(cart.finalAmount || 0).toFixed(2)}`;
+
+            if (cart.couponCode && cart.couponDiscount > 0) {
+                couponDiscountEl.classList.remove('hidden');
+                discountAmountEl.textContent = (cart.couponDiscount || 0).toFixed(2);
+                appliedCouponDiv.classList.remove('hidden');
+                appliedCouponCodeEl.textContent = cart.couponCode;
+
+                if (couponDescriptionEl) {
+                    if (cart.coupon && cart.coupon.type === 'Percentage') {
+                        couponDescriptionEl.textContent = `${cart.coupon.value}% OFF`;
+                    } else {
+                        couponDescriptionEl.textContent = `₹${(cart.couponDiscount || 0)} OFF`;
+                    }
                 }
-                totalElement.textContent = `₹${(cart.subtotal - cart.discount).toFixed(2)}`;
             } else {
-                if (couponDiscount) couponDiscount.classList.add('hidden');
-                if (appliedCouponDiv) appliedCouponDiv.classList.add('hidden');
-                totalElement.textContent = `₹${cart.subtotal.toFixed(2)}`;
+                couponDiscountEl.classList.add('hidden');
+                appliedCouponDiv.classList.add('hidden');
             }
         } else {
-            console.error('Could not find cart summary elements to update');
+            console.error('Could not find all required cart summary elements to update');
         }
     }
 

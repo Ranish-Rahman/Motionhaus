@@ -532,14 +532,37 @@ const getCart = async (req, res) => {
     return res.redirect('/login');
   }
   const userId = req.session.user._id || req.session.user.id;
-  // Fetch cart from DB and populate product details
-  const cart = await Cart.findOne({ user: userId }).populate('items.product');
-  res.render('user/cart', {
-    user: req.session.user,
-    cart: cart || { items: [], subtotal: 0 },
-    success: req.flash('success'),
-    error: req.flash('error')
-  });
+  
+  try {
+    // Fetch cart from DB and populate product and coupon details
+    const cart = await Cart.findOne({ user: userId }).populate(['items.product', 'coupon']);
+    
+    if (!cart || cart.items.length === 0) {
+      return res.render('user/cart', {
+        user: req.session.user,
+        cart: { items: [], subtotal: 0, finalAmount: 0, couponDiscount: 0, couponCode: null }, // Provide empty structure
+        success: req.flash('success'),
+        error: req.flash('error')
+      });
+    }
+
+    // Use the centralized calculator to get all totals
+    const cartData = await calculateCartTotals(cart, getBestOffer);
+
+    res.render('user/cart', {
+      user: req.session.user,
+      cart: {
+        ...cart.toObject(),
+        ...cartData
+      },
+      success: req.flash('success'),
+      error: req.flash('error')
+    });
+  } catch (error) {
+    console.error('Error getting cart page:', error);
+    req.flash('error', 'Could not load your cart.');
+    res.redirect('/');
+  }
 };
 
 // Get profile page
@@ -931,8 +954,9 @@ export const getOrders = async (req, res) => {
     const totalPages = Math.ceil(totalOrders / limit);
     
     const orders = await Order.find({ user: userId })
-      .select('_id orderID orderDate totalAmount status returnRequest items')
+      .select('_id orderID orderDate totalAmount originalAmount discountAmount status returnRequest items coupon')
       .populate('items.product', 'name price images sizes')
+      .populate('coupon', 'code')
       .sort({ orderDate: -1 })
       .skip(skip)
       .limit(limit);
@@ -1143,7 +1167,7 @@ const getCheckout = async (req, res) => {
     // Use the centralized calculator to get all totals
     // IMPORTANT: Ensure the cart is fully populated before calculating
     const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
-    const cartData = await calculateCartTotals(populatedCart);
+    const cartData = await calculateCartTotals(populatedCart, getBestOffer);
 
     // Store checkout data in session
     req.session.checkoutData = {
@@ -2117,6 +2141,7 @@ const createOrder = async (req, res) => {
         totalAmount: verifiedFinalAmount,
         originalAmount,
         discountAmount,
+        couponCode: checkoutData.couponCode,
         items: checkoutData.items,
         shippingAddress: addressId ? await Address.findById(addressId) : null,
         userId

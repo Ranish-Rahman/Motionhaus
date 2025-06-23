@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Offer from '../models/OfferModel.js';
 import Product from '../models/ProductModel.js';
 import Category from '../models/categoryModel.js';
@@ -49,9 +50,10 @@ async function getBestOffer(productId) {
 /**
  * Calculates all totals for a given cart, including offer and coupon discounts.
  * @param {Object} cart - The user's cart object, populated with product and coupon details.
+ * @param {Function} getBestOfferFunc - The function to fetch the best offer for a product.
  * @returns {Promise<Object>} An object containing all calculated totals and processed items.
  */
-export async function calculateCartTotals(cart) {
+export async function calculateCartTotals(cart, getBestOfferFunc) {
   if (!cart || !cart.items) {
     return { subtotal: 0, offerDiscount: 0, couponDiscount: 0, totalDiscount: 0, finalAmount: 0, items: [], couponCode: null };
   }
@@ -71,13 +73,24 @@ export async function calculateCartTotals(cart) {
     subtotal += originalPrice * quantity;
 
     let priceAfterOffer = originalPrice;
-    const bestOffer = await getBestOffer(item.product._id);
+    
+    // Final check to find the root cause
+    console.log(`[Cart Helper] About to call getBestOffer for product ID: ${item.product._id}`);
+    const bestOffer = await getBestOfferFunc(item.product._id);
+    
+    // --- Detailed Debugging ---
+    console.log(`[Cart Helper DEBUG] Item: ${item.product.name}, Original Price: ${originalPrice}`);
     if (bestOffer) {
+      console.log(`[Cart Helper DEBUG] Found Offer: ${bestOffer.name}, Discount: ${bestOffer.discount}%`);
       const offerDiscountOnItem = Math.round(originalPrice * (bestOffer.discount / 100));
+      console.log(`[Cart Helper DEBUG] Calculated Discount Per Item: ${offerDiscountOnItem}`);
       priceAfterOffer -= offerDiscountOnItem;
       totalOfferDiscount += offerDiscountOnItem * quantity;
+    } else {
+      console.log(`[Cart Helper DEBUG] No offer found for ${item.product.name}`);
     }
-    
+    // --- End Debugging ---
+
     processedItems.push({
       ...item.toObject(),
       finalPrice: priceAfterOffer, // This is price per unit after offer
@@ -111,5 +124,6 @@ export async function calculateCartTotals(cart) {
     finalAmount,
     items: processedItems,
     couponCode: cart.coupon ? cart.coupon.code : null,
+    coupon: cart.coupon ? cart.coupon.toObject() : null
   };
 } 
