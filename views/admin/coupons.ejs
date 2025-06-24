@@ -269,6 +269,16 @@
         .btn-primary:hover {
             background-color: #1f2937;
         }
+
+        .error {
+            color: red;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        .input-error {
+            border-color: red !important;
+            background: #fff0f0;
+        }
     </style>
 </head>
 <body>
@@ -385,6 +395,7 @@
                             <div class="input-group">
                                 <input type="text" class="form-control" name="code" required>
                                 <button type="button" class="btn btn-outline-secondary" id="generateCode">Generate</button>
+                                <div class="error" id="error-code"></div>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -393,36 +404,44 @@
                                 <option value="Percentage">Percentage</option>
                                 <option value="Fixed">Fixed Amount</option>
                             </select>
+                            <div class="error" id="error-type"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Value</label>
                             <input type="number" class="form-control" name="value" required min="0">
+                            <div class="error" id="error-value"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Minimum Order Amount</label>
                             <input type="number" class="form-control" name="minAmount" required min="0">
+                            <div class="error" id="error-minAmount"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Maximum Order Amount</label>
                             <input type="number" class="form-control" name="maxAmount" min="0">
+                            <div class="error" id="error-maxAmount"></div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Valid From</label>
                                 <input type="date" class="form-control" name="validFrom" required>
+                                <div class="error" id="error-validFrom"></div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Valid Until</label>
                                 <input type="date" class="form-control" name="validUntil" required>
+                                <div class="error" id="error-validUntil"></div>
                             </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Usage Limit (Optional)</label>
                             <input type="number" class="form-control" name="usageLimit" min="0">
+                            <div class="error" id="error-usageLimit"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
                             <textarea class="form-control" name="description" rows="2"></textarea>
+                            <div class="error" id="error-description"></div>
                         </div>
                     </form>
                 </div>
@@ -448,6 +467,7 @@
                         <div class="mb-3">
                             <label class="form-label">Coupon Code</label>
                             <input type="text" class="form-control" name="code" required readonly>
+                            <div class="error" id="edit-error-code"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Type</label>
@@ -455,36 +475,44 @@
                                 <option value="Percentage">Percentage</option>
                                 <option value="Fixed">Fixed Amount</option>
                             </select>
+                            <div class="error" id="edit-error-type"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Value</label>
                             <input type="number" class="form-control" name="value" required min="0">
+                            <div class="error" id="edit-error-value"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Minimum Order Amount</label>
                             <input type="number" class="form-control" name="minAmount" required min="0">
+                            <div class="error" id="edit-error-minAmount"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Maximum Order Amount</label>
                             <input type="number" class="form-control" name="maxAmount" min="0">
+                            <div class="error" id="edit-error-maxAmount"></div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Valid From</label>
                                 <input type="date" class="form-control" name="validFrom" required>
+                                <div class="error" id="edit-error-validFrom"></div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Valid Until</label>
                                 <input type="date" class="form-control" name="validUntil" required>
+                                <div class="error" id="edit-error-validUntil"></div>
                             </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Usage Limit</label>
                             <input type="number" class="form-control" name="usageLimit" min="0">
+                            <div class="error" id="edit-error-usageLimit"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
                             <textarea class="form-control" name="description" rows="2"></textarea>
+                            <div class="error" id="edit-error-description"></div>
                         </div>
                     </form>
                 </div>
@@ -527,15 +555,16 @@
     // Create coupon
     document.getElementById('createCoupon').addEventListener('click', async function() {
         const form = document.getElementById('addCouponForm');
+        clearFieldErrors();
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
         // Client-side validation for code field
         if (!data.code || data.code.trim() === '') {
             Swal.fire({
-                title: 'Validation Error!',
-                text: 'Coupon Code is required.',
-                icon: 'error'
+                title: 'Missing Code!',
+                text: 'Please provide or generate a coupon code.',
+                icon: 'warning'
             });
             return;
         }
@@ -544,10 +573,36 @@
         const minAmount = data.minAmount;
         const maxAmount = data.maxAmount;
         if (!validateAmounts(minAmount, maxAmount)) {
+            showFieldErrors({ maxAmount: 'Maximum order amount cannot be less than minimum order amount' });
             return;
         }
 
-        console.log('Client-side: Data being sent for createCoupon:', data);
+        // Prevent Fixed coupon with value 0
+        if (data.type === 'Fixed' && parseFloat(data.value) === 0) {
+            showFieldErrors({ value: 'Fixed discount value must be greater than 0' });
+            return;
+        }
+
+        // Validate Percentage coupon: value must be between 1 and 100
+        if (data.type === 'Percentage') {
+            const percentValue = parseFloat(data.value);
+            if (percentValue < 1 || percentValue > 100) {
+                showFieldErrors({ value: 'Percentage discount must be between 1 and 100' });
+                return;
+            }
+        }
+
+        // Validate Fixed amount coupons
+        if (data.type === 'Fixed' && parseFloat(data.value) >= parseFloat(data.minAmount)) {
+            showFieldErrors({ value: 'Fixed discount must be less than the minimum order amount' });
+            return;
+        }
+
+        // Validate Percentage coupon: if value >= 50, minAmount >= 100
+        if (data.type === 'Percentage' && parseFloat(data.value) >= 50 && parseFloat(data.minAmount) < 100) {
+            showFieldErrors({ minAmount: 'For percentage discounts of 50% or more, minimum order amount must be at least ₹100' });
+            return;
+        }
 
         try {
             const response = await fetch('/admin/coupons', {
@@ -560,6 +615,11 @@
 
             const result = await response.json();
 
+            if (result.errors) {
+                showFieldErrors(result.errors);
+                return;
+            }
+
             if (result.success) {
                 Swal.fire({
                     title: 'Success!',
@@ -571,7 +631,11 @@
                     location.reload();
                 });
             } else {
-                throw new Error(result.message);
+                Swal.fire({
+                    title: 'Error!',
+                    text: result.message || 'Failed to create coupon',
+                    icon: 'error'
+                });
             }
         } catch (error) {
             Swal.fire({
@@ -606,7 +670,6 @@
                     form.querySelector('textarea[name="description"]').value = coupon.description || '';
                 }
             } catch (error) {
-                console.error('Error:', error);
                 Swal.fire({
                     title: 'Error!',
                     text: 'Failed to load coupon details',
@@ -619,17 +682,14 @@
     // Update coupon
     document.getElementById('updateCoupon').addEventListener('click', async function() {
         const form = document.getElementById('editCouponForm');
+        clearFieldErrors('edit-');
         const formData = new FormData(form);
         const couponId = formData.get('couponId');
         const data = Object.fromEntries(formData.entries());
-        
+
         // Client-side validation for code field (for safety, though it's readonly)
         if (!data.code || data.code.trim() === '') {
-            Swal.fire({
-                title: 'Validation Error!',
-                text: 'Coupon Code is required.',
-                icon: 'error'
-            });
+            showFieldErrors({ code: 'Coupon Code is required' }, 'edit-');
             return;
         }
 
@@ -637,11 +697,36 @@
         const minAmount = data.minAmount;
         const maxAmount = data.maxAmount;
         if (!validateAmounts(minAmount, maxAmount)) {
+            showFieldErrors({ maxAmount: 'Maximum order amount cannot be less than minimum order amount' }, 'edit-');
             return;
         }
 
-        console.log('Client-side: Updating coupon with ID:', couponId);
-        console.log('Client-side: Update data:', data);
+        // Prevent Fixed coupon with value 0
+        if (data.type === 'Fixed' && parseFloat(data.value) === 0) {
+            showFieldErrors({ value: 'Fixed discount value must be greater than 0' }, 'edit-');
+            return;
+        }
+
+        // Validate Percentage coupon: value must be between 1 and 100
+        if (data.type === 'Percentage') {
+            const percentValue = parseFloat(data.value);
+            if (percentValue < 1 || percentValue > 100) {
+                showFieldErrors({ value: 'Percentage discount must be between 1 and 100' }, 'edit-');
+                return;
+            }
+        }
+
+        // Validate Fixed amount coupons
+        if (data.type === 'Fixed' && parseFloat(data.value) >= parseFloat(data.minAmount)) {
+            showFieldErrors({ value: 'Fixed discount must be less than the minimum order amount' }, 'edit-');
+            return;
+        }
+
+        // Validate Percentage coupon: if value >= 50, minAmount >= 100
+        if (data.type === 'Percentage' && parseFloat(data.value) >= 50 && parseFloat(data.minAmount) < 100) {
+            showFieldErrors({ minAmount: 'For percentage discounts of 50% or more, minimum order amount must be at least ₹100' }, 'edit-');
+            return;
+        }
 
         if (!couponId) {
             Swal.fire({
@@ -663,13 +748,15 @@
                 body: JSON.stringify(data)
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-            }
-
             const result = await response.json();
 
+            // If there are field errors, show them under the fields
+            if (result.errors) {
+                showFieldErrors(result.errors, 'edit-');
+                return;
+            }
+
+            // If update was successful
             if (result.success) {
                 Swal.fire({
                     title: 'Success!',
@@ -681,10 +768,14 @@
                     location.reload();
                 });
             } else {
-                throw new Error(result.message || 'Failed to update coupon');
+                // For any other error, show a general popup
+                Swal.fire({
+                    title: 'Error!',
+                    text: result.message || 'Failed to update coupon',
+                    icon: 'error'
+                });
             }
         } catch (error) {
-            console.error('Error updating coupon:', error);
             Swal.fire({
                 title: 'Error!',
                 text: error.message || 'Failed to update coupon',
@@ -789,6 +880,31 @@
     // Setup validation for both forms
     setupAmountValidation('addCouponForm');
     setupAmountValidation('editCouponForm');
+
+    function clearFieldErrors(formPrefix = '') {
+        const formId = `${formPrefix}CouponForm`;
+        const form = document.getElementById(formId);
+        if (!form) return;
+
+        form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+        form.querySelectorAll('[id^="' + formPrefix + 'error-"]').forEach(el => el.textContent = '');
+    }
+
+    function showFieldErrors(errors, formPrefix = '') {
+        let scrolled = false;
+        for (const [field, message] of Object.entries(errors)) {
+            const input = document.querySelector(`#${formPrefix}CouponForm [name="${field}"]`);
+            const errorDiv = document.getElementById(`${formPrefix}error-${field}`);
+            if (!input) console.warn('No input found for field:', field);
+            if (!errorDiv) console.warn('No error div found for field:', field);
+            if (input) input.classList.add('input-error');
+            if (errorDiv) errorDiv.textContent = message;
+            if (!scrolled && input) {
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                scrolled = true;
+            }
+        }
+    }
     </script>
 </body>
 </html> 

@@ -16,8 +16,13 @@
     <%- JSON.stringify(offers) %>
   </script>
   <script>
+    // Safely parse and log offers data for debugging
+    const offersDebug = JSON.parse(document.getElementById('offers-data').textContent);
+    console.log('Raw offers data:', offersDebug);
+
     // Store offers data for editing
     const offersData = JSON.parse(document.getElementById('offers-data').textContent);
+    console.log('Parsed offers data:', offersData);
 
     // Wait for DOM to be fully loaded
     document.addEventListener('DOMContentLoaded', function() {
@@ -26,7 +31,12 @@
         button.addEventListener('click', function() {
           const offerId = this.dataset.offerId;
           const offer = offersData.find(o => o._id === offerId);
-          if (!offer) return;
+          if (!offer) {
+            console.error('Could not find offer with ID:', offerId);
+            return;
+          }
+          
+          console.log('Editing offer:', offer);
 
           // Set form values
           document.getElementById('editOfferId').value = offer._id;
@@ -44,27 +54,46 @@
           const productSelect = document.getElementById('editProductSelect');
           const categorySelect = document.getElementById('editCategorySelect');
           
+          // Get target ID, handling both populated and unpopulated cases
+          const targetId = offer.target && typeof offer.target === 'object' ? offer.target._id : offer.target;
+          console.log('Target ID to set:', targetId);
+          
           if (offer.type === 'Product') {
             if (productSelect) {
               productSelect.style.display = 'block';
               const productTarget = document.getElementById('editProductTarget');
               if (productTarget) {
-                productTarget.value = offer.target;
+                // First, reset the select
+                productTarget.value = '';
+                // Then set the value and check if it was set correctly
+                productTarget.value = targetId;
+                console.log('Product target value after set:', productTarget.value);
                 productTarget.required = true;
+                
+                // If value wasn't set, try to find and select the option
+                if (!productTarget.value && targetId) {
+                  const option = Array.from(productTarget.options).find(opt => opt.value === targetId);
+                  if (option) {
+                    option.selected = true;
+                    console.log('Selected product option:', option.value);
+                  }
+                }
               }
             }
             if (categorySelect) {
               categorySelect.style.display = 'none';
               const categoryTarget = document.getElementById('editCategoryTarget');
               if (categoryTarget) {
+                categoryTarget.value = '';
                 categoryTarget.required = false;
               }
             }
-          } else {
+          } else if (offer.type === 'Category') {
             if (productSelect) {
               productSelect.style.display = 'none';
               const productTarget = document.getElementById('editProductTarget');
               if (productTarget) {
+                productTarget.value = '';
                 productTarget.required = false;
               }
             }
@@ -72,8 +101,21 @@
               categorySelect.style.display = 'block';
               const categoryTarget = document.getElementById('editCategoryTarget');
               if (categoryTarget) {
-                categoryTarget.value = offer.target;
+                // First, reset the select
+                categoryTarget.value = '';
+                // Then set the value and check if it was set correctly
+                categoryTarget.value = targetId;
+                console.log('Category target value after set:', categoryTarget.value);
                 categoryTarget.required = true;
+                
+                // If value wasn't set, try to find and select the option
+                if (!categoryTarget.value && targetId) {
+                  const option = Array.from(categoryTarget.options).find(opt => opt.value === targetId);
+                  if (option) {
+                    option.selected = true;
+                    console.log('Selected category option:', option.value);
+                  }
+                }
               }
             }
           }

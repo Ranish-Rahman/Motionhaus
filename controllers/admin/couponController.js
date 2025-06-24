@@ -126,6 +126,20 @@ export const createCoupon = async (req, res) => {
         });
     } catch (error) {
         console.error('Error in createCoupon:', error);
+        if (error.name === 'ValidationError') {
+            const errors = {};
+            for (const field in error.errors) {
+                const errObj = error.errors[field];
+                if (errObj.name === 'CastError' && errObj.kind === 'date') {
+                    errors[field] = 'Please enter a valid date';
+                } else if (errObj.message) {
+                    errors[field] = errObj.message;
+                } else {
+                    errors[field] = 'Invalid value';
+                }
+            }
+            return res.status(400).json({ success: false, errors });
+        }
         res.status(500).json({
             success: false,
             message: 'Failed to create coupon'

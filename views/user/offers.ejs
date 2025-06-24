@@ -1,0 +1,75 @@
+// Store offers data for editing
+const offersData = JSON.parse(document.getElementById('offers-data').textContent);
+console.log('Offers data:', offersData); // Debug log
+
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Add event listeners to edit buttons
+  document.querySelectorAll('.btn-edit').forEach(button => {
+    button.addEventListener('click', function() {
+      const offerId = this.dataset.offerId;
+      const offer = offersData.find(o => o._id === offerId);
+      if (!offer) return;
+      
+      console.log('Editing offer:', offer); // Debug log
+
+      // Set form values
+      document.getElementById('editOfferId').value = offer._id;
+      document.getElementById('editOfferName').value = offer.name;
+      document.getElementById('editOfferType').value = offer.type;
+      document.getElementById('editOfferDiscount').value = offer.discount;
+      
+      // Format dates for input fields (YYYY-MM-DD)
+      const startDate = new Date(offer.startDate).toISOString().split('T')[0];
+      const endDate = new Date(offer.endDate).toISOString().split('T')[0];
+      document.getElementById('editOfferStartDate').value = startDate;
+      document.getElementById('editOfferEndDate').value = endDate;
+
+      // Show/hide and set target based on type
+      const productSelect = document.getElementById('editProductSelect');
+      const categorySelect = document.getElementById('editCategorySelect');
+      
+      if (offer.type === 'Product') {
+        if (productSelect) {
+          productSelect.style.display = 'block';
+          const productTarget = document.getElementById('editProductTarget');
+          if (productTarget) {
+            productTarget.value = offer.target._id || offer.target;
+            productTarget.required = true;
+            console.log('Setting product target:', offer.target); // Debug log
+          }
+        }
+        if (categorySelect) {
+          categorySelect.style.display = 'none';
+          const categoryTarget = document.getElementById('editCategoryTarget');
+          if (categoryTarget) {
+            categoryTarget.value = '';
+            categoryTarget.required = false;
+          }
+        }
+      } else if (offer.type === 'Category') {
+        if (productSelect) {
+          productSelect.style.display = 'none';
+          const productTarget = document.getElementById('editProductTarget');
+          if (productTarget) {
+            productTarget.value = '';
+            productTarget.required = false;
+          }
+        }
+        if (categorySelect) {
+          categorySelect.style.display = 'block';
+          const categoryTarget = document.getElementById('editCategoryTarget');
+          if (categoryTarget) {
+            categoryTarget.value = offer.target._id || offer.target;
+            categoryTarget.required = true;
+            console.log('Setting category target:', offer.target); // Debug log
+          }
+        }
+      }
+
+      // Show modal
+      const editModal = new bootstrap.Modal(document.getElementById('editOfferModal'));
+      editModal.show();
+    });
+  });
+}); 
