@@ -2,706 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Offer Management - Admin</title>
   <link rel="stylesheet" href="/css/sidebar.css?v=2">
   <link rel="stylesheet" href="/css/tables.css?v=2">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Add SweetAlert2 CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script type="application/json" id="offers-data">
-    <%- JSON.stringify(offers) %>
-  </script>
-  <script>
-    // Safely parse and log offers data for debugging
-    const offersDebug = JSON.parse(document.getElementById('offers-data').textContent);
-    console.log('Raw offers data:', offersDebug);
-
-    // Store offers data for editing
-    const offersData = JSON.parse(document.getElementById('offers-data').textContent);
-    console.log('Parsed offers data:', offersData);
-
-    // Wait for DOM to be fully loaded
-    document.addEventListener('DOMContentLoaded', function() {
-      // Add event listeners to edit buttons
-      document.querySelectorAll('.btn-edit').forEach(button => {
-        button.addEventListener('click', function() {
-          const offerId = this.dataset.offerId;
-          const offer = offersData.find(o => o._id === offerId);
-          if (!offer) {
-            console.error('Could not find offer with ID:', offerId);
-            return;
-          }
-          
-          console.log('Editing offer:', offer);
-
-          // Set form values
-          document.getElementById('editOfferId').value = offer._id;
-          document.getElementById('editOfferName').value = offer.name;
-          document.getElementById('editOfferType').value = offer.type;
-          document.getElementById('editOfferDiscount').value = offer.discount;
-          
-          // Format dates for input fields (YYYY-MM-DD)
-          const startDate = new Date(offer.startDate).toISOString().split('T')[0];
-          const endDate = new Date(offer.endDate).toISOString().split('T')[0];
-          document.getElementById('editOfferStartDate').value = startDate;
-          document.getElementById('editOfferEndDate').value = endDate;
-
-          // Show/hide and set target based on type
-          const productSelect = document.getElementById('editProductSelect');
-          const categorySelect = document.getElementById('editCategorySelect');
-          
-          // Get target ID, handling both populated and unpopulated cases
-          const targetId = offer.target && typeof offer.target === 'object' ? offer.target._id : offer.target;
-          console.log('Target ID to set:', targetId);
-          
-          if (offer.type === 'Product') {
-            if (productSelect) {
-              productSelect.style.display = 'block';
-              const productTarget = document.getElementById('editProductTarget');
-              if (productTarget) {
-                // First, reset the select
-                productTarget.value = '';
-                // Then set the value and check if it was set correctly
-                productTarget.value = targetId;
-                console.log('Product target value after set:', productTarget.value);
-                productTarget.required = true;
-                
-                // If value wasn't set, try to find and select the option
-                if (!productTarget.value && targetId) {
-                  const option = Array.from(productTarget.options).find(opt => opt.value === targetId);
-                  if (option) {
-                    option.selected = true;
-                    console.log('Selected product option:', option.value);
-                  }
-                }
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'none';
-              const categoryTarget = document.getElementById('editCategoryTarget');
-              if (categoryTarget) {
-                categoryTarget.value = '';
-                categoryTarget.required = false;
-              }
-            }
-          } else if (offer.type === 'Category') {
-            if (productSelect) {
-              productSelect.style.display = 'none';
-              const productTarget = document.getElementById('editProductTarget');
-              if (productTarget) {
-                productTarget.value = '';
-                productTarget.required = false;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'block';
-              const categoryTarget = document.getElementById('editCategoryTarget');
-              if (categoryTarget) {
-                // First, reset the select
-                categoryTarget.value = '';
-                // Then set the value and check if it was set correctly
-                categoryTarget.value = targetId;
-                console.log('Category target value after set:', categoryTarget.value);
-                categoryTarget.required = true;
-                
-                // If value wasn't set, try to find and select the option
-                if (!categoryTarget.value && targetId) {
-                  const option = Array.from(categoryTarget.options).find(opt => opt.value === targetId);
-                  if (option) {
-                    option.selected = true;
-                    console.log('Selected category option:', option.value);
-                  }
-                }
-              }
-            }
-          }
-
-          // Show modal
-          const editModal = new bootstrap.Modal(document.getElementById('editOfferModal'));
-          editModal.show();
-        });
-      });
-
-      // Add form validation
-      const offerForm = document.getElementById('addOfferForm');
-      if (offerForm) {
-        const nameInput = offerForm.querySelector('input[name="name"]');
-        if (nameInput) {
-          nameInput.addEventListener('input', function() {
-            validateName(this);
-          });
-        }
-      }
-
-      // Handle offer type change in add form
-      const offerTypeSelect = document.getElementById('offerType');
-      if (offerTypeSelect) {
-        offerTypeSelect.addEventListener('change', function() {
-          const productSelect = document.getElementById('productSelect');
-          const categorySelect = document.getElementById('categorySelect');
-          
-          if (this.value === 'Product') {
-            if (productSelect) {
-              productSelect.style.display = 'block';
-              const productTarget = document.querySelector('select[name="productTarget"]');
-              if (productTarget) {
-                productTarget.required = true;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'none';
-              const categoryTarget = document.querySelector('select[name="categoryTarget"]');
-              if (categoryTarget) {
-                categoryTarget.required = false;
-              }
-            }
-          } else if (this.value === 'Category') {
-            if (productSelect) {
-              productSelect.style.display = 'none';
-              const productTarget = document.querySelector('select[name="productTarget"]');
-              if (productTarget) {
-                productTarget.required = false;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'block';
-              const categoryTarget = document.querySelector('select[name="categoryTarget"]');
-              if (categoryTarget) {
-                categoryTarget.required = true;
-              }
-            }
-          } else {
-            if (productSelect) {
-              productSelect.style.display = 'none';
-              const productTarget = document.querySelector('select[name="productTarget"]');
-              if (productTarget) {
-                productTarget.required = false;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'none';
-              const categoryTarget = document.querySelector('select[name="categoryTarget"]');
-              if (categoryTarget) {
-                categoryTarget.required = false;
-              }
-            }
-          }
-        });
-      }
-
-      // Handle offer type change in edit form
-      const editOfferType = document.getElementById('editOfferType');
-      if (editOfferType) {
-        editOfferType.addEventListener('change', function() {
-          const productSelect = document.getElementById('editProductSelect');
-          const categorySelect = document.getElementById('editCategorySelect');
-          
-          if (this.value === 'Product') {
-            if (productSelect) {
-              productSelect.style.display = 'block';
-              const productTarget = document.getElementById('editProductTarget');
-              if (productTarget) {
-                productTarget.required = true;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'none';
-              const categoryTarget = document.getElementById('editCategoryTarget');
-              if (categoryTarget) {
-                categoryTarget.required = false;
-              }
-            }
-          } else if (this.value === 'Category') {
-            if (productSelect) {
-              productSelect.style.display = 'none';
-              const productTarget = document.getElementById('editProductTarget');
-              if (productTarget) {
-                productTarget.required = false;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'block';
-              const categoryTarget = document.getElementById('editCategoryTarget');
-              if (categoryTarget) {
-                categoryTarget.required = true;
-              }
-            }
-          } else {
-            if (productSelect) {
-              productSelect.style.display = 'none';
-              const productTarget = document.getElementById('editProductTarget');
-              if (productTarget) {
-                productTarget.required = false;
-              }
-            }
-            if (categorySelect) {
-              categorySelect.style.display = 'none';
-              const categoryTarget = document.getElementById('editCategoryTarget');
-              if (categoryTarget) {
-                categoryTarget.required = false;
-              }
-            }
-          }
-        });
-      }
-
-      // Toggle offer status
-      document.querySelectorAll('.toggle-status').forEach(button => {
-        button.addEventListener('click', async function() {
-          const offerId = this.dataset.offerId;
-          const currentStatus = this.dataset.currentStatus === 'true';
-          const action = currentStatus ? 'deactivate' : 'activate';
-
-          try {
-            const result = await Swal.fire({
-              title: `${action.charAt(0).toUpperCase() + action.slice(1)} Offer?`,
-              text: `Are you sure you want to ${action} this offer?`,
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonColor: currentStatus ? '#dc3545' : '#28a745',
-              cancelButtonColor: '#6c757d',
-              confirmButtonText: `Yes, ${action} it!`
-            });
-
-            if (result.isConfirmed) {
-              // Show loading state
-              Swal.fire({
-                title: `${action.charAt(0).toUpperCase() + action.slice(1)}ing Offer...`,
-                text: 'Please wait...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                  Swal.showLoading();
-                }
-              });
-
-              const response = await fetch(`/admin/offers/${offerId}/status`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                  status: currentStatus ? 'Inactive' : 'Active' 
-                })
-              });
-
-              const data = await response.json();
-
-              if (data.success) {
-                await Swal.fire({
-                  title: 'Success!',
-                  text: data.message,
-                  icon: 'success',
-                  timer: 2000,
-                  showConfirmButton: false
-                });
-                location.reload();
-              } else {
-                throw new Error(data.message || `Failed to ${action} offer`);
-              }
-            }
-          } catch (error) {
-            console.error('Error:', error);
-            Swal.fire({
-              title: 'Error!',
-              text: error.message || `Failed to ${action} offer`,
-              icon: 'error'
-            });
-          }
-        });
-      });
-
-      document.getElementById('statusFilter').addEventListener('change', searchOffers);
-    });
-
-    function validateName(input) {
-      const name = input.value.trim();
-      const pattern = /^[A-Za-z0-9- ]{2,50}$/;
-      const isValid = pattern.test(name);
-      
-      if (isValid) {
-        input.classList.remove('is-invalid');
-        input.classList.add('is-valid');
-      } else {
-        input.classList.remove('is-valid');
-        input.classList.add('is-invalid');
-      }
-      return isValid;
-    }
-
-    // Functions that don't depend on DOM elements
-    function searchOffers() {
-      const searchTerm = document.getElementById('searchOffers').value.toLowerCase();
-      const statusFilter = document.getElementById('statusFilter').value;
-      const rows = document.querySelectorAll('tbody tr');
-
-      rows.forEach(row => {
-        const name = row.cells[1].textContent.toLowerCase();
-        const status = row.cells[5].textContent.trim().toLowerCase();
-        const matchesSearch = name.includes(searchTerm);
-        const matchesStatus = statusFilter === 'all' || status === statusFilter.toLowerCase();
-        
-        row.style.display = matchesSearch && matchesStatus ? '' : 'none';
-      });
-    }
-
-    async function submitOffer() {
-      const form = document.getElementById('addOfferForm');
-      if (!form) return;
-      
-      const nameInput = form.querySelector('input[name="name"]');
-      if (!nameInput) return;
-
-      // Validate all fields
-      if (!form.checkValidity() || !validateName(nameInput)) {
-        form.classList.add('was-validated');
-        return;
-      }
-
-      const formData = new FormData(form);
-      const type = formData.get('type');
-      
-      const data = {
-        name: formData.get('name').trim(),
-        type: type,
-        discount: parseFloat(formData.get('discount')),
-        startDate: formData.get('startDate'),
-        endDate: formData.get('endDate'),
-        target: type === 'Product' ? formData.get('productTarget') : formData.get('categoryTarget'),
-        targetModel: type === 'Product' ? 'Product' : 'Category'
-      };
-
-      try {
-        const response = await fetch('/admin/offers', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-          location.reload();
-        } else {
-          const error = await response.json();
-          alert(error.error || 'Error creating offer');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Error creating offer');
-      }
-    }
-
-    async function updateOffer() {
-      const form = document.getElementById('editOfferForm');
-      if (!form) return;
-      
-      // Validate form
-      if (!form.checkValidity()) {
-        form.classList.add('was-validated');
-        return;
-      }
-
-      const formData = new FormData(form);
-      const type = formData.get('type');
-      const offerId = formData.get('offerId');
-      
-      const data = {
-        name: formData.get('name').trim(),
-        type: type,
-        discount: parseFloat(formData.get('discount')),
-        startDate: formData.get('startDate'),
-        endDate: formData.get('endDate'),
-        target: type === 'Product' ? formData.get('productTarget') : formData.get('categoryTarget'),
-        targetModel: type === 'Product' ? 'Product' : 'Category'
-      };
-
-      try {
-        const response = await fetch(`/admin/offers/${offerId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-          location.reload();
-        } else {
-          const error = await response.json();
-          alert(error.error || 'Error updating offer');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Error updating offer');
-      }
-    }
-  </script>
   <style>
     body {
       background-color: #f8f9fa;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
-
-    .main-content {
-      padding: 2rem;
-      margin-left: 250px;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-    }
-
-    .page-header h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin: 0;
-      color: #111827;
-    }
-
-    .search-section {
-      background: #fff;
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .search-box {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-
-    .search-input {
-      padding: 0.5rem 1rem;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      width: 300px;
-      font-size: 0.875rem;
-    }
-
-    .search-input:focus {
-      outline: none;
-      border-color: #6366f1;
-      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
-    }
-
-    .btn-search {
-      background-color: #111827;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    .btn-search:hover {
-      background-color: #1f2937;
-    }
-
-    .status-filter {
-      padding: 0.5rem;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      color: #374151;
-    }
-
-    .table-container {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      overflow: hidden;
-    }
-
-    .table {
-      margin-bottom: 0;
-    }
-
-    .table thead {
-      background-color: #f9fafb;
-    }
-
-    .table th {
-      padding: 0.75rem 1.5rem;
-      font-weight: 500;
-      color: #6b7280;
-      font-size: 0.875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .table td {
-      padding: 1rem 1.5rem;
-      color: #111827;
-      font-size: 0.875rem;
-      border-bottom: 1px solid #e5e7eb;
-      vertical-align: middle;
-    }
-
-    .table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .status-badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      display: inline-flex;
-      align-items: center;
-    }
-
-    .status-active {
-      background-color: #dcfce7;
-      color: #15803d;
-    }
-
-    .status-inactive {
-      background-color: #fee2e2;
-      color: #b91c1c;
-    }
-
-    .btn-action {
-      padding: 0.375rem 0.75rem;
-      font-size: 0.75rem;
-      border-radius: 4px;
-      font-weight: 500;
-      text-decoration: none;
-    }
-
-    .btn-edit {
-      color: #4f46e5;
-      background: none;
-      border: none;
-      padding: 0;
-      margin-right: 1rem;
-    }
-
-    .btn-edit:hover {
-      color: #4338ca;
-    }
-
-    .btn-activate {
-      color: #15803d;
-      background: none;
-      border: none;
-      padding: 0;
-    }
-
-    .btn-activate:hover {
-      color: #166534;
-    }
-
-    .btn-deactivate {
-      color: #b91c1c;
-      background: none;
-      border: none;
-      padding: 0;
-    }
-
-    .btn-deactivate:hover {
-      color: #991b1b;
-    }
-
-    .btn-add {
-      background-color: #111827;
-      color: white;
-      border: none;
-      padding: 0.625rem 1.25rem;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .btn-add:hover {
-      background-color: #1f2937;
-      color: white;
-    }
-
-    .modal-content {
-      border-radius: 12px;
-      border: none;
-    }
-
-    .modal-header {
-      padding: 1.5rem;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #111827;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-    }
-
-    .form-label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: #374151;
-      margin-bottom: 0.5rem;
-    }
-
-    .form-control, .form-select {
-      padding: 0.625rem 0.75rem;
-      font-size: 0.875rem;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      color: #111827;
-    }
-
-    .form-control:focus, .form-select:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
-    }
-
-    .modal-footer {
-      padding: 1.5rem;
-      border-top: 1px solid #e5e7eb;
-    }
-
-    .btn-secondary {
-      background-color: #f3f4f6;
-      border: 1px solid #e5e7eb;
-      color: #374151;
-    }
-
-    .btn-secondary:hover {
-      background-color: #e5e7eb;
-      border-color: #d1d5db;
-    }
-
-    .btn-primary {
-      background-color: #111827;
-      border: none;
-    }
-
-    .btn-primary:hover {
-      background-color: #1f2937;
-    }
+    .main-content { padding: 2rem; margin-left: 250px; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; color: #111827; }
+    .search-section { background: #fff; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .search-box { display: flex; gap: 0.5rem; align-items: center; }
+    .search-input { padding: 0.5rem 1rem; border: 1px solid #e5e7eb; border-radius: 6px; width: 300px; font-size: 0.875rem; }
+    .search-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2); }
+    .btn-search { background-color: #111827; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; transition: background-color 0.2s; }
+    .btn-search:hover { background-color: #1f2937; }
+    .status-filter { padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.875rem; color: #374151; }
+    .table-container { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    .table { margin-bottom: 0; }
+    .table thead { background-color: #f9fafb; }
+    .table th { padding: 0.75rem 1.5rem; font-weight: 500; color: #6b7280; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb; }
+    .table td { padding: 1rem 1.5rem; color: #111827; font-size: 0.875rem; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+    .table tr:last-child td { border-bottom: none; }
+    .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; display: inline-flex; align-items: center; }
+    .status-active { background-color: #dcfce7; color: #15803d; }
+    .status-inactive { background-color: #fee2e2; color: #b91c1c; }
+    .btn-action { padding: 0.375rem 0.75rem; font-size: 0.75rem; border-radius: 4px; font-weight: 500; text-decoration: none; }
+    .btn-edit { color: #4f46e5; background: none; border: none; padding: 0; margin-right: 1rem; }
+    .btn-edit:hover { color: #4338ca; }
+    .btn-activate, .btn-deactivate { background: none; border: none; padding: 0; }
+    .btn-activate { color: #15803d; }
+    .btn-activate:hover { color: #166534; }
+    .btn-deactivate { color: #b91c1c; }
+    .btn-deactivate:hover { color: #991b1b; }
+    .btn-add { background-color: #111827; color: white; border: none; padding: 0.625rem 1.25rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; }
+    .btn-add:hover { background-color: #1f2937; color: white; }
+    .modal-content { border-radius: 12px; border: none; }
+    .modal-header { padding: 1.5rem; border-bottom: 1px solid #e5e7eb; }
+    .modal-title { font-size: 1.25rem; font-weight: 600; color: #111827; }
+    .modal-body { padding: 1.5rem; }
+    .form-label { font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.5rem; }
+    .form-control, .form-select { padding: 0.625rem 0.75rem; font-size: 0.875rem; border: 1px solid #e5e7eb; border-radius: 6px; color: #111827; }
+    .form-control:focus, .form-select:focus { border-color: #6366f1; box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2); }
+    .modal-footer { padding: 1.5rem; border-top: 1px solid #e5e7eb; }
+    .btn-secondary { background-color: #f3f4f6; border: 1px solid #e5e7eb; color: #374151; }
+    .btn-secondary:hover { background-color: #e5e7eb; border-color: #d1d5db; }
+    .btn-primary { background-color: #111827; border: none; }
+    .btn-primary:hover { background-color: #1f2937; }
+    .error { color: red; font-size: 0.875em; margin-top: 0.25rem; }
+    .input-error { border-color: red !important; }
   </style>
 </head>
 <body>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="application/json" id="offers-data">
+    <%- JSON.stringify(offers) %>
+  </script>
+
   <div class="app-layout">
     <%- include('../partials/sidebar') %>
 
@@ -752,7 +117,7 @@
                   </span>
                 </td>
                 <td>
-                  <button class="btn-action btn-edit" data-offer-id="<%= offer._id %>">
+                  <button class="btn-action btn-edit" data-offer-id="<%= offer._id %>" data-bs-toggle="modal" data-bs-target="#editOfferModal">
                     <i class="fas fa-edit"></i>
                   </button>
                   <button class="btn-action toggle-status <%= offer.status === 'Active' ? 'btn-deactivate' : 'btn-activate' %>"
@@ -765,6 +130,28 @@
             <% }) %>
           </tbody>
         </table>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-content-between align-items-center mt-4 px-4 pb-3">
+          <div class="text-muted">
+            Showing page <%= currentPage %> of <%= totalPages %>
+          </div>
+          <nav>
+            <ul class="pagination mb-0">
+              <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                <a class="page-link" href="/admin/offers?page=<%= currentPage - 1 %>">Previous</a>
+              </li>
+              <% for(let i = 1; i <= totalPages; i++) { %>
+                <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                  <a class="page-link" href="/admin/offers?page=<%= i %>"><%= i %></a>
+                </li>
+              <% } %>
+              <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                <a class="page-link" href="/admin/offers?page=<%= currentPage + 1 %>">Next</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
       </div>
     </main>
   </div>
@@ -780,14 +167,9 @@
         <div class="modal-body">
           <form id="addOfferForm">
             <div class="mb-3">
-              <label class="form-label">Offer Name</label>
-              <input type="text" 
-                     class="form-control" 
-                     name="name" 
-                     pattern="^[A-Za-z0-9- ]{2,50}$"
-                     title="Offer name can contain letters, numbers, spaces, and hyphens (2-50 characters)"
-                     required>
-              <div class="invalid-feedback">Please enter a valid offer name (2-50 characters)</div>
+              <label for="offerName" class="form-label">Offer Name</label>
+              <input type="text" class="form-control" id="offerName" name="name" required>
+              <div class="error" id="error-name"></div>
             </div>
             <div class="mb-3">
               <label class="form-label">Offer Type</label>
@@ -796,58 +178,46 @@
                 <option value="Product">Product</option>
                 <option value="Category">Category</option>
               </select>
+              <div class="error" id="error-type"></div>
             </div>
             <div class="mb-3">
-              <label class="form-label">Discount Percentage</label>
-              <input type="number" class="form-control" name="discount" min="0" max="100" required>
+              <label for="offerDiscount" class="form-label">Discount (%)</label>
+              <input type="number" class="form-control" id="offerDiscount" name="discount" required min="1" max="99">
+              <div class="error" id="error-discount"></div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Start Date</label>
-              <input type="date" class="form-control" name="startDate" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">End Date</label>
-              <input type="date" class="form-control" name="endDate" required>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="offerStartDate" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="offerStartDate" name="startDate" required>
+                <div class="error" id="error-startDate"></div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="offerEndDate" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="offerEndDate" name="endDate" required>
+                <div class="error" id="error-endDate"></div>
+              </div>
             </div>
             <div class="mb-3" id="productSelect" style="display: none;">
               <label class="form-label">Select Product</label>
-              <% if (products && products.length > 0) { %>
-                <select class="form-select" name="productTarget" required>
-                  <option value="">Select a product</option>
-                  <% products.forEach(product => { %>
-                    <option value="<%= product._id %>"><%= product.name %></option>
-                  <% }) %>
-                </select>
-                <div class="form-text text-muted">Only active products are shown</div>
-              <% } else { %>
-                <div class="alert alert-warning">
-                  <i class="bi bi-exclamation-triangle"></i>
-                  No active products available. Please add a product first.
-                </div>
-              <% } %>
+              <select class="form-select" name="productTarget">
+                <option value="">Select a product</option>
+                <% products.forEach(product => { %><option value="<%= product._id %>"><%= product.name %></option><% }) %>
+              </select>
+              <div class="error" id="error-productTarget"></div>
             </div>
             <div class="mb-3" id="categorySelect" style="display: none;">
               <label class="form-label">Select Category</label>
-              <% if (categories && categories.length > 0) { %>
-                <select class="form-select" name="categoryTarget" required>
-                  <option value="">Select a category</option>
-                  <% categories.forEach(category => { %>
-                    <option value="<%= category._id %>"><%= category.name %></option>
-                  <% }) %>
-                </select>
-                <div class="form-text text-muted">Only active categories are shown</div>
-              <% } else { %>
-                <div class="alert alert-warning">
-                  <i class="bi bi-exclamation-triangle"></i>
-                  No active categories available. Please create a category first.
-                </div>
-              <% } %>
+              <select class="form-select" name="categoryTarget">
+                <option value="">Select a category</option>
+                <% categories.forEach(category => { %><option value="<%= category._id %>"><%= category.name %></option><% }) %>
+              </select>
+              <div class="error" id="error-categoryTarget"></div>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" onclick="submitOffer()">Create Offer</button>
+          <button type="button" class="btn btn-primary" id="addOfferButton">Create Offer</button>
         </div>
       </div>
     </div>
@@ -863,17 +233,11 @@
         </div>
         <div class="modal-body">
           <form id="editOfferForm">
-            <input type="hidden" name="offerId" id="editOfferId">
+            <input type="hidden" id="editOfferId" name="offerId">
             <div class="mb-3">
-              <label class="form-label">Offer Name</label>
-              <input type="text" 
-                     class="form-control" 
-                     name="name" 
-                     id="editOfferName"
-                     pattern="^[A-Za-z0-9- ]{2,50}$"
-                     title="Offer name can contain letters, numbers, spaces, and hyphens (2-50 characters)"
-                     required>
-              <div class="invalid-feedback">Please enter a valid offer name (2-50 characters)</div>
+              <label for="editOfferName" class="form-label">Offer Name</label>
+              <input type="text" class="form-control" id="editOfferName" name="name" required>
+              <div class="error" id="edit-error-name"></div>
             </div>
             <div class="mb-3">
               <label class="form-label">Offer Type</label>
@@ -882,51 +246,245 @@
                 <option value="Product">Product</option>
                 <option value="Category">Category</option>
               </select>
+              <div class="error" id="edit-error-type"></div>
             </div>
             <div class="mb-3">
-              <label class="form-label">Discount Percentage</label>
-              <input type="number" class="form-control" name="discount" id="editOfferDiscount" min="0" max="100" required>
+              <label for="editOfferDiscount" class="form-label">Discount (%)</label>
+              <input type="number" class="form-control" id="editOfferDiscount" name="discount" required min="1" max="99">
+              <div class="error" id="edit-error-discount"></div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Start Date</label>
-              <input type="date" class="form-control" name="startDate" id="editOfferStartDate" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">End Date</label>
-              <input type="date" class="form-control" name="endDate" id="editOfferEndDate" required>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="editOfferStartDate" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="editOfferStartDate" name="startDate" required>
+                <div class="error" id="edit-error-startDate"></div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="editOfferEndDate" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="editOfferEndDate" name="endDate" required>
+                <div class="error" id="edit-error-endDate"></div>
+              </div>
             </div>
             <div class="mb-3" id="editProductSelect" style="display: none;">
               <label class="form-label">Select Product</label>
-              <% if (products && products.length > 0) { %>
-                <select class="form-select" name="productTarget" id="editProductTarget">
-                  <option value="">Select a product</option>
-                  <% products.forEach(product => { %>
-                    <option value="<%= product._id %>"><%= product.name %></option>
-                  <% }) %>
-                </select>
-                <div class="form-text text-muted">Only active products are shown</div>
-              <% } %>
+              <select class="form-select" name="productTarget" id="editProductTarget">
+                <option value="">Select a product</option>
+                <% products.forEach(product => { %><option value="<%= product._id %>"><%= product.name %></option><% }) %>
+              </select>
+              <div class="error" id="edit-error-productTarget"></div>
             </div>
             <div class="mb-3" id="editCategorySelect" style="display: none;">
               <label class="form-label">Select Category</label>
-              <% if (categories && categories.length > 0) { %>
-                <select class="form-select" name="categoryTarget" id="editCategoryTarget">
-                  <option value="">Select a category</option>
-                  <% categories.forEach(category => { %>
-                    <option value="<%= category._id %>"><%= category.name %></option>
-                  <% }) %>
-                </select>
-                <div class="form-text text-muted">Only active categories are shown</div>
-              <% } %>
+              <select class="form-select" name="categoryTarget" id="editCategoryTarget">
+                <option value="">Select a category</option>
+                <% categories.forEach(category => { %><option value="<%= category._id %>"><%= category.name %></option><% }) %>
+              </select>
+              <div class="error" id="edit-error-categoryTarget"></div>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" onclick="updateOffer()">Update Offer</button>
+          <button type="button" class="btn btn-primary" id="updateOfferButton">Update Offer</button>
         </div>
       </div>
     </div>
   </div>
+
+  <script>
+    function showFieldErrors(errors, formPrefix = '') {
+      for (const [field, message] of Object.entries(errors)) {
+        const fieldName = (field === 'productTarget' || field === 'categoryTarget') ? 'target' : field;
+        const errorDiv = document.getElementById(`${formPrefix}error-${fieldName}`);
+        const input = document.querySelector(`#${formPrefix.slice(0,-1)}OfferForm [name="${field}"]`);
+        if (input) input.classList.add('input-error');
+        if (errorDiv) errorDiv.textContent = message;
+      }
+    }
+    function clearFieldErrors(formId) {
+      const form = document.getElementById(formId);
+      if (!form) return;
+      form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+      form.querySelectorAll('.error').forEach(el => el.textContent = '');
+    }
+    function clearFieldError(field) {
+      field.classList.remove('input-error');
+      const errorDiv = field.nextElementSibling;
+      if (errorDiv && errorDiv.classList.contains('error')) {
+        errorDiv.textContent = '';
+      }
+    }
+    function setupRealtimeValidation(formId) {
+      const form = document.getElementById(formId);
+      if (!form) return;
+      form.querySelectorAll('input, select').forEach(field => {
+        const eventType = field.tagName === 'SELECT' ? 'change' : 'input';
+        field.addEventListener(eventType, () => clearFieldError(field));
+      });
+    }
+    function validateOffer(data) {
+      const errors = {};
+      if (!data.name.trim()) errors.name = 'Offer name is required.';
+      if (!data.type) errors.type = 'Offer type is required.';
+      if (!data.productTarget && !data.categoryTarget) errors.target = 'An offer target is required.';
+      if (!data.discount) errors.discount = 'Discount is required.';
+      if (data.discount < 1 || data.discount > 99) errors.discount = 'Discount must be between 1 and 99.';
+      if (!data.startDate) errors.startDate = 'Start date is required.';
+      if (!data.endDate) errors.endDate = 'End date is required.';
+      if (data.startDate && data.endDate && new Date(data.endDate) < new Date(data.startDate)) {
+        errors.endDate = 'End date cannot be before the start date.';
+      }
+      return errors;
+    }
+    function setupOfferTypeChange(formId, prefix = '') {
+      const form = document.getElementById(formId);
+      if (!form) return;
+      const offerTypeSelect = form.querySelector('[name="type"]');
+      const productSelectDiv = form.querySelector(`#${prefix}productSelect`);
+      const categorySelectDiv = form.querySelector(`#${prefix}categorySelect`);
+      const productTarget = form.querySelector('[name="productTarget"]');
+      const categoryTarget = form.querySelector('[name="categoryTarget"]');
+      offerTypeSelect.addEventListener('change', function() {
+        const isProduct = this.value === 'Product';
+        productSelectDiv.style.display = isProduct ? 'block' : 'none';
+        categorySelectDiv.style.display = !isProduct ? 'block' : 'none';
+        if (productTarget) productTarget.required = isProduct;
+        if (categoryTarget) categoryTarget.required = !isProduct;
+        if (isProduct && categoryTarget) categoryTarget.value = '';
+        if (!isProduct && productTarget) productTarget.value = '';
+      });
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      setupOfferTypeChange('addOfferForm');
+      setupOfferTypeChange('editOfferForm', 'edit');
+      setupRealtimeValidation('addOfferForm');
+      setupRealtimeValidation('editOfferForm', 'edit-');
+      document.getElementById('addOfferButton').addEventListener('click', handleAddOffer);
+      document.getElementById('updateOfferButton').addEventListener('click', handleUpdateOffer);
+      document.querySelectorAll('.btn-edit').forEach(button => button.addEventListener('click', handleEditButtonClick));
+      document.querySelectorAll('.toggle-status').forEach(button => button.addEventListener('click', handleToggleStatus));
+    });
+    async function handleAddOffer() {
+      const form = document.getElementById('addOfferForm');
+      clearFieldErrors('addOfferForm');
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      const errors = validateOffer(data);
+      if (Object.keys(errors).length > 0) {
+        showFieldErrors(errors);
+        return;
+      }
+      const body = { ...data, targetModel: data.type, target: data.productTarget || data.categoryTarget };
+      delete body.productTarget;
+      delete body.categoryTarget;
+      try {
+        const response = await fetch('/admin/offers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const result = await response.json();
+        if (result.errors) showFieldErrors(result.errors);
+        else if (result.success || response.ok) Swal.fire({ title: 'Success!', text: result.message || 'Offer created!', icon: 'success' }).then(() => location.reload());
+        else Swal.fire({ title: 'Error!', text: result.message || 'Failed to create offer.', icon: 'error' });
+      } catch (err) {
+        Swal.fire({ title: 'Error!', text: 'An unexpected error occurred.', icon: 'error' });
+      }
+    }
+    async function handleUpdateOffer() {
+      const form = document.getElementById('editOfferForm');
+      clearFieldErrors('editOfferForm');
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      const offerId = data.offerId;
+      const errors = validateOffer(data);
+      if (Object.keys(errors).length > 0) {
+        showFieldErrors(errors, 'edit-');
+        return;
+      }
+      const body = { ...data, targetModel: data.type, target: data.productTarget || data.categoryTarget };
+      delete body.productTarget;
+      delete body.categoryTarget;
+      delete body.offerId;
+      try {
+        const response = await fetch(`/admin/offers/${offerId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const result = await response.json();
+        if (result.errors) showFieldErrors(result.errors, 'edit-');
+        else if (result.success || response.ok) Swal.fire({ title: 'Success!', text: result.message || 'Offer updated!', icon: 'success' }).then(() => location.reload());
+        else Swal.fire({ title: 'Error!', text: result.message || 'Failed to update offer.', icon: 'error' });
+      } catch (err) {
+        Swal.fire({ title: 'Error!', text: 'An unexpected error occurred.', icon: 'error' });
+      }
+    }
+    function handleEditButtonClick() {
+      const offersData = JSON.parse(document.getElementById('offers-data').textContent);
+      const offerId = this.dataset.offerId;
+      const offer = offersData.find(o => o._id === offerId);
+      if (!offer) return;
+      const form = document.getElementById('editOfferForm');
+      form.querySelector('[name="offerId"]').value = offer._id;
+      form.querySelector('[name="name"]').value = offer.name;
+      form.querySelector('[name="type"]').value = offer.type;
+      form.querySelector('[name="discount"]').value = offer.discount;
+      form.querySelector('[name="startDate"]').value = new Date(offer.startDate).toISOString().split('T')[0];
+      form.querySelector('[name="endDate"]').value = new Date(offer.endDate).toISOString().split('T')[0];
+      form.querySelector('[name="type"]').dispatchEvent(new Event('change'));
+      setTimeout(() => {
+        const targetId = offer.target?._id || offer.target;
+        if (offer.type === 'Product') form.querySelector('[name="productTarget"]').value = targetId;
+        else if (offer.type === 'Category') form.querySelector('[name="categoryTarget"]').value = targetId;
+      }, 0);
+    }
+    async function handleToggleStatus() {
+        const offerId = this.dataset.offerId;
+        const currentStatus = this.dataset.currentStatus === 'true';
+        const action = currentStatus ? 'deactivate' : 'activate';
+        const newStatus = currentStatus ? 'Inactive' : 'Active';
+
+        const result = await Swal.fire({
+            title: `Are you sure you want to ${action} this offer?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: `Yes, ${action} it!`,
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch(`/admin/offers/${offerId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    Swal.fire('Success!', `Offer has been ${action}d.`, 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error!', data.message || `Failed to ${action} the offer.`, 'error');
+                }
+            } catch (err) {
+                Swal.fire('Error!', 'An unexpected error occurred.', 'error');
+            }
+        }
+    }
+    function searchOffers() {
+      const searchTerm = document.getElementById('searchOffers').value.toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+      const rows = document.querySelectorAll('tbody tr');
+
+      rows.forEach(row => {
+        const name = row.cells[1].textContent.toLowerCase();
+        const statusText = row.querySelector('.status-badge').textContent.trim().toLowerCase();
+        
+        const matchesSearch = name.includes(searchTerm);
+        const matchesStatus = statusFilter === 'all' || statusText === statusFilter;
+        
+        row.style.display = matchesSearch && matchesStatus ? '' : 'none';
+      });
+    }
+  </script>
 </body>
 </html>

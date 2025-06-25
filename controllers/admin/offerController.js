@@ -10,13 +10,23 @@ export const getAllOffers = async (req, res) => {
             return res.redirect('/admin/login');
         }
 
-        // offers and populate target based on targetModel
+        const page = parseInt(req.query.page) || 1;
+        const limit = 10;
+        const skip = (page - 1) * limit;
+
+        // Get total number of offers for pagination
+        const totalOffers = await OfferModel.countDocuments();
+        const totalPages = Math.ceil(totalOffers / limit);
+
+        // Fetch paginated offers and populate target based on targetModel
         const offers = await OfferModel.find()
             .populate({
                 path: 'target',
                 refPath: 'targetModel'
             })
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
         
         //  only active products and categories, sorted by name
         const products = await ProductModel.find({ 
@@ -33,6 +43,8 @@ export const getAllOffers = async (req, res) => {
             offers,
             products,
             categories,
+            totalPages,
+            currentPage: page,
             path: '/admin/offers',
             admin: req.session.admin,
             error: req.flash('error'),

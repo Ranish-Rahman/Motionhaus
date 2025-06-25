@@ -54,12 +54,6 @@ export const getSalesReportPage = (req, res) => {
 // Fetch sales report data (AJAX)
 export const getSalesReport = async (req, res) => {
   try {
-    console.log('Sales Report Request:', {
-      query: req.query,
-      path: req.path,
-      method: req.method
-    });
-
     const { range, startDate, endDate, page = 1, limit = 10 } = req.query;
     let start, end;
 
@@ -81,76 +75,42 @@ export const getSalesReport = async (req, res) => {
       start = moment.tz(startDate, TIMEZONE).startOf('day');
       end = moment.tz(endDate, TIMEZONE).endOf('day');
     } else {
-      console.log('Invalid range or dates:', { range, startDate, endDate });
       return res.status(400).json({ error: 'Invalid range or dates' });
     }
 
-    console.log('Date Range:', {
-      start: start.format(),
-      end: end.format(),
-      timezone: TIMEZONE
-    });
-
-    // Get total count for pagination
-    const totalOrders = await Order.countDocuments({
+    const matchStage = {
       createdAt: { $gte: start.toDate(), $lte: end.toDate() },
       status: { $nin: ['Cancelled', 'Returned'] },
-    });
+    };
 
-    // Fetch orders in the date range with pagination
-    const orders = await Order.find({
-      createdAt: { $gte: start.toDate(), $lte: end.toDate() },
-      status: { $nin: ['Cancelled', 'Returned'] },
-    })
-    .populate('user', 'name email')
-    .populate('items.product', 'name')
-    .populate('coupon', 'code')
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limitNum);
-
-    console.log('Found Orders:', {
-      count: orders.length,
-      firstOrder: orders[0] ? {
-        id: orders[0]._id,
-        createdAt: orders[0].createdAt,
-        totalAmount: orders[0].totalAmount,
-        status: orders[0].status
-      } : null
-    });
-
-    // Calculate summary
-    let totalSales = 0;
-    let totalDiscount = 0;
-
-    for (const order of orders) {
-      totalSales += order.totalAmount || 0;
-      
-      // Calculate total discount from both coupon and product-level discounts
-      if (order.items) {
-        // Sum up product-level discounts
-        order.items.forEach(item => {
-          if (item.originalPrice && item.price) {
-            const itemDiscount = (item.originalPrice * item.quantity) - (item.price * item.quantity);
-            totalDiscount += itemDiscount;
-          }
-        });
-      }
-      
-      // Add coupon discount if present
-      if (order.coupon) {
-        const coupon = await Coupon.findById(order.coupon).lean();
-        if (coupon && coupon.discountAmount) {
-          totalDiscount += coupon.discountAmount;
+    // --- New Aggregation for Summary ---
+    const summaryData = await Order.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: "$totalAmount" },
+          totalDiscount: { $sum: { $ifNull: ["$discountAmount", 0] } },
+          totalOrders: { $sum: 1 }
         }
       }
-    }
+    ]);
 
-    console.log('Summary:', {
-      totalSales,
-      totalOrders,
-      totalDiscount
-    });
+    const summary = summaryData[0] || {
+      totalSales: 0,
+      totalDiscount: 0,
+      totalOrders: 0
+    };
+    // --- End New Aggregation ---
+
+    // Fetch orders for the current page
+    const orders = await Order.find(matchStage)
+      .populate('user', 'name email')
+      .populate('items.product', 'name')
+      .populate('coupon', 'code')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     // Prepare table data
     const tableData = orders.map(order => ({
@@ -163,23 +123,19 @@ export const getSalesReport = async (req, res) => {
     }));
 
     // Calculate pagination info
-    const totalPages = Math.ceil(totalOrders / limitNum);
+    const totalPages = Math.ceil(summary.totalOrders / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 
     res.json({
-      summary: {
-        totalSales,
-        totalOrders,
-        totalDiscount
-      },
+      summary,
       tableData,
       pagination: {
         currentPage: pageNum,
         totalPages,
         hasNextPage,
         hasPrevPage,
-        totalOrders,
+        totalOrders: summary.totalOrders,
         limit: limitNum
       }
     });

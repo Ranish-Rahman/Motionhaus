@@ -112,6 +112,10 @@
                 <p><strong>Invoice #:</strong> <%= order.orderID %></p>
                 <p><strong>Date:</strong> <%= new Date(order.orderDate).toLocaleDateString() %></p>
                 <p><strong>Status:</strong> <%= order.status %></p>
+                <p><strong>Payment Method:</strong> <%= order.paymentMethod === 'cod' ? 'Cash on Delivery' : 
+                                                      order.paymentMethod === 'razorpay' ? 'Razorpay' : 
+                                                      order.paymentMethod === 'wallet' ? 'Wallet' : 
+                                                      order.paymentMethod %></p>
             </div>
         </div>
 

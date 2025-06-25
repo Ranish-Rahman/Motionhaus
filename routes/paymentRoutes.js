@@ -5,6 +5,10 @@ import { getOrderSuccess, getOrderFailure } from '../controllers/user/userContro
 
 const router = express.Router();
 
+// Add middleware for larger request bodies specifically for payment routes
+router.use(express.json({ limit: '50mb' }));
+router.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 // Payment routes
 router.post('/create-razorpay-order', createRazorpayOrder);
 router.post('/verify-payment', verifyPayment);

@@ -173,7 +173,10 @@
         <% } %>
         <div class="info-item">
           <div class="info-label">Payment Method</div>
-          <div class="info-value"><%= order.paymentMethod === 'razorpay' ? 'Razorpay' : 'Cash on Delivery' %></div>
+          <div class="info-value"><%= order.paymentMethod === 'razorpay' ? 'Razorpay' : 
+                                    order.paymentMethod === 'wallet' ? 'Wallet' : 
+                                    order.paymentMethod === 'cod' ? 'Cash on Delivery' : 
+                                    order.paymentMethod %></div>
         </div>
       </div>
     </div>

@@ -528,19 +528,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
-    // Validation function for min and max amounts
-    function validateAmounts(minAmount, maxAmount) {
-        if (maxAmount && parseFloat(maxAmount) < parseFloat(minAmount)) {
-            Swal.fire({
-                title: 'Validation Error!',
-                text: 'Maximum order amount cannot be less than minimum order amount',
-                icon: 'error'
-            });
-            return false;
-        }
-        return true;
-    }
-
     // Generate random coupon code
     document.getElementById('generateCode').addEventListener('click', function() {
         const length = 8;
@@ -549,7 +536,7 @@
         for (let i = 0; i < length; i++) {
             code += chars.charAt(Math.floor(Math.random() * chars.length));
         }
-        document.querySelector('input[name="code"]').value = code;
+        document.querySelector('#addCouponForm input[name="code"]').value = code;
     });
 
     // Create coupon
@@ -558,78 +545,73 @@
         clearFieldErrors();
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+        const errors = {};
 
-        // Client-side validation for code field
+        // --- Client-side Validation ---
         if (!data.code || data.code.trim() === '') {
             Swal.fire({
                 title: 'Missing Code!',
                 text: 'Please provide or generate a coupon code.',
                 icon: 'warning'
             });
-            return;
+            return; // Hard stop for this specific error
         }
 
-        // Validate min and max amounts
-        const minAmount = data.minAmount;
-        const maxAmount = data.maxAmount;
-        if (!validateAmounts(minAmount, maxAmount)) {
-            showFieldErrors({ maxAmount: 'Maximum order amount cannot be less than minimum order amount' });
-            return;
+        // Required fields
+        if (!data.value) errors.value = 'Value is required.';
+        if (!data.minAmount) errors.minAmount = 'Minimum order amount is required.';
+        if (!data.validFrom) errors.validFrom = 'Valid from date is required.';
+        if (!data.validUntil) errors.validUntil = 'Valid until date is required.';
+
+        // Business logic validation
+        const minAmount = parseFloat(data.minAmount);
+        const maxAmount = parseFloat(data.maxAmount);
+
+        if (!isNaN(minAmount) && !isNaN(maxAmount) && maxAmount < minAmount) {
+            errors.maxAmount = 'Maximum order amount cannot be less than minimum.';
         }
 
-        // Prevent Fixed coupon with value 0
-        if (data.type === 'Fixed' && parseFloat(data.value) === 0) {
-            showFieldErrors({ value: 'Fixed discount value must be greater than 0' });
-            return;
-        }
-
-        // Validate Percentage coupon: value must be between 1 and 100
-        if (data.type === 'Percentage') {
+        if (data.type === 'Fixed') {
+            const fixedValue = parseFloat(data.value);
+            if (fixedValue === 0) {
+                errors.value = 'Fixed discount must be greater than 0.';
+            } else if (!isNaN(fixedValue) && !isNaN(minAmount) && fixedValue >= minAmount) {
+                errors.value = 'Fixed discount must be less than the minimum order amount.';
+            }
+        } else if (data.type === 'Percentage') {
             const percentValue = parseFloat(data.value);
             if (percentValue < 1 || percentValue > 100) {
-                showFieldErrors({ value: 'Percentage discount must be between 1 and 100' });
-                return;
+                errors.value = 'Percentage must be between 1 and 100.';
+            }
+            if (percentValue >= 50 && minAmount < 100) {
+                errors.minAmount = 'For discounts of 50% or more, minimum order must be at least ₹100.';
             }
         }
 
-        // Validate Fixed amount coupons
-        if (data.type === 'Fixed' && parseFloat(data.value) >= parseFloat(data.minAmount)) {
-            showFieldErrors({ value: 'Fixed discount must be less than the minimum order amount' });
+        if (Object.keys(errors).length > 0) {
+            showFieldErrors(errors);
             return;
         }
 
-        // Validate Percentage coupon: if value >= 50, minAmount >= 100
-        if (data.type === 'Percentage' && parseFloat(data.value) >= 50 && parseFloat(data.minAmount) < 100) {
-            showFieldErrors({ minAmount: 'For percentage discounts of 50% or more, minimum order amount must be at least ₹100' });
-            return;
-        }
+        // --- End Validation ---
 
         try {
             const response = await fetch('/admin/coupons', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-
             const result = await response.json();
-
             if (result.errors) {
                 showFieldErrors(result.errors);
-                return;
-            }
-
-            if (result.success) {
+            } else if (result.success) {
                 Swal.fire({
                     title: 'Success!',
                     text: 'Coupon created successfully',
                     icon: 'success',
                     timer: 2000,
                     showConfirmButton: false
-                }).then(() => {
-                    location.reload();
-                });
+                }).then(() => location.reload());
             } else {
                 Swal.fire({
                     title: 'Error!',
@@ -686,89 +668,74 @@
         const formData = new FormData(form);
         const couponId = formData.get('couponId');
         const data = Object.fromEntries(formData.entries());
+        const errors = {};
 
-        // Client-side validation for code field (for safety, though it's readonly)
-        if (!data.code || data.code.trim() === '') {
-            showFieldErrors({ code: 'Coupon Code is required' }, 'edit-');
+        // --- Client-side Validation ---
+        if (!couponId) {
+            Swal.fire({ title: 'Error!', text: 'Coupon ID is missing', icon: 'error' });
             return;
         }
+        
+        // Required fields
+        if (!data.value) errors.value = 'Value is required.';
+        if (!data.minAmount) errors.minAmount = 'Minimum order amount is required.';
+        if (!data.validFrom) errors.validFrom = 'Valid from date is required.';
+        if (!data.validUntil) errors.validUntil = 'Valid until date is required.';
 
-        // Validate min and max amounts
-        const minAmount = data.minAmount;
-        const maxAmount = data.maxAmount;
-        if (!validateAmounts(minAmount, maxAmount)) {
-            showFieldErrors({ maxAmount: 'Maximum order amount cannot be less than minimum order amount' }, 'edit-');
-            return;
+        // Business logic validation
+        const minAmount = parseFloat(data.minAmount);
+        const maxAmount = parseFloat(data.maxAmount);
+
+        if (!isNaN(minAmount) && !isNaN(maxAmount) && maxAmount < minAmount) {
+            errors.maxAmount = 'Maximum order amount cannot be less than minimum.';
         }
 
-        // Prevent Fixed coupon with value 0
-        if (data.type === 'Fixed' && parseFloat(data.value) === 0) {
-            showFieldErrors({ value: 'Fixed discount value must be greater than 0' }, 'edit-');
-            return;
-        }
-
-        // Validate Percentage coupon: value must be between 1 and 100
-        if (data.type === 'Percentage') {
+        if (data.type === 'Fixed') {
+            const fixedValue = parseFloat(data.value);
+            if (fixedValue === 0) {
+                errors.value = 'Fixed discount must be greater than 0.';
+            } else if (!isNaN(fixedValue) && !isNaN(minAmount) && fixedValue >= minAmount) {
+                errors.value = 'Fixed discount must be less than the minimum order amount.';
+            }
+        } else if (data.type === 'Percentage') {
             const percentValue = parseFloat(data.value);
             if (percentValue < 1 || percentValue > 100) {
-                showFieldErrors({ value: 'Percentage discount must be between 1 and 100' }, 'edit-');
-                return;
+                errors.value = 'Percentage must be between 1 and 100.';
+            }
+            if (percentValue >= 50 && minAmount < 100) {
+                errors.minAmount = 'For discounts of 50% or more, minimum order must be at least ₹100.';
             }
         }
 
-        // Validate Fixed amount coupons
-        if (data.type === 'Fixed' && parseFloat(data.value) >= parseFloat(data.minAmount)) {
-            showFieldErrors({ value: 'Fixed discount must be less than the minimum order amount' }, 'edit-');
+        if (Object.keys(errors).length > 0) {
+            showFieldErrors(errors, 'edit-');
             return;
         }
 
-        // Validate Percentage coupon: if value >= 50, minAmount >= 100
-        if (data.type === 'Percentage' && parseFloat(data.value) >= 50 && parseFloat(data.minAmount) < 100) {
-            showFieldErrors({ minAmount: 'For percentage discounts of 50% or more, minimum order amount must be at least ₹100' }, 'edit-');
-            return;
-        }
-
-        if (!couponId) {
-            Swal.fire({
-                title: 'Error!',
-                text: 'Coupon ID is missing',
-                icon: 'error'
-            });
-            return;
-        }
+        // --- End Validation ---
 
         delete data.couponId;
 
         try {
             const response = await fetch(`/admin/coupons/${couponId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
 
             const result = await response.json();
 
-            // If there are field errors, show them under the fields
             if (result.errors) {
                 showFieldErrors(result.errors, 'edit-');
-                return;
-            }
-
-            // If update was successful
-            if (result.success) {
+            } else if (result.success) {
                 Swal.fire({
                     title: 'Success!',
                     text: 'Coupon updated successfully',
                     icon: 'success',
                     timer: 2000,
                     showConfirmButton: false
-                }).then(() => {
-                    location.reload();
-                });
+                }).then(() => location.reload());
             } else {
-                // For any other error, show a general popup
                 Swal.fire({
                     title: 'Error!',
                     text: result.message || 'Failed to update coupon',
@@ -865,6 +832,36 @@
             }
         });
     });
+
+    // --- Real-time Validation ---
+    function clearFieldError(fieldName, formPrefix = '') {
+        const input = document.querySelector(`#${formPrefix}CouponForm [name="${fieldName}"]`);
+        const errorDiv = document.getElementById(`${formPrefix}error-${fieldName}`);
+
+        if (input && input.classList.contains('input-error')) {
+            input.classList.remove('input-error');
+        }
+        if (errorDiv) {
+            errorDiv.textContent = '';
+        }
+    }
+
+    function setupRealtimeValidation(formId, formPrefix = '') {
+        const form = document.getElementById(formId);
+        if (!form) return;
+
+        form.querySelectorAll('input, select, textarea').forEach(field => {
+            const eventType = field.tagName === 'SELECT' ? 'change' : 'input';
+            field.addEventListener(eventType, () => {
+                // As the user types or makes a selection, clear the error for that specific field.
+                clearFieldError(field.name, formPrefix);
+            });
+        });
+    }
+
+    // Setup real-time validation for both forms on page load
+    setupRealtimeValidation('addCouponForm');
+    setupRealtimeValidation('editCouponForm', 'edit-');
 
     // Update maxAmount min attribute when minAmount changes
     function setupAmountValidation(formId) {

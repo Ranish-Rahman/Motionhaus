@@ -507,6 +507,10 @@
                 <p><strong>Date:</strong> ${order.formattedDate || new Date(order.orderDate).toLocaleDateString()}</p>
                 <p><strong>Status:</strong> ${order.status}</p>
                 <p><strong>Payment Status:</strong> ${order.paymentStatus}</p>
+                <p><strong>Payment Method:</strong> ${order.paymentMethod === 'cod' ? 'Cash on Delivery' : 
+                                                      order.paymentMethod === 'razorpay' ? 'Razorpay' : 
+                                                      order.paymentMethod === 'wallet' ? 'Wallet' : 
+                                                      order.paymentMethod}</p>
                 <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
                 ${order.originalAmount && order.originalAmount > order.totalAmount ? 
                   `<p><strong>Original Amount:</strong> <span class="text-decoration-line-through">₹${order.originalAmount.toFixed(2)}</span></p>

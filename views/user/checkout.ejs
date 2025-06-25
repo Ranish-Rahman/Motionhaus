@@ -1294,7 +1294,9 @@
                   const finalItemPrice = Math.round((itemSubtotal - itemDiscount) * 100) / 100;
                   
                   return {
-                    ...item,
+                    product: item.product._id, // Only send product ID instead of full object
+                    quantity: item.quantity,
+                    size: item.size,
                     originalPrice: item.product.price,
                     price: finalItemPrice / item.quantity,
                     discountAmount: itemDiscount
@@ -1310,6 +1312,14 @@
                 body: JSON.stringify(orderPayload),
                 credentials: 'same-origin'
               });
+
+              if (!createOrderResponse.ok) {
+                if (createOrderResponse.status === 413) {
+                  throw new Error('Order data is too large. Please try with fewer items or contact support.');
+                }
+                const errorData = await createOrderResponse.json();
+                throw new Error(errorData.message || 'Failed to create order');
+              }
 
               const razorpayOrder = await createOrderResponse.json();
               if (!razorpayOrder.success) {
