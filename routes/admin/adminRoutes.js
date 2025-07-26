@@ -52,6 +52,7 @@ import { isAdmin } from '../../middleware/authMiddleware.js';
 import couponRoutes from './couponRoutes.js';
 import salesReportRoutes from './sales-report.js';
 import Coupon from '../../models/couponModel.js';
+import { getDashboard } from '../../controllers/admin/dashboardController.js';
 
 const router = express.Router();
 
@@ -81,7 +82,7 @@ router.get('/logout', (req, res) => {
 router.use(isAdmin);
 
 // Protected routes
-router.get('/dashboard', dashboard);
+router.get('/dashboard', getDashboard);
 router.get('/customers', customers);
 router.get('/products', getProducts);
 router.get('/categories', getCategories);
@@ -102,6 +103,7 @@ router.get('/categories/add', getAddCategory);
 router.post('/categories/add', addCategory);
 router.get('/categories/edit/:id', getEditCategory);
 router.post('/categories/edit/:id', editCategory);
+router.post('/categories/delete/:id', softDeleteCategory); // for HTML form
 router.delete('/categories/:id', softDeleteCategory);
 router.post('/categories/:id/restore', restoreCategory);
 

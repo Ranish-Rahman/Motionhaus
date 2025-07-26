@@ -16,9 +16,20 @@ export const getWallet = async (req, res) => {
 
         const userId = req.session.user._id;
 
-        // Get user's transactions
+        // Add pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10; // Number of transactions per page
+        const skip = (page - 1) * limit;
+
+        // Get total count of transactions
+        const totalTransactions = await Transaction.countDocuments({ user: userId });
+        const totalPages = Math.ceil(totalTransactions / limit);
+
+        // Get user's transactions with pagination
         const transactions = await Transaction.find({ user: userId })
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
         // Get user data
         const user = await User.findById(userId);
@@ -35,6 +46,10 @@ export const getWallet = async (req, res) => {
             title: 'My Wallet',
             user: user,
             transactions,
+            pageNumber: page,
+            totalPages,
+            totalTransactions,
+            limit,
             currentPage: 'wallet'
         });
     } catch (error) {

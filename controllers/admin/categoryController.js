@@ -233,6 +233,7 @@ export const editCategory = async (req, res) => {
 
 // Soft delete category
 export const softDeleteCategory = async (req, res) => {
+     console.log('softDeleteCategory hit');
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             req.flash('error', 'Invalid category ID');
