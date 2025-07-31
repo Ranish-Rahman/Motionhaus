@@ -556,9 +556,9 @@
                   <tbody>
                     ${order.items.map(item => {
                       // Calculate the actual price paid for this item
-                      const actualPrice = item.price;
-                      // Get the original product price
-                      const originalPrice = item.product?.price || actualPrice;
+                      const actualPrice = item.paidPrice || item.price;
+                      // Get the original price
+                      const originalPrice = item.originalPrice || item.price;
                       // Calculate discount percentage if there's a difference
                       const discountPercent = originalPrice > actualPrice ? 
                         Math.round(((originalPrice - actualPrice) / originalPrice) * 100) : 0;

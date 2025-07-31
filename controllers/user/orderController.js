@@ -9,6 +9,7 @@ import razorpay from '../../utils/razorpay.js';
 import Transaction from '../../models/transactionModel.js';
 import { addRefund } from './walletController.js';
 import Coupon from '../../models/couponModel.js';
+import { processReferralReward } from '../../utils/referralCodeGenerator.js';
 
 // Place Order function
 export const placeOrder = async (req, res) => {
@@ -29,6 +30,18 @@ export const placeOrder = async (req, res) => {
     // For COD and Wallet, data comes from checkoutData
     // For Razorpay, it comes from pendingOrder after verification
     const sourceData = req.session.pendingOrder || req.session.checkoutData;
+    
+    if (!sourceData) {
+        console.error('Source data for order creation is missing.');
+        return res.status(400).json({ success: false, message: 'Your session has expired. Please try again.' });
+    }
+
+    if(paymentMethod === 'cod' && sourceData.finalAmount > 1000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cash on Delivery is not allowed for orders above ₹1000. Please choose a different payment method.'
+      })
+    }
     
     if (!sourceData) {
         console.error('Source data for order creation is missing.');
@@ -110,25 +123,34 @@ export const placeOrder = async (req, res) => {
     }
 
     // 4. Create the new order using checkoutData from session
-    const order = new Order({
-      orderID,
-      user: userId,
-      items: checkoutItems.map(item => ({
-        product: item.product,
-        quantity: item.quantity,
-        price: item.price,
-        originalPrice: item.originalPrice,
-        size: item.size
-      })),
-      totalAmount: sourceData.totalAmount || sourceData.finalAmount,
-      originalAmount: sourceData.originalAmount || sourceData.cartTotal,
-      discountAmount: sourceData.discountAmount || sourceData.totalDiscount,
-      coupon: couponId,
-      shippingAddress: mappedShippingAddress,
-      paymentMethod,
-      paymentStatus: 'pending',
+const order = new Order({
+  orderID,
+  user: userId,
+  items: checkoutItems.map(item => {
+    // Calculate proportional discount for each item
+    const itemShare = item.price / sourceData.cartTotal;
+    const itemDiscount = sourceData.totalDiscount * itemShare;
+    
+    return {
+      product: item.product,
+      quantity: item.quantity,
+      price: item.price,               // Original price
+      paidPrice: item.price - itemDiscount, // Actual paid price
+      discountApplied: itemDiscount,   // Exact discount applied
+      originalPrice: item.originalPrice,
+      size: item.size,
       status: 'Pending'
-    });
+    }
+  }),
+  totalAmount: sourceData.finalAmount,    // After discounts
+  originalAmount: sourceData.cartTotal,   // Before discounts
+  discountAmount: sourceData.totalDiscount, // Total discount
+  coupon: couponId,
+  shippingAddress: mappedShippingAddress,
+  paymentMethod,
+  paymentStatus: 'pending',
+  status: 'Pending'
+});
 
     // If payment was with Razorpay, add payment details and update status
     if (paymentMethod === 'razorpay') {
@@ -145,7 +167,23 @@ export const placeOrder = async (req, res) => {
         req.session.orderId = savedOrder._id; // Store new order ID in session
         console.log('Order created successfully with unified calculation:', orderID);
 
-        // 5. Decrease stock after successful order creation
+        // 5. Process referral reward if user was referred
+        const user = await User.findById(userId);
+        if (user && user.referredBy) {
+          try {
+            const referralResult = await processReferralReward(user.referredBy, finalAmount);
+            console.log('Referral reward processed:', {
+              referrer: user.referredBy,
+              rewardAmount: referralResult.rewardAmount,
+              orderAmount: finalAmount
+            });
+          } catch (referralError) {
+            console.error('Error processing referral reward:', referralError);
+            // Don't fail the order if referral reward fails
+          }
+        }
+
+        // 6. Decrease stock after successful order creation
         for (const item of checkoutItems) {
           await Product.updateOne({
             _id: item.product,
@@ -157,7 +195,7 @@ export const placeOrder = async (req, res) => {
           });
         }
 
-        // 6. Clear user cart and session data
+        // 7. Clear user cart and session data
         await Cart.findOneAndDelete({ user: userId });
         delete req.session.checkoutData;
         delete req.session.pendingOrder; // Also clear any pending razorpay orders
@@ -310,8 +348,46 @@ export const cancelOrderItem = async (req, res) => {
       });
     }
 
-    // Calculate refund amount for the item
-    const refundAmount = item.price * item.quantity;
+    // Calculate refund amount for the item using the same logic as approveItemReturn
+    let refundAmount;
+    let calculationMethod;
+
+    // Method 1: Use stored paidPrice if available (most accurate)
+    if (item.paidPrice !== undefined && item.paidPrice !== null) {
+      refundAmount = item.paidPrice * item.quantity;
+      calculationMethod = 'paidPrice';
+    }
+    // Special case: If single item order with discount applied
+    else if (order.items.length === 1 && 
+             order.discountAmount > 0 && 
+             order.totalAmount !== order.originalAmount) {
+      refundAmount = order.totalAmount;
+      calculationMethod = 'singleItemAdjustedPrice';
+    }
+    // Method 2: Calculate proportional discount for multi-item orders
+    else if (order.discountAmount > 0) {
+      // Calculate item's proportion of the total order value
+      const itemValueProportion = item.price / order.originalAmount;
+      // Apply the same proportion of discount
+      const itemDiscount = order.discountAmount * itemValueProportion;
+      refundAmount = (item.price - itemDiscount) * item.quantity;
+      calculationMethod = 'proportionalDiscount';
+    }
+    // Method 3: No discount was applied
+    else {
+      refundAmount = item.price * item.quantity;
+      calculationMethod = 'fullPrice';
+    }
+    
+    // Ensure refund amount is not negative and is properly rounded
+    refundAmount = Math.max(0, Math.round(refundAmount * 100) / 100);
+    
+    console.log('Cancellation Refund Calculation:', {
+      orderId: order._id,
+      itemId: item._id,
+      calculationMethod,
+      refundAmount
+    });
 
     // Process refund to wallet if payment was made
     if (order.paymentStatus === 'paid' && ['razorpay', 'wallet', 'cod'].includes(order.paymentMethod)) {
@@ -446,29 +522,110 @@ export const approveItemReturn = async (req, res) => {
   try {
     const { orderId, itemId } = req.params;
     
-    const order = await Order.findById(orderId).populate('items.product');
+    // 1. Find the order with necessary populated data
+    const order = await Order.findById(orderId)
+      .populate('items.product')
+      .populate('coupon')
+      .populate('user');
+
+    // 2. Validate order exists
     if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+      console.error(`Order not found: ${orderId}`);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
     }
 
-    // Find the specific item
+    // 3. Find the specific item
     const item = order.items.id(itemId);
     if (!item) {
-      return res.status(404).json({ success: false, message: 'Item not found in order' });
+      console.error(`Item not found in order: ${itemId}`);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Item not found in order' 
+      });
     }
 
-    // Check if item has a pending return request
+    // 4. Validate return request status
     if (!item.returnRequest || item.returnRequest.status !== 'pending') {
+      console.error('No pending return request', {
+        orderId,
+        itemId,
+        currentStatus: item.returnRequest?.status
+      });
       return res.status(400).json({ 
         success: false, 
         message: 'No pending return request found for this item' 
       });
     }
 
-    // Calculate refund amount for the item
-    const refundAmount = item.price * item.quantity;
+    // 5. Validate item is in returnable state
+    if (item.status !== 'Delivered') {
+      console.error('Item not in returnable state', {
+        currentStatus: item.status
+      });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Only delivered items can be returned' 
+      });
+    }
 
-    // Process refund to wallet
+    // ===== REFUND CALCULATION =====
+    let refundAmount;
+    let calculationMethod;
+
+    // Method 1: Use stored paidPrice if available (most accurate)
+    if (item.paidPrice !== undefined && item.paidPrice !== null) {
+      refundAmount = item.paidPrice * item.quantity;
+      calculationMethod = 'paidPrice';
+    }
+    // Special case: If single item order with discount applied
+    else if (order.items.length === 1 && 
+             order.discountAmount > 0 && 
+             order.totalAmount !== order.originalAmount) {
+      refundAmount = order.totalAmount;
+      calculationMethod = 'singleItemAdjustedPrice';
+    }
+    // Method 2: Calculate proportional discount for multi-item orders
+    else if (order.discountAmount > 0) {
+      // Calculate item's proportion of the total order value
+      const itemValueProportion = item.price / order.originalAmount;
+      // Apply the same proportion of discount
+      const itemDiscount = order.discountAmount * itemValueProportion;
+      refundAmount = (item.price - itemDiscount) * item.quantity;
+      calculationMethod = 'proportionalDiscount';
+    }
+    // Method 3: No discount was applied
+    else {
+      refundAmount = item.price * item.quantity;
+      calculationMethod = 'fullPrice';
+    }
+    
+    // Ensure refund amount is not negative and is properly rounded
+    refundAmount = Math.max(0, Math.round(refundAmount * 100) / 100);
+
+    // Debug logs
+   console.log('Refund Calculation Details:', {
+  orderId: order._id,
+  itemId: item._id,
+  originalPrice: item.price,
+  originalOrderAmount: order.originalAmount, // Add this
+  itemPaidPrice: item.paidPrice, // Add this
+  quantity: item.quantity,
+  couponApplied: !!order.coupon,
+  couponCode: order.coupon?.code,
+  orderTotal: order.totalAmount,
+  orderDiscount: order.discountAmount,
+  calculationMethod,
+  specialCaseApplied: calculationMethod === 'singleItemAdjustedPrice', // Add this line
+  refundAmount,
+  // Add these for complete verification:
+  priceVsOriginal: item.price === order.originalAmount,
+  isSingleItem: order.items.length === 1
+});
+
+    // 6. Process refund to wallet
     try {
       await addRefund(
         order.user,
@@ -477,40 +634,59 @@ export const approveItemReturn = async (req, res) => {
         order._id
       );
     } catch (refundError) {
-      console.error('Error processing refund:', refundError);
+      console.error('Refund processing failed:', {
+        error: refundError.message,
+        userId: order.user._id,
+        amount: refundAmount
+      });
       return res.status(500).json({
         success: false,
-        message: 'Failed to process refund'
+        message: 'Failed to process refund payment'
       });
     }
 
-    // Update item status
-    item.status = 'returned';
+    // 7. Update item status
+    item.status = 'Returned';
     item.returnRequest.status = 'approved';
     item.returnRequest.processedAt = new Date();
+    item.returnRequest.amount = refundAmount;
 
-    // Check if all items are returned
-    const allItemsReturned = order.items.every(item => item.status === 'returned');
+    // 8. Check if all items are returned
+    const allItemsReturned = order.items.every(i => 
+      i.status === 'Returned' || i.status === 'Cancelled'
+    );
+    
     if (allItemsReturned) {
-      order.status = 'returned';
+      order.status = 'Returned';
+      order.paymentStatus = 'refunded';
     }
 
-    // Save the updated order
+    // 9. Save changes
     await order.save();
 
+    // 10. Return success response
     return res.json({ 
       success: true, 
-      message: 'Return request approved and refund processed',
-      order: {
-        status: order.status,
-        items: order.items
+      message: 'Return approved and refund processed',
+      data: {
+        orderId: order.orderID,
+        itemId: item._id,
+        refundAmount,
+        newWalletBalance: order.user.wallet?.balance,
+        orderStatus: order.status
       }
     });
+
   } catch (error) {
-    console.error('Approve return error:', error);
-    res.status(500).json({
+    console.error('Approve return error:', {
+      error: error.message,
+      stack: error.stack,
+      params: req.params
+    });
+    return res.status(500).json({
       success: false,
-      message: 'Failed to approve return'
+      message: 'Failed to approve return',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

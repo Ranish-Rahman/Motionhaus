@@ -453,10 +453,35 @@ export const verifyPayment = async (req, res) => {
             // This is a new order - create it
             console.log('[Debug] Creating new order for payment');
             
+            // --- PATCH: Distribute discount and set finalPrice ---
+            let items = pendingOrder.items;
+            const discountAmount = pendingOrder.discountAmount || 0;
+            if (discountAmount > 0 && items && items.length > 0) {
+                const subtotal = items.reduce((sum, item) => sum + (item.originalPrice || item.price) * item.quantity, 0);
+                items = items.map(item => {
+                    const itemSubtotal = (item.originalPrice || item.price) * item.quantity;
+                    const itemShare = itemSubtotal / subtotal;
+                    const itemDiscount = discountAmount * itemShare;
+                    const paidPrice = ((item.originalPrice || item.price) * item.quantity - itemDiscount) / item.quantity;
+                    return {
+                        ...item,
+                        originalPrice: item.originalPrice || item.price,
+                        finalPrice: Number(paidPrice.toFixed(2)),
+                    };
+                });
+            } else if (items && items.length > 0) {
+                items = items.map(item => ({
+                    ...item,
+                    originalPrice: item.originalPrice || item.price,
+                    finalPrice: item.price
+                }));
+            }
+            // --- END PATCH ---
+
             order = await Order.create({
                 orderID: orderIdToSearch,
                 user: userId,
-                items: pendingOrder.items,
+                items,
                 totalAmount: pendingOrder.totalAmount,
                 originalAmount: pendingOrder.originalAmount,
                 discountAmount: pendingOrder.discountAmount,

@@ -288,14 +288,15 @@
                                             </td>
                                             <td>
                                                 <div>
-                                                    ₹<%= item.price.toFixed(2) %>
-                                                    <% if (item.originalPrice && item.originalPrice > item.price) { %>
-                                                        <br><small class="text-decoration-line-through text-muted">₹<%= item.originalPrice.toFixed(2) %></small>
-                                                        <br><small class="text-success">-₹<%= (item.originalPrice - item.price).toFixed(2) %></small>
+                                                    <% if (item.finalPrice !== undefined && item.finalPrice < item.originalPrice) { %>
+                                                        <span style="text-decoration: line-through; color: #888;">₹<%= item.originalPrice.toFixed(2) %></span>
+                                                        <span style="color: #000; font-weight: bold;">₹<%= item.finalPrice.toFixed(2) %></span>
+                                                    <% } else { %>
+                                                        ₹<%= (item.finalPrice !== undefined ? item.finalPrice : item.price).toFixed(2) %>
                                                     <% } %>
                                                 </div>
                                             </td>
-                                            <td>₹<%= (item.price * item.quantity).toFixed(2) %></td>
+                                            <td>₹<%= ((item.finalPrice !== undefined ? item.finalPrice : item.price) * item.quantity).toFixed(2) %></td>
                                             <td>
                                                 <span class="badge bg-<%= 
                                                     item.status === 'Pending' ? 'warning' : 

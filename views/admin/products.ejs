@@ -422,8 +422,8 @@
                   <td><%= product.name %></td>
                   <td>₹<%= product.price.toFixed(2) %></td>
                   <td>
-                    <span class="stock-badge <%= product.stock > 10 ? 'stock-in' : product.stock > 0 ? 'stock-low' : 'stock-out' %>">
-                      <%= product.stock %>
+                    <span class="stock-badge <%= (product.sizes && product.sizes.reduce((sum, s) => sum + s.quantity, 0) > 10) ? 'stock-in' : (product.sizes && product.sizes.reduce((sum, s) => sum + s.quantity, 0) > 0) ? 'stock-low' : 'stock-out' %>">
+                      <%= product.sizes && product.sizes.length > 0 ? product.sizes.reduce((sum, s) => sum + s.quantity, 0) : 0 %>
                     </span>
                   </td>
                   <td>

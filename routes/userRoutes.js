@@ -33,7 +33,10 @@ import {
   cancelRazorpayOrder,
   getOrderSuccess,
   getOrderFailure,
-  createOrder
+  createOrder,
+  getReferralStats,
+  checkReferralCodeValidity,
+  getMyReferralCode
 } from '../controllers/user/userController.js';
 import { 
   requestReturn, 
@@ -141,6 +144,11 @@ router.get('/checkout', getCheckout);
 router.post('/checkout', createOrder);
 router.get('/profile/change-password', getChangePassword);
 router.post('/profile/change-password', postChangePassword);
+
+// Referral API routes
+router.get('/api/referral/stats', getReferralStats);
+router.post('/api/referral/check', checkReferralCodeValidity);
+router.get('/api/referral/my-code', getMyReferralCode);
 
 // Add password rules endpoint
 router.get('/api/password-rules', (req, res) => {

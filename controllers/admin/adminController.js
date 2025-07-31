@@ -644,6 +644,7 @@ export const getOrderDetails = async (req, res) => {
     order.items = order.items.map(item => ({
       ...item,
       originalPrice: item.originalPrice || item.price,
+      paidPrice: item.paidPrice || (item.price - (item.discountApplied || 0)),
       discountApplied: item.originalPrice ? 
         Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100) : 0
     }));
@@ -738,11 +739,22 @@ export const processReturn = async (req, res) => {
 
     // Process refund based on method
     if (refundMethod === 'wallet') {
-      // Add amount to user's wallet
-      const user = await User.findById(order.user._id);
-      user.walletBalance = (user.walletBalance || 0) + refundAmount;
-      await user.save();
-      console.log(`Added ${refundAmount} to user's wallet`);
+      // Add amount to user's wallet using the addRefund function
+      try {
+        await addRefund(
+          order.user._id,
+          refundAmount,
+          `Refund for returned order #${order.orderID}`,
+          order._id
+        );
+        console.log(`Added ${refundAmount} to user's wallet`);
+      } catch (refundError) {
+        console.error('Error processing refund:', refundError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to process refund'
+        });
+      }
     } else {
       // Process refund through original payment method
       console.log(`Processing refund of ₹${refundAmount} through original payment method`);
@@ -847,11 +859,16 @@ export const updateReturnRequest = async (req, res) => {
 
         // If approved, update user's wallet
         if (action === 'approved') {
-            const user = await User.findById(order.user);
-            if (user) {
-                user.wallet = (user.wallet || 0) + order.totalAmount;
-                await user.save();
+            try {
+                await addRefund(
+                    order.user,
+                    order.totalAmount,
+                    `Refund for returned order #${order.orderID}`,
+                    order._id
+                );
                 console.log(`Updated user wallet: Added ₹${order.totalAmount}`);
+            } catch (refundError) {
+                console.error('Error processing refund:', refundError);
             }
         }
 
@@ -923,11 +940,16 @@ export const processReturnRequest = async (req, res) => {
 
     // If approved, update user's wallet
     if (status === 'approved') {
-      const user = await User.findById(order.user);
-      if (user) {
-        user.wallet = (user.wallet || 0) + order.totalAmount;
-        await user.save();
+      try {
+        await addRefund(
+          order.user,
+          order.totalAmount,
+          `Refund for returned order #${order.orderID}`,
+          order._id
+        );
         console.log(`Updated user wallet: Added ₹${order.totalAmount}`);
+      } catch (refundError) {
+        console.error('Error processing refund:', refundError);
       }
     }
     
@@ -970,7 +992,7 @@ export const processItemReturn = async (req, res) => {
     }
 
     // Validate return amount
-    const itemTotal = item.price * item.quantity;
+    const itemTotal = (item.paidPrice ?? item.finalPrice ?? item.price) * item.quantity;
     if (returnAmount > itemTotal) {
       return res.status(400).json({
         success: false,
@@ -1042,7 +1064,7 @@ export const approveItemReturn = async (req, res) => {
     }
 
     // Calculate refund amount
-    const refundAmount = item.returnRequest.amount || (item.price * item.quantity);
+    const refundAmount = item.returnRequest.amount || ((item.paidPrice ?? item.finalPrice ?? item.price) * item.quantity);
 
     // Process refund to wallet
     try {

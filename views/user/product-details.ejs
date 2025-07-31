@@ -764,14 +764,20 @@
     }
 
     function addToCart() {
+      console.log('addToCart function called');
+      
       // Check if product is blocked
       const isBlocked = document.getElementById('isBlocked').value === 'true';
+      console.log('isBlocked:', isBlocked);
+      
       if (isBlocked) {
         alert('This product is currently unavailable and cannot be added to your cart.');
         return;
       }
       
       const size = document.getElementById('sizeSelect').value;
+      console.log('selected size:', size);
+      
       if (!size) {
         alert('Please select a size');
         return;
@@ -779,6 +785,8 @@
       
       const quantity = document.getElementById('quantity').value;
       const productId = '<%= product._id %>';
+      
+      console.log('sending request with:', { productId, size, quantity });
       
       fetch('/cart/add', {
         method: 'POST',
@@ -791,11 +799,17 @@
           quantity
         })
       })
-      .then(response => response.json())
+      .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+      })
       .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
+          console.log('Success! Redirecting to cart...');
           window.location.href = '/cart';
         } else {
+          console.log('Failed:', data.message);
           alert(data.message || 'Failed to add item to cart');
         }
       })

@@ -13,6 +13,13 @@ import razorpay from '../../utils/razorpay.js';
 import { nanoid } from 'nanoid';
 import { getBestOffer } from './productController.js';
 import { calculateCartTotals } from '../../utils/cartHelper.js';
+import Coupon from '../../models/couponModel.js';
+import { 
+  generateReferralCode, 
+  checkReferralCode, 
+  processReferralReward 
+} from '../../utils/referralCodeGenerator.js';
+import Transaction from '../../models/transactionModel.js';
 
 // Render signup page
 const signUpPage = (req, res) => {
@@ -53,11 +60,12 @@ const postSignup = async (req, res) => {
       delete req.session.tempUser;
     }
 
-    const { username, email, password } = req.body;
+    const { username, email, password, referralCode } = req.body;
 
     console.log(" Signup request received:");
     console.log("   ↳ Username:", username);
     console.log("   ↳ Email:", email);
+    console.log("   ↳ Referral Code:", referralCode);
 
     //Validate username
     if (!username || !/^[a-zA-Z]{3,10}$/.test(username.trim())) {
@@ -87,7 +95,7 @@ const postSignup = async (req, res) => {
       });
     }
 
-    //  Check for existing user
+    // Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       console.log(" Email already registered:", email);
@@ -97,24 +105,40 @@ const postSignup = async (req, res) => {
       });
     }
 
-    //  Generate OTP
+    // Validate referral code if provided
+    let referrerId = null;
+    if (referralCode && referralCode.trim()) {
+      const referralCheck = await checkReferralCode(referralCode.trim());
+      if (!referralCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: referralCheck.message
+        });
+      }
+      referrerId = referralCheck.referrer;
+      console.log(" Valid referral code provided, referrer:", referralCheck.referrerUsername);
+    }
+
+    // Generate OTP
     const otp = generateOTP();
 
     console.log(" OTP Generated:", otp);
 
-    //  Save new user temporarily in session
+    // Save new user temporarily in session
     req.session.tempUser = {
       username: username.trim(),
       email,
       password, // Store plain password, model will hash it
       otp,
       expiresAt: Date.now() + 2 * 60 * 1000, // 2 minutes
-      attempts: 0
+      attempts: 0,
+      referralCode: referralCode ? referralCode.trim() : null,
+      referrerId
     };
 
     console.log("Temp user saved in session");
 
-    //  Send OTP email
+    // Send OTP email
     console.log(" Sending OTP email to:", email);
     await sendOTPEmail(email, otp);
 
@@ -172,19 +196,27 @@ const verifyOTP = async (req, res) => {
       });
     }
 
+    // Generate unique referral code for the new user
+    const referralCode = await generateReferralCode(tempUser.username);
+
     // Create new user with plain password (model will hash it)
     const newUser = new User({
       username: tempUser.username,
       email: tempUser.email,
-      password: tempUser.password // Plain password, model will hash it
+      password: tempUser.password, // Plain password, model will hash it
+      referralCode,
+      referredBy: tempUser.referrerId || null
     });
 
     await newUser.save();
     delete req.session.tempUser;
 
+    console.log(" New user created with referral code:", referralCode);
+
     return res.json({
       success: true,
-      message: "Account created successfully!"
+      message: "Account created successfully!",
+      referralCode
     });
 
   } catch (error) {
@@ -545,7 +577,23 @@ const getCart = async (req, res) => {
         error: req.flash('error')
       });
     }
+    
+    for(const item of cart.items){
+      const product = item.product;
+      if(!product) continue;
 
+      const basePrice = product.price;
+      const bestOffer = await getBestOffer(product._id);
+
+      if(bestOffer) {
+        const discountAmount = (basePrice * bestOffer.discount) / 100;
+        item.price = basePrice - discountAmount;
+      }else{
+        item.price = basePrice;
+      }
+    }
+
+    await cart.save()
     // Use the centralized calculator to get all totals
     const cartData = await calculateCartTotals(cart, getBestOffer);
 
@@ -565,30 +613,56 @@ const getCart = async (req, res) => {
   }
 };
 
-// Get profile page
-const getProfile = async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
+// Ensure user has a referral code
+const ensureReferralCode = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return null;
+    
+    // If user doesn't have a referral code, generate one
+    if (!user.referralCode) {
+      const referralCode = await generateReferralCode(user.username);
+      await User.findByIdAndUpdate(userId, { referralCode });
+      console.log(`Generated referral code "${referralCode}" for user "${user.username}"`);
+      return referralCode;
+    }
+    
+    return user.referralCode;
+  } catch (error) {
+    console.error('Error ensuring referral code:', error);
+    return null;
   }
+};
+
+// Render profile page
+const getProfile = async (req, res) => {
   try {
     const userId = req.session.user._id;
+    
+    // Ensure user has a referral code
+    await ensureReferralCode(userId);
+    
+    // Get fresh user data with referral code
     const user = await User.findById(userId);
-
-    if (!user) {
-      req.flash('error', 'User not found');
-      return res.redirect('/login');
-    }
-
+    
+    // Get real order count
+    const orderCount = await Order.countDocuments({ user: userId });
+    
+    // Get real address count
+    const addressCount = await Address.countDocuments({ userId: userId });
+    
     res.render('user/user-profile', {
-      user,
-      success: req.flash('success'),
-      error: req.flash('error'),
-      currentPage: 'profile'
+      title: 'Profile',
+      user: user,
+      orderCount: orderCount,
+      addressCount: addressCount
     });
   } catch (error) {
-    console.error('Error fetching user profile:', error);
-    req.flash('error', 'Failed to load profile');
-    res.redirect('/login');
+    console.error('Error in getProfile:', error);
+    res.status(500).render('error', {
+      title: 'Error',
+      message: 'Failed to load profile page'
+    });
   }
 };
 
@@ -1164,6 +1238,20 @@ const getCheckout = async (req, res) => {
       return res.redirect('/cart');
     }
 
+    // Fetch all valid coupons
+    const now = new Date();
+    const availableCoupons = await Coupon.find({
+      isActive: true,
+      validFrom: { $lte: now },
+      validUntil: { $gte: now },
+      $expr: {
+        $or: [
+          { $eq: ["$usageLimit", null] },
+          { $lt: ["$usageCount", "$usageLimit"] }
+        ]
+      }
+    }).lean();
+
     // Use the centralized calculator to get all totals
     // IMPORTANT: Ensure the cart is fully populated before calculating
     const populatedCart = await Cart.findById(cart._id).populate(['items.product', 'coupon']);
@@ -1193,7 +1281,8 @@ const getCheckout = async (req, res) => {
         ...cartData
       },
       addresses,
-      user: await User.findById(userId).lean()
+      user: await User.findById(userId).lean(),
+      availableCoupons // Pass to view
     });
   } catch (error) {
     console.error('Error getting checkout page:', error);
@@ -2107,6 +2196,29 @@ const createOrder = async (req, res) => {
     const discountAmount = checkoutData.cartTotal - checkoutData.finalAmount; // Calculate the actual total discount (offer + coupon)
     const verifiedFinalAmount = checkoutData.finalAmount;
 
+    // Distribute coupon discount proportionally to each item
+    let items = checkoutData.items;
+    if (discountAmount > 0 && items && items.length > 0) {
+      const subtotal = items.reduce((sum, item) => sum + (item.originalPrice || item.price) * item.quantity, 0);
+      items = items.map(item => {
+        const itemSubtotal = (item.originalPrice || item.price) * item.quantity;
+        const itemShare = itemSubtotal / subtotal;
+        const itemDiscount = discountAmount * itemShare;
+        const paidPrice = ((item.originalPrice || item.price) * item.quantity - itemDiscount) / item.quantity;
+        return {
+          ...item,
+          originalPrice: item.originalPrice || item.price,
+          finalPrice: Number(paidPrice.toFixed(2)),
+        };
+      });
+    } else if (items && items.length > 0) {
+      items = items.map(item => ({
+        ...item,
+        originalPrice: item.originalPrice || item.price,
+        finalPrice: item.price
+      }));
+    }
+
     // Create unique order ID
     const orderID = `ORD-${Date.now()}-${nanoid(6)}`;
 
@@ -2137,12 +2249,12 @@ const createOrder = async (req, res) => {
       // Store complete order data in session
       req.session.pendingOrder = {
         orderID,
-        razorpayOrderId: razorpayOrder.id,
+        razorpayOrderId: razorpayOrder && razorpayOrder.id,
         totalAmount: verifiedFinalAmount,
         originalAmount,
         discountAmount,
         couponCode: checkoutData.couponCode,
-        items: checkoutData.items,
+        items,
         shippingAddress: addressId ? await Address.findById(addressId) : null,
         userId
       };
@@ -2189,6 +2301,126 @@ const createOrder = async (req, res) => {
   }
 };
 
+
+
+// Get referral statistics for a user
+const getReferralStats = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    const userId = req.session.user._id;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get users referred by this user
+    const referredUsers = await User.find({ referredBy: userId })
+      .select('username email createdAt')
+      .sort({ createdAt: -1 });
+
+    // Get total referral rewards earned
+    const totalReferralRewards = user.referralRewards || 0;
+
+    // Get referrer information if user was referred
+    let referrerInfo = null;
+    if (user.referredBy) {
+      const referrer = await User.findById(user.referredBy).select('username');
+      if (referrer) {
+        referrerInfo = {
+          username: referrer.username,
+          referralCode: referrer.referralCode
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        referralCode: user.referralCode,
+        referredUsers: referredUsers.length,
+        totalReferralRewards,
+        referredUsersList: referredUsers,
+        referrerInfo
+      }
+    });
+  } catch (error) {
+    console.error('Error getting referral stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get referral statistics'
+    });
+  }
+};
+
+// Check if a referral code is valid
+const checkReferralCodeValidity = async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Referral code is required'
+      });
+    }
+
+    const result = await checkReferralCode(code);
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('Error checking referral code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check referral code'
+    });
+  }
+};
+
+// Get user's referral code for sharing
+const getMyReferralCode = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    const user = await User.findById(req.session.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      referralCode: user.referralCode,
+      username: user.username
+    });
+  } catch (error) {
+    console.error('Error getting referral code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get referral code'
+    });
+  }
+};
+
 export {
   signUpPage,
   getLogin,
@@ -2217,6 +2449,9 @@ export {
   sendProfileOTP,
   verifyProfileOTP,
   getProfileData,
-  createOrder
+  createOrder,
+  getReferralStats,
+  checkReferralCodeValidity,
+  getMyReferralCode
 };
 

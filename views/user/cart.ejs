@@ -290,6 +290,47 @@
     .applied-coupon.hidden {
       display: none;
     }
+
+    /* Enhanced error styling for quantity limits */
+    .quantity-error {
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 12px;
+      color: #c53030;
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 4px rgba(197, 48, 48, 0.1);
+    }
+
+    .quantity-error::before {
+      content: "⚠️";
+      font-size: 16px;
+    }
+
+    .quantity-error.show {
+      display: flex;
+    }
+
+    .quantity-error.hide {
+      display: none;
+    }
+
+    /* Warning styling for quantity controls */
+    .quantity-controls {
+      position: relative;
+    }
+
+    .quantity-controls.warning {
+      border: 2px solid #f56565;
+      border-radius: 8px;
+      padding: 4px;
+      background: #fff5f5;
+    }
   </style>
 </head>
 <body>
@@ -364,7 +405,7 @@
           <div style="color: #e74c3c; font-size: 14px; margin-top: 8px; font-weight: 500;">This item is no longer available</div>
         <% } %>
       </div>
-      <div style="display: flex; align-items: center; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 16px;" class="quantity-controls">
         <button class="quantity-btn" 
                 onclick="updateQuantity('<%= item.product._id %>', -1)" 
                 style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #eee; background: #fafafa; font-size: 20px;"
@@ -391,6 +432,9 @@
         <span title="Remove">&#128465;</span>
       </button>
     </div>
+
+    <!-- Enhanced error message display -->
+    <div class="quantity-error hide" id="error-<%= item.product._id %>"></div>
   <% } %>
 <% }) %>
 
@@ -462,25 +506,51 @@
       const newValue = parseInt(input.value);
       const maxStock = parseInt(input.getAttribute('max'));
       const maxLimit = 3; // Maximum limit per product
+      const errorElement = document.getElementById(`error-${itemId}`);
+      const quantityControls = input.closest('.quantity-controls');
+      
+      // Clear previous errors
+      if(errorElement) {
+        errorElement.classList.remove('show');
+        errorElement.classList.add('hide');
+        errorElement.textContent = '';
+      }
+      
+      // Remove warning styling
+      if(quantityControls) {
+        quantityControls.classList.remove('warning');
+      }
       
       if (newValue > maxLimit) {
-        Swal.fire({
-          title: 'Maximum Limit Reached',
-          text: `You can only add up to ${maxLimit} items of this product`,
-          icon: 'warning',
-          confirmButtonColor: '#000'
-        });
+        // Show enhanced error message
+        if(errorElement) {
+          errorElement.classList.remove('hide');
+          errorElement.classList.add('show');
+          errorElement.textContent = `Maximum limit reached! You can only add up to ${maxLimit} items of this product`;
+        }
+        
+        // Add warning styling to quantity controls
+        if(quantityControls) {
+          quantityControls.classList.add('warning');
+        }
+        
         input.value = maxLimit;
         return;
       }
       
       if (newValue > maxStock) {
-        Swal.fire({
-          title: 'Stock Limit Reached',
-          text: `Only ${maxStock} items available in stock`,
-          icon: 'warning',
-          confirmButtonColor: '#000'
-        });
+        // Show enhanced error message
+        if(errorElement) {
+          errorElement.classList.remove('hide');
+          errorElement.classList.add('show');
+          errorElement.textContent = `Only ${maxStock} items available in stock`;
+        }
+        
+        // Add warning styling to quantity controls
+        if(quantityControls) {
+          quantityControls.classList.add('warning');
+        }
+        
         input.value = maxStock;
         return;
       }
@@ -494,15 +564,52 @@
       const currentValue = parseInt(input.value);
       const maxStock = parseInt(input.getAttribute('max'));
       const maxLimit = 3; // Maximum limit per product
-      const newValue = Math.max(1, Math.min(Math.min(maxStock, maxLimit), currentValue + change));
+      const errorElement = document.getElementById(`error-${itemId}`);
+      const quantityControls = input.closest('.quantity-controls');
+      const newValue = currentValue + change;
       
-      if (newValue !== currentValue) {
+      // Clear previous errors
+      if(errorElement) {
+        errorElement.classList.remove('show');
+        errorElement.classList.add('hide');
+        errorElement.textContent = '';
+      }
+      
+      // Remove warning styling
+      if(quantityControls) {
+        quantityControls.classList.remove('warning');
+      }
+      
+      if(newValue > maxStock || newValue > maxLimit) {
+        if(errorElement) {
+          errorElement.classList.remove('hide');
+          errorElement.classList.add('show');
+          
+          if(newValue > maxStock) {
+            errorElement.textContent = `Only ${maxStock} items available in stock`;
+          } else {
+            errorElement.textContent = `Maximum limit reached! You can only add up to ${maxLimit} items of this product`;
+          }
+        }
+        
+        // Add warning styling to quantity controls
+        if(quantityControls) {
+          quantityControls.classList.add('warning');
+        }
+        
+        return;
+      }
+      
+      const finalQuantity = Math.max(1, newValue);
+
+
+      if (finalQuantity !== currentValue) {
         fetch(`/cart/update/${itemId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ quantity: newValue })
+          body: JSON.stringify({ quantity: finalQuantity })
         })
         .then(response => response.json())
         .then(data => {
@@ -524,7 +631,7 @@
             const stockStatus = input.closest('.cart-item').querySelector('.stock-status');
             if (stockStatus) {
               const stockAvailable = parseInt(input.getAttribute('max'));
-              const isOutOfStock = stockAvailable < newValue;
+              const isOutOfStock = stockAvailable < finalQuantity;
               stockStatus.className = isOutOfStock ? 'out-of-stock' : 'in-stock';
             }
           } else {

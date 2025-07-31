@@ -96,6 +96,20 @@ export const createCoupon = async (req, res) => {
             });
         }
 
+        if(type ==='Percentage' && (value <=0 || value >=100)){
+            return res.status(400).json({
+                success: false,
+                message: 'For percentage discounts, value must be between 1 and 99'
+            })
+        }
+
+        if(type === 'Percentage' && !maxAmount){
+            return res.status(400).json({
+                success: false,
+                message: 'Max discount amount is required for percentage coupons'
+            })
+        }
+
         // Check if coupon code already exists
         const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
         if (existingCoupon) {
@@ -190,17 +204,25 @@ export const updateCoupon = async (req, res) => {
 
         // Validate fixed amount coupon value on update
         const currentCoupon = await Coupon.findById(id);
-        if (currentCoupon) {
-            const newType = updateData.type || currentCoupon.type;
-            const newValue = updateData.value || currentCoupon.value;
-            const newMinAmount = updateData.minAmount || currentCoupon.minAmount;
+        // Always define these, even if currentCoupon is null
+        const newType = updateData.type || (currentCoupon && currentCoupon.type);
+        const newValue = updateData.value || (currentCoupon && currentCoupon.value);
+        const newMinAmount = updateData.minAmount || (currentCoupon && currentCoupon.minAmount);
 
+        if (currentCoupon) {
             if (newType === 'Fixed' && Number(newValue) >= Number(newMinAmount)) {
                 return res.status(400).json({
                     success: false,
                     message: 'For a fixed discount, the value must be less than the minimum purchase amount.'
                 });
             }
+        }
+
+        if(newType === 'Percentage' && (newValue <= 0 || newValue >= 100)){
+            return res.status(400).json({
+                success: false,
+                message: 'For percentage discounts, value must be between 1 and 99'
+            })
         }
 
         const coupon = await Coupon.findByIdAndUpdate(

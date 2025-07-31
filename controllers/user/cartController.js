@@ -7,13 +7,20 @@ import { calculateCartTotals } from '../../utils/cartHelper.js';
 // Add to cart 
 export const addToCart = async (req, res) => {
   try {
+    console.log('=== ADD TO CART REQUEST ===');
+    console.log('Session user:', req.session.user);
+    console.log('Request body:', req.body);
+    
     if (!req.session.user) {
+      console.log('No user session found');
       return res.status(401).json({ success: false, message: 'Please login to add items to cart' });
     }
 
     const userId = req.session.user._id || req.session.user.id;
+    console.log('User ID:', userId);
 
     const { productId, size, quantity } = req.body;
+    console.log('Request data:', { productId, size, quantity });
 
     // Validate input
     if (!productId || !size || !quantity) {
@@ -73,9 +80,16 @@ export const addToCart = async (req, res) => {
       if (newQuantity > sizeObj.quantity) {
         return res.status(400).json({ success: false, message: 'Not enough stock available' });
       }
+      if(newQuantity > 3){
+        return res.status(400).json({success: false, message: 'You can only add up to 3 units of this product'})
+      }
       cart.items[existingItemIndex].quantity = newQuantity;
       cart.items[existingItemIndex].price = finalPrice; // Update price in case offer changed
     } else {
+
+       if(qty >3){
+        return res.status(400).json({ success: false, message: 'You can only add up to 3 units of this product'})
+       }
       // Add new item
       cart.items.push({
         product: product._id,
@@ -91,6 +105,9 @@ export const addToCart = async (req, res) => {
     // Populate product details for response
     await cart.populate('items.product');
 
+    console.log('=== ADD TO CART SUCCESS ===');
+    console.log('Cart saved successfully');
+    
     res.json({
       success: true,
       message: 'Item added to cart',

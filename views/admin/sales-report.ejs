@@ -164,39 +164,25 @@
         <button class="btn btn-custom" id="customBtn">Custom</button>
       </div>
 
-      <div class="row mb-4">
-        <div class="col-md-4">
-          <div class="card text-center mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Sales</h5>
-              <p class="card-text fs-4" id="totalSales">₹0</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="card text-center mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Orders</h5>
-              <p class="card-text fs-4" id="totalOrders">0</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="card text-center mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Discount</h5>
-              <p class="card-text fs-4" id="totalDiscount">₹0</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="card-title mb-3">Orders</h5>
+          <h5 class="card-title mb-3">Sales Report</h5>
           <div class="table-responsive">
             <table class="table table-dark table-striped align-middle">
+              <caption class="text-white">Summary</caption>
               <thead>
+                <tr>
+                  <th>Total Sales</th>
+                  <th>Total Orders</th>
+                  <th>Total Discount</th>
+                  <th colspan="4"></th>
+                </tr>
+                <tr>
+                  <td id="totalSales">₹0</td>
+                  <td id="totalOrders">0</td>
+                  <td id="totalDiscount">₹0</td>
+                  <td colspan="4"></td>
+                </tr>
                 <tr>
                   <th>Order ID</th>
                   <th>Date</th>
@@ -215,9 +201,7 @@
             <span class="pagination-info">
               Showing <span id="showingStart">0</span> to <span id="showingEnd">0</span> of <span id="totalOrders">0</span> orders
             </span>
-            <div id="paginationControls" class="d-flex gap-2">
-              <!-- Pagination buttons will be inserted here -->
-            </div>
+            <div id="paginationControls" class="d-flex gap-2"></div>
           </div>
         </div>
       </div>

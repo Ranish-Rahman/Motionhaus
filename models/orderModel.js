@@ -30,9 +30,13 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       required: true
     },
+     paidPrice: {  // NEW FIELD - store actual paid price per item
+    type: Number,
+    required: true
+    },
     discountApplied: {
       type: Number,
-      default: null
+      default: 0
     },
     size: String,
     status: {
@@ -211,5 +215,22 @@ orderSchema.methods.trackPaymentAttempt = function() {
   this.paymentDetails.lastPaymentAttempt = new Date();
 };
 
+orderSchema.methods.calculateItemRefund = function(itemId) {
+  const item = this.items.id(itemId);
+  if (!item) return 0;
+
+  // Use the stored paidPrice if available
+  if (item.paidPrice) {
+    return item.paidPrice * item.quantity;
+  }
+  
+  // Fallback calculation
+  if (this.coupon) {
+    const discountPerItem = this.discountAmount / this.items.length;
+    return (item.price - discountPerItem) * item.quantity;
+  }
+  
+  return item.price * item.quantity;
+};
 const Order = mongoose.model('Order', orderSchema);
 export default Order;
