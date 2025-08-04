@@ -182,15 +182,8 @@
             </div>
         <% } %>
 
-        <% if (order.items.some(item => { 
-            const sizeObj = item.product?.sizes?.find(s => Number(s.size) === Number(item.size));
-            return sizeObj && item.quantity > Math.min(sizeObj.quantity, 3);
-        })) { %>
-            <div class="stock-warning">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                Some items in your order exceed current stock limits or maximum allowed quantity (3 per item).
-                Please review your order quantities.
-            </div>
+        <% if (false) { %>
+            <!-- Stock warnings disabled for existing orders since items were already purchased -->
         <% } %>
 
         <div class="row">
@@ -233,43 +226,21 @@
                                                         <% 
                                                             const sizeObj = item.product?.sizes?.find(s => Number(s.size) === Number(item.size));
                                                             const stockAvailable = sizeObj ? sizeObj.quantity : 0;
-                                                            const maxAllowed = Math.min(stockAvailable, 3);
-                                                            const isOutOfStock = stockAvailable === 0;
-                                                            const isOverLimit = item.quantity > maxAllowed;
+                                                            // For existing orders, don't show out of stock warnings since items were already purchased
+                                                            const isOutOfStock = false; // Don't show out of stock for purchased items
+                                                            const isOverLimit = false; // Don't show over limit for purchased items
                                                         %>
                                                         <div class="stock-info">
-                                                            <% if (isOutOfStock) { %>
-                                                                <div class="stock-error">
-                                                                    <i class="bi bi-x-circle me-1"></i>
-                                                                    Out of Stock
-                                                                </div>
-                                                            <% } else if (isOverLimit) { %>
-                                                                <div class="stock-warning">
-                                                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                                                    Quantity exceeds limit
-                                                                    <span class="max-limit-badge">
-                                                                        Max: <%= maxAllowed %> units
-                                                                    </span>
-                                                                </div>
-                                                            <% } else { %>
-                                                                <small class="text-muted">
-                                                                    <%= stockAvailable %> units available
-                                                                    <span class="max-limit-badge">
-                                                                        Max per order: 3
-                                                                    </span>
-                                                                </small>
-                                                            <% } %>
+                                                            <small class="text-success">
+                                                                <i class="bi bi-check-circle me-1"></i>
+                                                                Purchased - Order confirmed
+                                                            </small>
                                                         </div>
                                     </div>
                                 </div>
                                             </td>
                                             <td>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <button class="btn btn-sm btn-outline-secondary" 
-                                                            onclick="updateQuantity('<%= item._id %>', -1)"
-                                                            <%= item.status === 'Delivered' ? 'disabled' : '' %>>
-                                                        −
-                                                    </button>
+                                              
                                                     <input type="number" 
                                                            class="form-control form-control-sm quantity-input" 
                                                            style="width: 60px;"
@@ -279,11 +250,7 @@
                                                            data-item-id="<%= item._id %>"
                                                            data-max-stock="<%= sizeObj ? sizeObj.quantity : 0 %>"
                                                            <%= item.status === 'Delivered' ? 'disabled' : '' %>>
-                                                    <button class="btn btn-sm btn-outline-secondary" 
-                                                            onclick="updateQuantity('<%= item._id %>', 1)"
-                                                            <%= item.status === 'Delivered' ? 'disabled' : '' %>>
-                                                        +
-                                                    </button>
+                                            
                                                 </div>
                                             </td>
                                             <td>
@@ -316,6 +283,7 @@
                                                     </button>
                                                 <% } else if (item.status === 'Delivered') { %>
                                                     <% if (!item.returnRequest || (item.returnRequest.status !== 'pending' && item.returnRequest.status !== 'approved' && item.returnRequest.status !== 'denied')) { %>
+                                                        <!-- Debug: order._id = <%= order._id %>, item._id = <%= item._id %> -->
                                                         <button class="btn btn-sm btn-warning request-return" 
                                                                 data-order-id="<%= order._id %>" 
                                                                 data-item-id="<%= item._id %>">
@@ -588,11 +556,26 @@
             }
         });
 
-        // Return request functionality
-        document.querySelectorAll('.request-return').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const orderId = e.target.closest('button').dataset.orderId;
-                const itemId = e.target.closest('button').dataset.itemId;
+        // Return request functionality - using event delegation
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.request-return')) {
+                const button = e.target.closest('.request-return');
+                const orderId = button.dataset.orderId;
+                const itemId = button.dataset.itemId;
+                
+                console.log('Return button clicked:', { orderId, itemId });
+                console.log('Button dataset:', button.dataset);
+                
+                if (!orderId || !itemId) {
+                    console.error('Missing orderId or itemId:', { orderId, itemId });
+                    Swal.fire({
+                        title: 'Error!',
+                        text: 'Missing order or item information',
+                        icon: 'error',
+                        confirmButtonColor: '#dc3545'
+                    });
+                    return;
+                }
                 
                 // Store the IDs in the modal for later use
                 document.getElementById('returnRequestModal').dataset.orderId = orderId;
@@ -600,7 +583,7 @@
                 
                 // Show the modal
                 new bootstrap.Modal(document.getElementById('returnRequestModal')).show();
-            });
+            }
         });
 
         // Handle return request submission
@@ -609,6 +592,9 @@
             const orderId = modal.dataset.orderId;
             const itemId = modal.dataset.itemId;
             const reason = document.getElementById('returnReason').value;
+
+            console.log('Submitting return request:', { orderId, itemId, reason });
+            console.log('Modal dataset:', modal.dataset);
 
             if (!reason) {
                 Swal.fire({
@@ -774,95 +760,9 @@
         });
 
         function checkStockLimits() {
-            // Get items data from the hidden input field
-            const orderItemsData = document.getElementById('orderItemsData');
-            const items = JSON.parse(orderItemsData.value);
-            const stockWarnings = [];
-
-            items.forEach(function(item) {
-                if (item.product && item.product.sizes) {
-                    const sizeObj = item.product.sizes.find(function(s) {
-                        return Number(s.size) === Number(item.size);
-                    });
-                    const stockAvailable = sizeObj ? sizeObj.quantity : 0;
-                    const maxAllowed = Math.min(stockAvailable, 3);
-
-                    if (stockAvailable === 0) {
-                        stockWarnings.push({
-                            product: item.product.name,
-                            size: item.size,
-                            type: 'out_of_stock',
-                            message: item.product.name + ' (Size ' + item.size + ') is out of stock'
-                        });
-                    } else if (item.quantity > maxAllowed) {
-                        stockWarnings.push({
-                            product: item.product.name,
-                            size: item.size,
-                            type: 'over_limit',
-                            current: item.quantity,
-                            max: maxAllowed,
-                            message: item.product.name + ' (Size ' + item.size + ') exceeds the maximum limit. Current: ' + item.quantity + ', Maximum allowed: ' + maxAllowed
-                        });
-                    }
-                }
-            });
-
-            if (stockWarnings.length > 0) {
-                var warningHtml = '<div class="stock-alerts">';
-                
-                // Group warnings by type
-                var outOfStock = stockWarnings.filter(function(w) { 
-                    return w.type === 'out_of_stock';
-                });
-                var overLimit = stockWarnings.filter(function(w) {
-                    return w.type === 'over_limit';
-                });
-
-                if (outOfStock.length > 0) {
-                    warningHtml += '<div class="alert-section">' +
-                        '<h6 class="text-danger"><i class="bi bi-x-circle"></i> Out of Stock Items:</h6>' +
-                        '<ul>' +
-                        outOfStock.map(function(w) {
-                            return '<li>' + w.message + '</li>';
-                        }).join('') +
-                        '</ul>' +
-                        '</div>';
-                }
-
-                if (overLimit.length > 0) {
-                    warningHtml += '<div class="alert-section">' +
-                        '<h6 class="text-warning"><i class="bi bi-exclamation-triangle"></i> Quantity Limit Exceeded:</h6>' +
-                        '<ul>' +
-                        overLimit.map(function(w) {
-                            return '<li>' + w.message + '</li>';
-                        }).join('') +
-                        '</ul>' +
-                        '</div>';
-                }
-
-                warningHtml += '</div>';
-
-                Swal.fire({
-                    title: 'Stock Warning',
-                    html: warningHtml,
-                    icon: 'warning',
-                    confirmButtonText: 'Review Order',
-                    showCancelButton: true,
-                    cancelButtonText: 'Dismiss',
-                    customClass: {
-                        container: 'stock-alert-container',
-                        popup: 'stock-alert-popup',
-                        content: 'stock-alert-content'
-                    }
-                }).then(function(result) {
-                    if (result.isConfirmed) {
-                        var firstWarningItem = document.querySelector('.stock-warning, .stock-error');
-                        if (firstWarningItem) {
-                            firstWarningItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }
-                });
-            }
+            // Disabled for existing orders since items were already purchased
+            // Stock warnings are not relevant for completed orders
+            return;
         }
 
         // Call the function when the page loads

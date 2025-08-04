@@ -1195,6 +1195,33 @@ export const updateOrderItemStatus = async (req, res) => {
     // Update only the status field of the specific item
     item.status = status;
 
+    // Check if all items are now delivered and update order status accordingly
+    const allItemsDelivered = order.items.every(item => item.status === 'Delivered');
+    const allItemsCancelled = order.items.every(item => item.status === 'Cancelled');
+    const allItemsReturned = order.items.every(item => item.status === 'Returned');
+
+    if (allItemsDelivered) {
+      order.status = 'Delivered';
+      // For COD orders, update payment status to 'paid' when delivered
+      if (order.paymentMethod === 'cod' && order.paymentStatus === 'pending') {
+        order.paymentStatus = 'paid';
+      }
+    } else if (allItemsCancelled) {
+      order.status = 'Cancelled';
+    } else if (allItemsReturned) {
+      order.status = 'Returned';
+    } else {
+      // If some items are delivered but not all, set to 'Shipped' or keep current status
+      const hasDeliveredItems = order.items.some(item => item.status === 'Delivered');
+      const hasShippedItems = order.items.some(item => item.status === 'Shipped');
+      
+      if (hasDeliveredItems || hasShippedItems) {
+        order.status = 'Shipped';
+      } else {
+        order.status = 'Pending';
+      }
+    }
+
     // Save with validation options
     await order.save({ validateModifiedOnly: true });
 

@@ -699,6 +699,10 @@ const getAddress = async (req, res) => {
 // Add new address
 const addAddress = async (req, res) => {
   if (!req.session.user) {
+    // Check if it's an AJAX request
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
     return res.redirect('/login');
   }
   
@@ -713,7 +717,7 @@ const addAddress = async (req, res) => {
       zipCode,
       country,
       addressType,
-      defaultAddress
+      isDefault
     } = req.body;
     
     // Server-side validation
@@ -724,8 +728,8 @@ const addAddress = async (req, res) => {
       validationErrors.push('Full name should contain only letters and spaces (2-50 characters)');
     }
     
-    // Validate phone number (10-15 digits, can include +, -, (, ), and spaces)
-    if (!phone || !/^[0-9+\s()-]{10,15}$/.test(phone)) {
+    // Validate phone number (10-15 digits only, as frontend strips non-numeric characters)
+    if (!phone || !/^[0-9]{10,15}$/.test(phone)) {
       validationErrors.push('Phone number should be 10-15 digits');
     }
     
@@ -759,10 +763,15 @@ const addAddress = async (req, res) => {
       validationErrors.push('Country is required');
     }
     
-    // If there are validation errors, redirect back with error messages
+    // If there are validation errors, handle based on request type
     if (validationErrors.length > 0) {
-      req.flash('error', validationErrors.join(', '));
-      return res.redirect('/profile/address');
+      const errorMessage = validationErrors.join(', ');
+      if (req.headers['content-type'] === 'application/json') {
+        return res.status(400).json({ success: false, message: errorMessage });
+      } else {
+        req.flash('error', errorMessage);
+        return res.redirect('/profile/address');
+      }
     }
     
     // Create new address
@@ -777,17 +786,32 @@ const addAddress = async (req, res) => {
       zipCode,
       country,
       addressType,
-      isDefault: defaultAddress === 'on'
+      isDefault: isDefault === true || isDefault === 'true' || isDefault === 'on'
     });
     
     await newAddress.save();
     
-    req.flash('success', 'Address added successfully');
-    res.redirect('/profile/address');
+    // Handle response based on request type
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Address added successfully',
+        address: newAddress
+      });
+    } else {
+      req.flash('success', 'Address added successfully');
+      res.redirect('/profile/address');
+    }
   } catch (error) {
     console.error('Error adding address:', error);
-    req.flash('error', 'Failed to add address. Please try again.');
-    res.redirect('/profile/address');
+    const errorMessage = 'Failed to add address. Please try again.';
+    
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(500).json({ success: false, message: errorMessage });
+    } else {
+      req.flash('error', errorMessage);
+      res.redirect('/profile/address');
+    }
   }
 };
 
@@ -866,8 +890,8 @@ const updateAddress = async (req, res) => {
       validationErrors.push('Full name should contain only letters and spaces (2-50 characters)');
     }
     
-    // Validate phone number (10-15 digits, can include +, -, (, ), and spaces)
-    if (!phone || !/^[0-9+\s()-]{10,15}$/.test(phone)) {
+    // Validate phone number (10-15 digits only, as frontend strips non-numeric characters)
+    if (!phone || !/^[0-9]{10,15}$/.test(phone)) {
       validationErrors.push('Phone number should be 10-15 digits');
     }
     
@@ -974,6 +998,10 @@ const deleteAddress = async (req, res) => {
 // Set address as default
 const setDefaultAddress = async (req, res) => {
   if (!req.session.user) {
+    // Check if it's an AJAX request
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
     return res.redirect('/login');
   }
   
@@ -987,20 +1015,36 @@ const setDefaultAddress = async (req, res) => {
     });
     
     if (!address) {
-      req.flash('error', 'Address not found');
-      return res.redirect('/profile/address');
+      const errorMessage = 'Address not found';
+      if (req.headers['content-type'] === 'application/json') {
+        return res.status(404).json({ success: false, message: errorMessage });
+      } else {
+        req.flash('error', errorMessage);
+        return res.redirect('/profile/address');
+      }
     }
     
     // Set this address as default (the pre-save hook will handle unsetting others)
     address.isDefault = true;
     await address.save();
     
-    req.flash('success', 'Default address updated successfully');
-    res.redirect('/profile/address');
+    const successMessage = 'Default address updated successfully';
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(200).json({ success: true, message: successMessage });
+    } else {
+      req.flash('success', successMessage);
+      res.redirect('/profile/address');
+    }
   } catch (error) {
     console.error('Error setting default address:', error);
-    req.flash('error', 'Failed to update default address. Please try again.');
-    res.redirect('/profile/address');
+    const errorMessage = 'Failed to update default address. Please try again.';
+    
+    if (req.headers['content-type'] === 'application/json') {
+      return res.status(500).json({ success: false, message: errorMessage });
+    } else {
+      req.flash('error', errorMessage);
+      res.redirect('/profile/address');
+    }
   }
 };
 

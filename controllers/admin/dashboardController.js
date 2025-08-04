@@ -2,6 +2,8 @@ import Order from '../../models/orderModel.js';
 import User from '../../models/userModel.js';
 import Product from '../../models/ProductModel.js';
 import Category from '../../models/categoryModel.js';
+import fs from 'fs';
+import path from 'path';
 
 function getMonthStart(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -69,7 +71,7 @@ export const getDashboard = async (req, res) => {
   const customersChange = lastCustomers ? Math.round(((totalCustomers - lastCustomers) / lastCustomers) * 100) : totalCustomers > 0 ? 100 : 0;
 
   // Pending Delivery (this is independent of period)
-  const pendingDelivery = await Order.countDocuments({ status: 'Shipped' });
+  const pendingDelivery = await Order.countDocuments({ status: 'Pending' });
   const pendingChange = 3; // Placeholder
 
   // Sales Analytics
@@ -132,13 +134,36 @@ export const getDashboard = async (req, res) => {
       }
   }
 
-  // Sales Target
-  const monthlyTarget = 30000; // Set your target
+  // Sales Target - Calculate based on current month
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const currentDay = new Date().getDate();
+  
+ 
+  let monthlyTarget = 120000; // Default ₹50,000 monthly target
+  const configPath = path.join(process.cwd(), 'config', 'salesTarget.json');
+  
+  try {
+    if (fs.existsSync(configPath)) {
+      const targetConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      monthlyTarget = targetConfig.monthlyTarget || monthlyTarget;
+    }
+  } catch (error) {
+    console.error('Error reading sales target config:', error);
+    // Use default target if config file is invalid
+  }
+  
+  // Calculate remaining target
+  const remainingDays = daysInMonth - currentDay + 1;
+  const remainingTarget = Math.max(0, monthlyTarget - totalRevenue);
   const targetProgress = {
     achieved: totalRevenue,
-    remaining: Math.max(0, monthlyTarget - totalRevenue)
+    remaining: remainingTarget
   };
-  const dailyTarget = Math.round(monthlyTarget / 30);
+  
+  // Calculate target percentage
+  const targetPercentage = Math.min(100, Math.round((totalRevenue / monthlyTarget) * 100));
 
   // Top 10 Products
   const productAgg = await Order.aggregate([
@@ -205,7 +230,9 @@ export const getDashboard = async (req, res) => {
       customersChange,
       pendingDelivery,
       pendingChange,
-      dailyTarget
+      monthlyTarget,
+      targetPercentage,
+      remainingDays
     },
     salesAnalytics,
     targetProgress,

@@ -7,6 +7,8 @@ import Address from '../../models/addressModel.js';
 import razorpay from '../../utils/razorpay.js';
 import { getBestOffer } from './productController.js';
 import Coupon from '../../models/couponModel.js';
+import User from '../../models/userModel.js';
+import { processReferralReward } from '../../utils/referralCodeGenerator.js';
 
 // Generate unique order ID
 const generateOrderId = () => {
@@ -466,14 +468,16 @@ export const verifyPayment = async (req, res) => {
                     return {
                         ...item,
                         originalPrice: item.originalPrice || item.price,
-                        finalPrice: Number(paidPrice.toFixed(2)),
+                        paidPrice: Number(paidPrice.toFixed(2)),
+                        discountApplied: itemDiscount,
                     };
                 });
             } else if (items && items.length > 0) {
                 items = items.map(item => ({
                     ...item,
                     originalPrice: item.originalPrice || item.price,
-                    finalPrice: item.price
+                    paidPrice: item.price,
+                    discountApplied: 0,
                 }));
             }
             // --- END PATCH ---
@@ -561,6 +565,22 @@ export const verifyPayment = async (req, res) => {
             console.error('[Debug] Error updating stock:', error);
             // Even if stock update fails, we'll continue with order update
             // but log the error for manual intervention
+        }
+
+        // Process referral reward if user was referred
+        const user = await User.findById(userId);
+        if (user && user.referredBy) {
+          try {
+            const referralResult = await processReferralReward(user.referredBy, order.totalAmount);
+            console.log('Referral reward processed:', {
+              referrer: user.referredBy,
+              rewardAmount: referralResult.rewardAmount,
+              orderAmount: order.totalAmount
+            });
+          } catch (referralError) {
+            console.error('Error processing referral reward:', referralError);
+            // Don't fail the order if referral reward fails
+          }
         }
 
         await Cart.findOneAndUpdate(
@@ -656,6 +676,8 @@ export const handlePaymentFailure = async (req, res) => {
             quantity: item.quantity,
             price: item.price,
             originalPrice: item.originalPrice,
+            paidPrice: item.price, // For failed orders, paidPrice = original price
+            discountApplied: 0,
             size: item.size,
             status: 'Failed'
           })) || [],

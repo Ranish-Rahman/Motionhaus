@@ -53,7 +53,7 @@ export const checkReferralCode = async (code) => {
     }
     
     try {
-        const user = await User.findOne({ referralCode: code.toUpperCase() });
+        const user = await User.findOne({ referralCode: code });
         if (!user) {
             return { exists: false, valid: true, message: 'Referral code not found' };
         }
@@ -101,6 +101,17 @@ export const processReferralReward = async (referrerId, orderAmount) => {
         const referrer = await User.findById(referrerId);
         if (!referrer) {
             throw new Error('Referrer not found');
+        }
+        
+        // Initialize wallet and referralRewards if they don't exist
+        if (!referrer.wallet) {
+            referrer.wallet = { balance: 0 };
+        }
+        if (typeof referrer.wallet.balance !== 'number' || isNaN(referrer.wallet.balance)) {
+            referrer.wallet.balance = 0;
+        }
+        if (typeof referrer.referralRewards !== 'number' || isNaN(referrer.referralRewards)) {
+            referrer.referralRewards = 0;
         }
         
         // Add reward to referrer's wallet

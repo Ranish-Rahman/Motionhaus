@@ -82,6 +82,11 @@ router.get('/user/landing', (req, res) => {
   res.render('user/landing');
 });
 
+// About page route
+router.get('/about', (req, res) => {
+  res.render('user/about');
+});
+
 // Apply session check middleware
 router.use(sessionCheck);
 

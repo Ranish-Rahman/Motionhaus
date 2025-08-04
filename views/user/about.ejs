@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - Motionhaus</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #ffffff;
+            color: #333;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .hero-section {
+            min-height: 75vh;
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding: 0 5%;
+            margin-top: 80px; /* Add margin to account for fixed navbar */
+        }
+
+        .hero-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-text h1 {
+            font-size: 4rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(45deg, #333, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-text p {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #666;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+            40% { transform: translateX(-50%) translateY(-10px); }
+            60% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        .scroll-indicator div {
+            background: #666 !important;
+        }
+
+        .hero-visual {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .hero-image {
+            width: 400px;
+            height: 500px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .hero-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .hero-image:hover img {
+            transform: scale(1.05);
+        }
+
+        .clients-section {
+            padding: 5rem 5%;
+            background: #f8f9fa;
+        }
+
+        .clients-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .clients-section h2 {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .client-logos {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 3rem;
+            flex-wrap: wrap;
+        }
+
+        .client-logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+
+        .client-logo:hover {
+            opacity: 1;
+        }
+
+        .about-section {
+            padding: 8rem 5%;
+        }
+
+        .about-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .about-text h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            background: linear-gradient(45deg, #333, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .about-text p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #666;
+        }
+
+        .infinity-symbol {
+            width: 200px;
+            height: 100px;
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .infinity-loop {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 2px solid #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            text-align: center;
+            line-height: 1.2;
+            color: #333;
+        }
+
+        .infinity-loop.left {
+            left: 0;
+            top: 10px;
+        }
+
+        .infinity-loop.right {
+            right: 0;
+            top: 10px;
+        }
+
+        .projects-section {
+            padding: 8rem 5%;
+        }
+
+        .projects-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .projects-content h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 3rem;
+            background: linear-gradient(45deg, #333, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .project-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .project-card.large {
+            grid-column: span 2;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .project-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .project-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .stats-section {
+            padding: 5rem 5%;
+            background: #f8f9fa;
+        }
+
+        .stats-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 2rem;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .cta-section {
+            padding: 8rem 5%;
+            text-align: center;
+        }
+
+        .cta-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .cta-content h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(45deg, #333, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .cta-content p {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .cta-button {
+            background: linear-gradient(45deg, #a855f7, #ec4899);
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(168, 85, 247, 0.3);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .hero-text h1 {
+                font-size: 2.5rem;
+            }
+
+            .about-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .project-card.large {
+                grid-column: span 1;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .client-logos {
+                gap: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Navbar -->
+    <%- include('../partials/navbar') %>
+    
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h1>Premium footwear<br>for the<br>modern lifestyle</h1>
+                <p>We curate the finest collection of shoes from top brands worldwide. Our innovative platform combines cutting-edge technology with timeless style to deliver exceptional footwear experiences.</p>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-image">
+                    <img src="/image/hero-img.jpg" alt="Motionhaus - Modern E-commerce Platform">
+                </div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <i class="bi bi-chevron-down"></i>
+            <div style="width: 1px; height: 30px; background: #a0aec0; margin-top: 5px;"></div>
+        </div>
+    </section>
+
+    <!-- Clients Section -->
+    <section class="clients-section">
+        <div class="clients-content">
+                         <h2>Trusted by leading brands:</h2>
+             <div class="client-logos">
+                 <div class="client-logo">Nike</div>
+                 <div class="client-logo">Adidas</div>
+                 <div class="client-logo">Jordan</div>
+                 <div class="client-logo">New Balance</div>
+             </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="about-section">
+        <div class="about-content">
+            <div class="about-text">
+                                 <h2>What is Motionhaus?</h2>
+                 <p>Things around footwear retail and modern shoe shopping are unbelievably interesting. Unfortunately, the overall shopping experience and the quality of online footwear platforms are often still not up to the task. To achieve the perfect fit for every customer, overcoming those hurdles will be key. And this is where our story begins.</p>
+                 <p>We believe in creating seamless shoe shopping experiences that bridge the gap between traditional retail and the digital future. Our platform combines innovative technology with user-centric design to deliver exceptional footwear value to both customers and brands.</p>
+            </div>
+            <div class="infinity-symbol">
+                                 <div class="infinity-loop left">Passion for<br>footwear</div>
+                 <div class="infinity-loop right">Quality<br>craftsmanship</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section class="projects-section">
+        <div class="projects-content">
+                         <h2>Our Platform</h2>
+             <div class="projects-grid">
+                 <div class="project-card">
+                     <h3>Smart Shoe Finder</h3>
+                     <p>Advanced footwear recommendations and personalized shoe shopping experiences powered by AI. Find your perfect fit with intelligent size matching and style suggestions.</p>
+                 </div>
+                 <div class="project-card">
+                     <h3>Secure Payments</h3>
+                     <p>Multiple payment options including digital wallets, UPI, and traditional methods. Shop with confidence knowing your transactions are protected.</p>
+                 </div>
+                 <div class="project-card">
+                     <h3>Referral Program</h3>
+                     <p>Earn rewards by sharing your unique referral code with friends and family. Build a community of shoe enthusiasts and earn while you share.</p>
+                 </div>
+                 <div class="project-card large">
+                     <h3>Motionhaus</h3>
+                     <p>A comprehensive footwear platform designed for the modern shoe enthusiast. We offer everything from athletic sneakers to formal shoes, all delivered with exceptional service and innovative features.</p>
+                 </div>
+             </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="stats-content">
+                         <h2>Our Impact</h2>
+             <div class="stats-grid">
+                 <div class="stat-card">
+                     <div class="stat-number">10K+</div>
+                     <div class="stat-label">Happy Customers</div>
+                 </div>
+                 <div class="stat-card">
+                     <div class="stat-number">500+</div>
+                     <div class="stat-label">Shoe Models</div>
+                 </div>
+                 <div class="stat-card">
+                     <div class="stat-number">50+</div>
+                     <div class="stat-label">Footwear Brands</div>
+                 </div>
+                 <div class="stat-card">
+                     <div class="stat-number">99%</div>
+                     <div class="stat-label">Perfect Fit Rate</div>
+                 </div>
+             </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-content">
+                         <h2>Ready to Step into the Future?</h2>
+             <p>Join thousands of satisfied customers who have already discovered the perfect fit with our innovative footwear platform. Experience the difference that quality shoes and cutting-edge technology can make in your lifestyle.</p>
+             <a href="/" class="cta-button">Start Shopping Now</a>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
