@@ -1975,7 +1975,10 @@ export const cancelRazorpayOrder = async (req, res) => {
         order = new Order({
           orderID: orderData.orderID,
           user: userId,
-          items: orderData.items || [],
+          items: (orderData.items || []).map(item => ({
+            ...item,
+            paidPrice: item.paidPrice !== undefined ? item.paidPrice : (item.price || 0)
+          })),
           totalAmount: orderData.totalAmount || 0,
           originalAmount: orderData.originalAmount || orderData.totalAmount || 0,
           discountAmount: orderData.discountAmount || 0,

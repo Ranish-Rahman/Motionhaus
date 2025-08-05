@@ -355,7 +355,7 @@ form input {
 </style>
   <div class="container">
     <div class="left">
-      <img src="/image/signupimg.jpg" alt="Sneaker" />
+      <img src="/image/sign-up-img-1.jpg" alt="Sneaker" />
     </div>
     <div class="right">
       <div class="form-container">
@@ -659,13 +659,13 @@ form input {
       verifyOtpBtn.addEventListener('click', async () => {
         const otpValue = Array.from(otpInputs).map(i => i.value).join('');
         otpError.classList.add('hidden');
-      
+
         if (otpValue.length !== 6) {
           otpError.textContent = 'Please enter the full 6-digit OTP.';
           otpError.classList.remove('hidden');
           return;
         }
-      
+
         try {
           const response = await fetch('/verify-otp', {
             method: 'POST',
@@ -675,18 +675,17 @@ form input {
             body: JSON.stringify({ otp: otpValue })
           });
 
-          const contentType = response.headers.get('content-type');
-  
-  if (!response.ok || !contentType.includes('application/json')) {
-    const errorText = await response.text(); // fallback to text to see what you got
-    console.error('Unexpected response:', errorText);
-    otpError.textContent = 'Server returned an unexpected response.';
-    otpError.classList.remove('hidden');
-    return;
-  }
+          let data;
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            data = await response.json();
+          } else {
+            const errorText = await response.text();
+            otpError.textContent = 'Server returned an unexpected response.';
+            otpError.classList.remove('hidden');
+            return;
+          }
 
-          const data = await response.json();
-          
           if (data.success) {
             Swal.fire({
               title: 'Success!',
@@ -701,8 +700,20 @@ form input {
               }
             });
           } else {
-            otpError.textContent = data.message;
+            otpError.textContent = data.message || 'Invalid OTP. Please try again.';
             otpError.classList.remove('hidden');
+            // If session expired, OTP expired, or too many attempts, close modal and clear inputs
+            if (
+              data.message && (
+                data.message.includes('expired') ||
+                data.message.includes('Too many attempts')
+              )
+            ) {
+              setTimeout(() => {
+                otpModal.classList.add('hidden');
+                otpInputs.forEach(input => input.value = '');
+              }, 2000);
+            }
           }
         } catch (error) {
           console.error('Error:', error);
