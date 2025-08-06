@@ -16,7 +16,12 @@ export const placeOrder = async (req, res) => {
   console.log('=== COD/WALLET ORDER PLACEMENT STARTED ===');
 
   try {
-    const userId = req.session.user._id;
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    const userId = sessionUser && (sessionUser._id || sessionUser.id);
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
     const { addressId, paymentMethod } = req.body;
     console.log('Received addressId:', addressId);
 
@@ -804,8 +809,8 @@ export const cancelOrder = async (req, res) => {
 // Retry Payment endpoint
 export const retryPayment = async (req, res) => {
   try {
-    // Test log to verify Razorpay configuration
-    console.log('Razorpay Configuration Check:', {
+    console.log('=== PAYMENT RETRY STARTED ===');
+    console.log('Razorpay config check:', {
       keyIdExists: !!process.env.RAZORPAY_KEY_ID,
       keySecretExists: !!process.env.RAZORPAY_KEY_SECRET,
       keyIdLength: process.env.RAZORPAY_KEY_ID?.length,
@@ -813,7 +818,13 @@ export const retryPayment = async (req, res) => {
     });
 
     const { orderId } = req.params;
-    const userId = req.session.user._id;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = sessionUser._id || sessionUser.id;
 
     // Find the order and populate user details
     const order = await Order.findOne({ _id: orderId, user: userId });
@@ -881,7 +892,13 @@ export const verifyPayment = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
-    const userId = req.session.user._id;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = sessionUser._id || sessionUser.id;
 
     console.log('Verifying payment:', {
       orderId,

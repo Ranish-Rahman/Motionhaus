@@ -18,14 +18,16 @@ const generateOrderId = () => {
 export const createRazorpayOrder = async (req, res) => {
     try {
         const { addressId, retryOrderId, isRetry, shippingAddress: providedAddress } = req.body;
-        const userId = req.session.user?._id;
-
-        if (!userId) {
+        
+        // Use standardized session accessor
+        const sessionUser = req.user || req.session.user || req.session.userData;
+        if (!sessionUser) {
             return res.status(401).json({
                 success: false,
                 message: 'User not logged in'
             });
         }
+        const userId = sessionUser._id || sessionUser.id;
 
         // Get checkout data from session
         const checkoutData = req.session.checkoutData;
@@ -250,7 +252,7 @@ export const createRazorpayOrder = async (req, res) => {
             amount: amountInPaise,
             currency: 'INR',
             customerName: shippingAddress.fullName,
-            customerEmail: req.session.user.email,
+            customerEmail: sessionUser.email,
             customerPhone: shippingAddress.phone,
             notes: {
                 originalAmount,
@@ -280,7 +282,16 @@ export const createRazorpayOrder = async (req, res) => {
 export const verifyPayment = async (req, res) => {
     try {
         const { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderID } = req.body;
-        const userId = req.session.user?._id;
+        
+        // Use standardized session accessor
+        const sessionUser = req.user || req.session.user || req.session.userData;
+        if (!sessionUser) {
+            return res.status(401).json({
+                success: false,
+                message: 'User not logged in'
+            });
+        }
+        const userId = sessionUser._id || sessionUser.id;
 
         console.log('[Debug] verifyPayment - Request received:', {
             hasUserId: !!userId,
@@ -291,19 +302,12 @@ export const verifyPayment = async (req, res) => {
             sessionKeys: Object.keys(req.session)
         });
 
-        if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: 'User not logged in'
-            });
-        }
-
         const pendingOrder = req.session.pendingOrder;
         if (!pendingOrder) {
             console.error('[Debug] verifyPayment: No pending order found in session');
             console.error('[Debug] verifyPayment: Session data:', {
                 sessionKeys: Object.keys(req.session),
-                hasUser: !!req.session.user,
+                hasUser: !!sessionUser,
                 hasCheckoutData: !!req.session.checkoutData
             });
             return res.status(400).json({
@@ -615,15 +619,17 @@ export const verifyPayment = async (req, res) => {
 export const handlePaymentFailure = async (req, res) => {
   try {
     const { orderID, razorpayOrderId, error } = req.body;
-    const userId = req.session.user?._id;
     
-    if (!userId) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({
         success: false,
         message: 'User not logged in'
       });
     }
-
+    const userId = sessionUser._id || sessionUser.id;
+    
     console.log('[Debug] Handling failed payment:', { 
       orderID, 
       razorpayOrderId,

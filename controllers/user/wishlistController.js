@@ -58,23 +58,29 @@ const validateProductData = async (productId) => {
     }
 };
 
+// Helper to get userId from session
+function getSessionUserId(req) {
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  return sessionUser && (sessionUser._id || sessionUser.id);
+}
+
 // Updated getWishlist
 const getWishlist = async (req, res) => {
     try {
         console.log('==================== START WISHLIST ====================');
-        
-        if (!req.session.user || !req.session.user._id) {
+        const userId = getSessionUserId(req);
+        if (!userId) {
             return res.redirect('/login');
         }
 
-        console.log('User ID:', req.session.user._id);
+        console.log('User ID:', userId);
 
         // Get wishlist
-        let wishlist = await Wishlist.findOne({ user: req.session.user._id });
+        let wishlist = await Wishlist.findOne({ user: userId });
         
         if (!wishlist) {
             console.log('No wishlist found, creating new one');
-            wishlist = new Wishlist({ user: req.session.user._id, items: [] });
+            wishlist = new Wishlist({ user: userId, items: [] });
             await wishlist.save();
         } else {
             console.log('Found existing wishlist with', wishlist.items.length, 'items');
@@ -147,7 +153,7 @@ const getWishlist = async (req, res) => {
 
         return res.render('user/wishlist', {
             title: 'My Wishlist',
-            user: req.session.user,
+            user: req.session.user || req.session.userData,
             wishlist: wishlistObj
         });
 
@@ -162,7 +168,8 @@ const getWishlist = async (req, res) => {
 
 const addToWishlist = async (req, res) => {
   try {
-    if (!req.session.user || !req.session.user._id) {
+    const userId = getSessionUserId(req);
+    if (!userId) {
       return res.status(401).json({ success: false, message: 'User not logged in' });
     }
 
@@ -207,9 +214,9 @@ const addToWishlist = async (req, res) => {
       return res.status(400).json({ success: false, message: `Size ${size} is out of stock` });
     }
 
-    let wishlist = await Wishlist.findOne({ user: req.session.user._id });
+    let wishlist = await Wishlist.findOne({ user: userId });
     if (!wishlist) {
-      wishlist = new Wishlist({ user: req.session.user._id, items: [] });
+      wishlist = new Wishlist({ user: userId, items: [] });
     }
 
     // Check if product with same size already exists in wishlist
@@ -249,6 +256,11 @@ const addToWishlist = async (req, res) => {
 
 const removeFromWishlist = async (req, res) => {
   try {
+    const userId = getSessionUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'User not logged in' });
+    }
+
     const productId = req.params.productId;
     let { size } = req.body;
 
@@ -267,7 +279,7 @@ const removeFromWishlist = async (req, res) => {
       }
     }
 
-    const wishlist = await Wishlist.findOne({ user: req.session.user._id });
+    const wishlist = await Wishlist.findOne({ user: userId });
     if (!wishlist) {
       return res.status(404).json({ success: false, message: 'Wishlist not found' });
     }
@@ -309,8 +321,12 @@ const removeFromWishlist = async (req, res) => {
 
 const clearWishlist = async (req, res) => {
     try {
+        const userId = getSessionUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'User not logged in' });
+        }
         const result = await Wishlist.findOneAndUpdate(
-            { user: req.session.user._id },
+            { user: userId },
             { $set: { items: [] } },
             { new: true }
         );
@@ -329,6 +345,11 @@ const clearWishlist = async (req, res) => {
 
 const moveToCart = async (req, res) => {
     try {
+        const userId = getSessionUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'User not logged in' });
+        }
+
         const productId = req.params.productId;
         const { size } = req.body;
 
@@ -350,8 +371,8 @@ const moveToCart = async (req, res) => {
             return res.status(400).json({ success: false, message: `Size ${size} is out of stock` });
         }
 
-        let cart = await Cart.findOne({ user: req.session.user._id });
-        if (!cart) cart = new Cart({ user: req.session.user._id, items: [] });
+        let cart = await Cart.findOne({ user: userId });
+        if (!cart) cart = new Cart({ user: userId, items: [] });
 
         const existingItem = cart.items.find(i => i.product.toString() === productId && i.size === size);
         if (existingItem) {
@@ -362,7 +383,7 @@ const moveToCart = async (req, res) => {
 
         await cart.save();
 
-        const wishlist = await Wishlist.findOne({ user: req.session.user._id });
+        const wishlist = await Wishlist.findOne({ user: userId });
         if (wishlist) {
             wishlist.items = wishlist.items.filter(item =>
                 !(item.product.toString() === productId && item.size === size)

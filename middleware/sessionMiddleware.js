@@ -5,7 +5,7 @@ export const sessionCheck = async (req, res, next) => {
   // Add debug logging
   console.log('Session Check - Current session:', {
     hasSession: !!req.session,
-    userData: req.session?.user,
+    userData: req.user || req.session?.user,
     path: req.path
   });
 
@@ -28,15 +28,15 @@ export const sessionCheck = async (req, res, next) => {
   
   // For public routes (login, signup), redirect if already logged in
   if (req.path === '/login' || req.path === '/signup') {
-    if (req.session?.user) {
+    if (req.user || req.session?.user) {
       console.log('Redirecting logged in user from public route to home');
       return res.redirect('/home');
     }
     return next();
   }
 
-  // For protected routes, check user session
-  if (!req.session?.user) {
+  // For protected routes, check user session (Passport sets req.user)
+  if (!req.user && !req.session?.user) {
     console.log('No user session found, redirecting to login');
     req.session.returnTo = req.originalUrl;
     return res.redirect('/login');
@@ -93,14 +93,14 @@ export const noCache = (req, res, next) => {
 
 // Middleware to check if user is already logged in (for login/signup pages)
 export const redirectIfLoggedIn = (req, res, next) => {
-  if (req.session.user) {
+  if (req.user || req.session?.user) {
     return res.redirect('/home');
   }
   next();
 };
 
 export const isAuthenticated = (req, res, next) => {
-  if (req.session && req.session.user) {
+  if (req.user || (req.session && req.session.user)) {
     return next();
   }
   res.redirect('/login');

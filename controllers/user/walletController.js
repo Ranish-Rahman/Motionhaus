@@ -2,19 +2,23 @@ import Transaction from '../../models/transactionModel.js';
 import User from '../../models/userModel.js';
 import mongoose from 'mongoose';
 
+// Helper to get userId from session
+function getSessionUserId(req) {
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  return sessionUser && (sessionUser._id || sessionUser.id);
+}
+
 // Get wallet page with transactions
 export const getWallet = async (req, res) => {
     try {
-        // Check if user exists in session
-        if (!req.session.user || !req.session.user._id) {
+        const userId = getSessionUserId(req);
+        if (!userId) {
             return res.status(401).render('error', {
                 title: 'Error',
                 message: 'Please login to access wallet',
                 statusCode: 401
             });
         }
-
-        const userId = req.session.user._id;
 
         // Add pagination
         const page = parseInt(req.query.page) || 1;
@@ -65,7 +69,10 @@ export const getWallet = async (req, res) => {
 // Fix wallet balance based on transaction history
 export const fixWalletBalance = async (req, res) => {
     try {
-        const userId = req.session.user._id;
+        const userId = getSessionUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
+        }
 
         // Get all transactions
         const transactions = await Transaction.find({ user: userId })

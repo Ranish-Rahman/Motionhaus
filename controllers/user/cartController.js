@@ -8,15 +8,18 @@ import { calculateCartTotals } from '../../utils/cartHelper.js';
 export const addToCart = async (req, res) => {
   try {
     console.log('=== ADD TO CART REQUEST ===');
-    console.log('Session user:', req.session.user);
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    console.log('Session user:', sessionUser);
     console.log('Request body:', req.body);
     
-    if (!req.session.user) {
+    if (!sessionUser) {
       console.log('No user session found');
       return res.status(401).json({ success: false, message: 'Please login to add items to cart' });
     }
 
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
     console.log('User ID:', userId);
 
     const { productId, size, quantity } = req.body;
@@ -165,11 +168,13 @@ const checkAndUpdateCoupon = async (cart) => {
 // Update cart item quantity
 export const updateCartItem = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({ success: false, message: 'Please login to update cart' });
     }
 
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
     const { itemId } = req.params;
     const { quantity } = req.body;
 
@@ -261,11 +266,13 @@ export const updateCartItem = async (req, res) => {
 // Remove item from cart
 export const removeFromCart = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({ success: false, message: 'Please login to remove items' });
     }
 
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
     const { itemId } = req.params;
     const { size } = req.body;
 
@@ -314,14 +321,16 @@ export const removeFromCart = async (req, res) => {
 // Apply coupon to cart
 export const applyCoupon = async (req, res) => {
     try {
-        if (!req.session.user) {
+        // Use standardized session accessor
+        const sessionUser = req.user || req.session.user || req.session.userData;
+        if (!sessionUser) {
             return res.status(401).json({
                 success: false,
                 message: 'Please login to apply a coupon.'
             });
         }
 
-        const userId = req.session.user._id;
+        const userId = sessionUser._id || sessionUser.id;
         const { code } = req.body;
 
         if (!code) {
@@ -468,7 +477,13 @@ export const applyCoupon = async (req, res) => {
 // Remove coupon from cart
 export const removeCoupon = async (req, res) => {
   try {
-    const userId = req.session.user._id;
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'Please login to remove coupon' });
+    }
+
+    const userId = sessionUser._id || sessionUser.id;
     const cart = await Cart.findOne({ user: userId });
 
     if (!cart) {
@@ -504,11 +519,13 @@ export const removeCoupon = async (req, res) => {
 // Validate stock availability for all items in cart
 export const validateStock = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({ success: false, message: 'Please login to validate stock' });
     }
 
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
 
     // Find cart
     const cart = await Cart.findOne({ user: userId });

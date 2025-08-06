@@ -186,48 +186,32 @@
     </div>
   </footer>
   <script>
-    const toggle = document.getElementById('darkModeToggle');
-    const body = document.body;
-  
-    // Load preference from localStorage
-    if (localStorage.getItem('theme') === 'dark') {
-      body.classList.add('dark-mode');
-      toggle.checked = true;
-    }
-  
-    toggle.addEventListener('change', () => {
-      if (toggle.checked) {
-        body.classList.add('dark-mode');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        body.classList.remove('dark-mode');
-        localStorage.setItem('theme', 'light');
-      }
-    });
-
-    document.getElementById('logoutLink')?.addEventListener('click', function(e) {
-      e.preventDefault();
-      fetch('/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      })
-      .then(response => {
-        if (response.ok) {
-          // Clear any client-side storage
-          localStorage.clear();
-          sessionStorage.clear();
-          
-          // Force a hard redirect to login page
-          window.location.replace('/login');
-        }
-      })
-      .catch(error => {
-        console.error('Logout error:', error);
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+      logoutLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        fetch('/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        })
+        .then(response => {
+          if (response.ok) {
+            // Clear any client-side storage
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Force a hard redirect to login page
+            window.location.replace('/login');
+          }
+        })
+        .catch(error => {
+          console.error('Logout error:', error);
+        });
       });
-    });
+    }
   </script>
   
 </body>
@@ -236,46 +220,15 @@
 <style>
 
   /* ===== CSS VARIABLES FOR THEMES ===== */
-  :root {
-    --bg: #fff;
-    --text: #000;
-    --border: #eee;
-    --card-bg: #ddd;
-    --caption: white;
-    --caption-shadow: rgba(0,0,0,0.5);
-    --feature-icon-bg: #000;
-    --feature-icon-color: #fff;
-    --footer-text: #333;
-    --footer-link: #444;
-    --footer-border: #ddd;
-    --social-icon-bg: #fff;
-    --social-icon-border: #ccc;
-  }
-  
-  body.dark-mode {
-  --bg: #111;
-  --text: #fff;
-  --border: #333;
-  --card-bg: #1a1a1a;
-  --caption: white;
-  --caption-shadow: rgba(0,0,0,0.7);
-  --feature-icon-bg: #fff;
-  --feature-icon-color: #000;
-  --footer-text: #bbb;
-  --footer-link: #ccc;
-  --footer-border: #444;
-  --social-icon-bg: #222;
-  --social-icon-border: #444;
-}
-
+  /* Remove all :root and body.dark-mode CSS variables and theme-toggle styles */
   
   /* ===== BODY & GLOBAL ===== */
   body {
     font-family: 'Inter', sans-serif;
     margin: 0;
     padding: 0;
-    background: var(--bg);
-    color: var(--text);
+    background: #fff; /* Default to light mode */
+    color: #000; /* Default to light mode */
   }
   
   /* ===== HEADER ===== */
@@ -284,8 +237,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 25px 50px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
+    background: #fff; /* Default to light mode */
+    border-bottom: 1px solid #eee; /* Default to light mode */
   }
   
   .logo {
@@ -296,7 +249,7 @@
   nav a {
     margin: 0 15px;
     text-decoration: none;
-    color: var(--text);
+    color: #000; /* Default to light mode */
     font-weight: 600;
   }
   
@@ -392,12 +345,12 @@
   
   .inspiration .text button {
     padding: 10px 20px;
-    border: 1px solid var(--text);
+    border: 1px solid #000; /* Default to light mode */
     background: transparent;
     cursor: pointer;
     font-weight: 500;
     border-radius: 50px;
-    color: var(--text);
+    color: #000; /* Default to light mode */
   }
   
   /* ===== CARDS ===== */
@@ -426,10 +379,10 @@
     position: absolute;
     bottom: 10px;
     left: 10px;
-    color: var(--caption);
+    color: white;
     font-size: 14px;
     font-weight: 600;
-    text-shadow: 1px 1px 4px var(--caption-shadow);
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
   }
   
   /* ===== SPACER ===== */
@@ -496,7 +449,7 @@
   /* ===== WHY SHOP ===== */
   .why-shop {
     padding: 60px 80px;
-    background: var(--bg);
+    background: #fff; /* Default to light mode */
     text-align: left;
   }
   
@@ -536,7 +489,7 @@
   
   /* ===== FEATURES SECTION ===== */
   .features {
-    background: var(--bg);
+    background: #fff; /* Default to light mode */
     padding: 60px 45px;
     text-align: center;
   }
@@ -562,8 +515,8 @@
   
   .feature-item .icon {
     font-size: 32px;
-    background: var(--feature-icon-bg);
-    color: var(--feature-icon-color);
+    background: #000; /* Default to light mode */
+    color: #fff; /* Default to light mode */
     width: 48px;
     height: 48px;
     display: flex;
@@ -587,7 +540,7 @@
   
   /* ===== FOOTER ===== */
   .footer {
-    background: var(--card-bg);
+    background: #ddd; /* Default to light mode */
     padding: 60px 80px 30px;
     font-size: 14px;
   }
@@ -607,7 +560,7 @@
   .footer-about p {
     margin: 20px 0;
     line-height: 1.5;
-    color: var(--footer-text);
+    color: #333; /* Default to light mode */
   }
   
   .social-icons {
@@ -619,8 +572,8 @@
   .social-icons .icon {
     font-size: 16px;
     padding: 10px;
-    background: var(--social-icon-bg);
-    border: 1px solid var(--social-icon-border);
+    background: #fff; /* Default to light mode */
+    border: 1px solid #ccc; /* Default to light mode */
     border-radius: 50%;
     cursor: pointer;
   }
@@ -641,7 +594,7 @@
     margin: 6px 0;
     font-size: 13px;
     cursor: pointer;
-    color: var(--footer-link);
+    color: #444; /* Default to light mode */
   }
   
   .footer-bottom {
@@ -649,7 +602,7 @@
     justify-content: space-between;
     margin-top: 40px;
     padding-top: 20px;
-    border-top: 1px solid var(--footer-border);
+    border-top: 1px solid #ddd; /* Default to light mode */
     font-size: 12px;
     color: #888;
   }
@@ -671,55 +624,7 @@
   }
   
   /* Toggle Switch Styles */
-.theme-toggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 999;
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 26px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0;
-  right: 0; bottom: 0;
-  background-color: #ccc;
-  transition: 0.4s;
-  border-radius: 34px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #333;
-}
-
-input:checked + .slider:before {
-  transform: translateX(24px);
-}
+/* Remove all theme-toggle and switch styles */
 
   </style>
   

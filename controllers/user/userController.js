@@ -560,10 +560,12 @@ const liveSearch = async (req, res) => {
 
 // Get cart page
 const getCart = async (req, res) => {
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  if (!sessionUser) {
     return res.redirect('/login');
   }
-  const userId = req.session.user._id || req.session.user.id;
+  const userId = sessionUser._id || sessionUser.id;
   
   try {
     // Fetch cart from DB and populate product and coupon details
@@ -571,7 +573,7 @@ const getCart = async (req, res) => {
     
     if (!cart || cart.items.length === 0) {
       return res.render('user/cart', {
-        user: req.session.user,
+        user: sessionUser,
         cart: { items: [], subtotal: 0, finalAmount: 0, couponDiscount: 0, couponCode: null }, // Provide empty structure
         success: req.flash('success'),
         error: req.flash('error')
@@ -598,7 +600,7 @@ const getCart = async (req, res) => {
     const cartData = await calculateCartTotals(cart, getBestOffer);
 
     res.render('user/cart', {
-      user: req.session.user,
+      user: sessionUser,
       cart: {
         ...cart.toObject(),
         ...cartData
@@ -637,15 +639,19 @@ const ensureReferralCode = async (userId) => {
 // Render profile page
 const getProfile = async (req, res) => {
   try {
-    // Handle both session structures for compatibility
-    const sessionUser = req.session.user || req.session.userData;
-    
-    if (!sessionUser || !sessionUser.id) {
+    // Passport-compliant: use req.user if available
+    let userId;
+    if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+      userId = req.user._id || req.user.id;
+    } else {
+      // Fallback for legacy session-based users
+      const sessionUser = req.session.user || req.session.userData;
+      userId = sessionUser && (sessionUser._id || sessionUser.id);
+    }
+    if (!userId) {
       console.log('No user session found, redirecting to login');
       return res.redirect('/login');
     }
-    
-    const userId = sessionUser.id;
     
     // Ensure user has a referral code
     await ensureReferralCode(userId);
@@ -681,19 +687,23 @@ const getProfile = async (req, res) => {
 
 // Get address page
 const getAddress = async (req, res) => {
-  // Handle both session structures for compatibility
-  const sessionUser = req.session.user || req.session.userData;
-  
-  if (!sessionUser || !sessionUser.id) {
+  // Passport-compliant: use req.user if available
+  let userId;
+  if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+    userId = req.user._id || req.user.id;
+  } else {
+    // Fallback for legacy session-based users
+    const sessionUser = req.session.user || req.session.userData;
+    userId = sessionUser && (sessionUser._id || sessionUser.id);
+  }
+  if (!userId) {
     return res.redirect('/login');
   }
-  
   try {
     // Fetch user's addresses from the database
-    const addresses = await Address.find({ userId: sessionUser.id });
-    
+    const addresses = await Address.find({ userId: userId });
     res.render('user/address', {
-      user: sessionUser,
+      user: req.user || req.session.user || req.session.userData,
       addresses: addresses,
       success: req.flash('success'),
       error: req.flash('error'),
@@ -703,7 +713,7 @@ const getAddress = async (req, res) => {
     console.error('Error fetching addresses:', error);
     req.flash('error', 'Failed to load addresses. Please try again.');
     res.render('user/address', {
-      user: sessionUser,
+      user: req.user || req.session.user || req.session.userData,
       addresses: [],
       success: req.flash('success'),
       error: req.flash('error'),
@@ -836,17 +846,20 @@ const addAddress = async (req, res) => {
 
 // Get address for editing
 const getEditAddress = async (req, res) => {
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  if (!sessionUser) {
     return res.redirect('/login');
   }
   
   try {
     const addressId = req.params.id;
+    const userId = sessionUser._id || sessionUser.id;
     
     // Find the address and ensure it belongs to the current user
     const address = await Address.findOne({
       _id: addressId,
-      userId: req.session.user._id
+      userId: userId
     });
     
     if (!address) {
@@ -855,7 +868,7 @@ const getEditAddress = async (req, res) => {
     }
     
     res.render('user/edit-address', {
-      user: req.session.user,
+      user: sessionUser,
       address: address,
       success: req.flash('success'),
       error: req.flash('error'),
@@ -870,17 +883,20 @@ const getEditAddress = async (req, res) => {
 
 // Update address
 const updateAddress = async (req, res) => {
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  if (!sessionUser) {
     return res.redirect('/login');
   }
   
   try {
     const addressId = req.params.id;
+    const userId = sessionUser._id || sessionUser.id;
     
     // Find the address and ensure it belongs to the current user
     const address = await Address.findOne({
       _id: addressId,
-      userId: req.session.user._id
+      userId: userId
     });
     
     if (!address) {
@@ -1070,15 +1086,18 @@ const setDefaultAddress = async (req, res) => {
 // Get orders page
 export const getOrders = async (req, res) => {
   console.log('=== GET ORDERS STARTED ===');
-  console.log('Session user:', req.session.user);
   
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  console.log('Session user:', sessionUser);
+  
+  if (!sessionUser) {
     console.log('No user session found, redirecting to login');
     return res.redirect('/login');
   }
   
   try {
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
     console.log('User ID:', userId);
     
     // Add pagination
@@ -1102,7 +1121,7 @@ export const getOrders = async (req, res) => {
     console.log('Pagination info:', { page, totalPages, totalOrders });
     
     res.render('user/orders', {
-      user: req.session.user,
+      user: sessionUser,
       orders,
       currentPage: page,
       totalPages,
@@ -1121,7 +1140,9 @@ export const getOrders = async (req, res) => {
 // Get order details page
 const getOrderDetails = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.redirect('/login');
     }
 
@@ -1142,7 +1163,7 @@ const getOrderDetails = async (req, res) => {
       return res.redirect('/profile/orders');
     }
 
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
     if (order.user._id.toString() !== userId.toString()) {
       req.flash('error', 'You are not authorized to view this order');
       return res.redirect('/profile/orders');
@@ -1174,7 +1195,7 @@ const getOrderDetails = async (req, res) => {
     }
 
     res.render('user/order-details', {
-      user: req.session.user,
+      user: sessionUser,
       order,
       statusClass,
       success: req.flash('success'),
@@ -1190,11 +1211,13 @@ const getOrderDetails = async (req, res) => {
 
 // Get change password page
 const getChangePassword = (req, res) => {
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  if (!sessionUser) {
     return res.redirect('/login');
   }
   res.render('user/change-password', {
-    user: req.session.user,
+    user: sessionUser,
     success: req.flash('success'),
     error: req.flash('error'),
     currentPage: 'change-password'
@@ -1209,11 +1232,18 @@ const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 // Handle change password
 const postChangePassword = async (req, res) => {
   try {
-    const userId = req.session.user._id;
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      req.flash('error', 'User not authenticated');
+      return res.redirect('/login');
+    }
+    
+    const userId = sessionUser._id || sessionUser.id;
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
     console.log('Attempting password change for user:', userId);
-    console.log('Session user:', req.session.user);
+    console.log('Session user:', sessionUser);
 
     // Check rate limiting
     const attempts = passwordChangeAttempts.get(userId) || { count: 0, timestamp: Date.now() };
@@ -1290,7 +1320,13 @@ const postChangePassword = async (req, res) => {
 
 const getCheckout = async (req, res) => {
   try {
-    const userId = req.session.user._id || req.session.user.id;
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.redirect('/login');
+    }
+    
+    const userId = sessionUser._id || sessionUser.id;
     const addresses = await Address.find({ userId });
     let cart = await Cart.findOne({ user: userId })
       .populate('items.product')
@@ -1541,9 +1577,14 @@ const verifyProfileOTP = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const { username, email, phone } = req.body;
-    const userId = req.session.user._id;
+    const sessionUser = req.session.user || req.session.userData;
+    const userId = sessionUser && (sessionUser._id || sessionUser.id);
 
     console.log('Update Profile Request:', { username, email, phone, userId });
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
 
     // Validate input
     if (!username || !email) {

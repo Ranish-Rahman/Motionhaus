@@ -10,13 +10,13 @@ const router = express.Router();
 router.get('/auth/status', (req, res) => {
   console.log('Session Check - Current session:', {
     hasSession: !!req.session,
-    userData: req.session?.user,
+    userData: req.user || req.session?.user,
     path: req.path
   });
 
   res.json({
-    authenticated: !!req.session?.user,
-    user: req.session?.user || null
+    authenticated: !!(req.user || req.session?.user),
+    user: req.user || req.session?.user || null
   });
 });
 
@@ -38,65 +38,14 @@ router.get('/auth/google',
 
 // Google callback route
 router.get('/auth/google/callback',
-  (req, res, next) => {
-    console.log('Google OAuth callback received');
-    console.log('Query params:', req.query);
-    console.log('Session:', req.session);
-    next();
-  },
-  (req, res, next) => {
-    passport.authenticate('google', { 
-      failureRedirect: '/login',
-      failureFlash: true
-    }, async (err, user, info) => {
-      if (err) {
-        console.error('Authentication error:', err);
-        return res.redirect('/login?error=auth_failed');
-      }
-      
-      try {
-        // If this is a signup flow and user exists, redirect to signup with error
-        if (req.session.isSignup && user) {
-          console.log('User already exists during signup');
-          return res.redirect('/signup?error=user_exists');
-        }
-        
-        // If this is a login flow and no user exists, redirect to signup
-        if (!req.session.isSignup && !user) {
-          console.log('No user found during login');
-          return res.redirect('/signup?error=no_user');
-        }
-        
-        // Set user in session
-        req.session.user = {
-          id: user._id,
-          username: user.username,
-          email: user.email
-        };
-        
-        // Update last login time
-        user.lastLogin = new Date();
-        await user.save();
-        
-        console.log('User logged in successfully:', user.email);
-        const returnTo = req.session.returnTo || '/home';
-        delete req.session.returnTo;
-        delete req.session.isSignup;
-        
-        // Save session and redirect
-        req.session.save((err) => {
-          if (err) {
-            console.error('Error saving session:', err);
-            return res.redirect('/login?error=session_error');
-          }
-          return res.redirect(returnTo);
-        });
-        
-      } catch (error) {
-        console.error('Error in Google callback:', error);
-        return res.redirect('/login?error=internal');
-      }
-    })(req, res, next);
+  passport.authenticate('google', {
+    failureRedirect: '/login',
+    failureFlash: true
+  }),
+  (req, res) => {
+    const returnTo = req.session.returnTo || '/home';
+    delete req.session.returnTo;
+    res.redirect(returnTo);
   }
 );
 

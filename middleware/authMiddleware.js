@@ -3,11 +3,11 @@ import User from '../models/userModel.js';
 // Middleware to check if user is authenticated
 export const isAuthenticated = async (req, res, next) => {
   try {
-    if (req.session.user) {
-      // Check if user is blocked
-      const user = await User.findById(req.session.user._id);
-      if (user && user.isBlocked) {
-        // Destroy the session and clear cookies
+    // Passport-compliant check
+    if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+      // Optionally, check if user is blocked
+      if (req.user.isBlocked) {
+        req.logout(() => {});
         req.session.destroy((err) => {
           if (err) {
             console.error('Error destroying session:', err);
@@ -20,7 +20,24 @@ export const isAuthenticated = async (req, res, next) => {
       }
       return next();
     }
-    // Store the original URL for redirection after login
+    // Fallback for legacy session-based users
+    const sessionUser = req.session.user || req.session.userData;
+    if (sessionUser && (sessionUser._id || sessionUser.id)) {
+      // Optionally, check if user is blocked
+      const user = await User.findById(sessionUser._id || sessionUser.id);
+      if (user && user.isBlocked) {
+        req.session.destroy((err) => {
+          if (err) {
+            console.error('Error destroying session:', err);
+          }
+          res.clearCookie('connect.sid');
+          req.flash('error', 'Your account has been blocked. Please contact support for assistance.');
+          return res.redirect('/login');
+        });
+        return;
+      }
+      return next();
+    }
     req.session.returnTo = req.originalUrl;
     res.redirect('/login');
   } catch (error) {
@@ -29,13 +46,16 @@ export const isAuthenticated = async (req, res, next) => {
   }
 };
 
+
 // Middleware to check if user is not authenticated
 export const isNotAuthenticated = (req, res, next) => {
-  if (!req.isAuthenticated()) {
-    return next();
+  const sessionUser = req.session.userData || req.session.user;
+  if (!sessionUser || !(sessionUser._id || sessionUser.id)) {
+    return next(); // user is NOT logged in
   }
-  res.redirect('/home');
+  res.redirect('/home'); // user IS logged in
 };
+
 
 // Middleware to check if user is admin
 export const isAdmin = (req, res, next) => {
@@ -68,34 +88,31 @@ export const isAdmin = (req, res, next) => {
 
 // Authentication middleware
 export const requireAuth = (req, res, next) => {
-  // Set cache control headers for all responses
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  
-  if (!req.session.user) {
-    // Store the original URL to redirect after login
-    req.session.returnTo = req.originalUrl;
-    
-    // Clear any existing session data
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Error destroying session:', err);
-      }
-    });
-    
-    // Clear session cookie
-    res.clearCookie('connect.sid', {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
-    });
-    
-    return res.redirect('/login');
+  // Passport-compliant check
+  if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+    return next();
   }
-  
-  next();
+  // Fallback for legacy session-based users
+  const sessionUser = req.session.user || req.session.userData;
+  if (sessionUser && (sessionUser._id || sessionUser.id)) {
+    return next();
+  }
+  req.session.returnTo = req.originalUrl;
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+    }
+  });
+  res.clearCookie('connect.sid', {
+    path: '/',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  return res.redirect('/login');
 };
 
 function noCache(req, res, next) {
@@ -106,14 +123,22 @@ function noCache(req, res, next) {
 }
 
 function sessionCheck(req, res, next) {
-  if (req.session && req.session.user) {
+  if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+    return next();
+  }
+  const sessionUser = req.session.user || req.session.userData;
+  if (sessionUser && (sessionUser._id || sessionUser.id)) {
     return next();
   }
   res.redirect('/login');
 }
 
 function redirectIfLoggedIn(req, res, next) {
-  if (req.session && req.session.user) {
+  if (req.isAuthenticated && req.isAuthenticated() && req.user) {
+    return res.redirect('/home');
+  }
+  const sessionUser = req.session.user || req.session.userData;
+  if (sessionUser && (sessionUser._id || sessionUser.id)) {
     return res.redirect('/home');
   }
   next();
