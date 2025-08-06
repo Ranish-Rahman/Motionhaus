@@ -124,8 +124,8 @@ app.use((error, req, res, next) => {
       error: 'PAYLOAD_TOO_LARGE'
     });
   }
-  next(error);
-});
+  next(error); 
+}); 
 
 // Start server
 const PORT = process.env.PORT || 2002;

@@ -16,7 +16,7 @@ export const generateReferralCode = async (username) => {
             return referralCode;
         }
         
-        // Generate a new code with different random part
+        // Generate a new code with different random part 
         const newUniquePart = Math.floor(1000 + Math.random() * 9000);
         referralCode = `${cleanUsername}${newUniquePart}`;
         attempts++;

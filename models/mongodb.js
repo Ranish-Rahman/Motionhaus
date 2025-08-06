@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/motionhaus';
-
+const MONGODB_URI = process.env.MONGODB_URI ||"mongodb+srv://motionhaus11:moF9NS1JzrqstSPa@cluster0.03ujm2o.mongodb.net/newData"
 const connectDB = async () => {
   try {
     console.log('Attempting to connect to MongoDB...');

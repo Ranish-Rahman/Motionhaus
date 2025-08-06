@@ -637,13 +637,26 @@ const ensureReferralCode = async (userId) => {
 // Render profile page
 const getProfile = async (req, res) => {
   try {
-    const userId = req.session.user._id;
+    // Handle both session structures for compatibility
+    const sessionUser = req.session.user || req.session.userData;
+    
+    if (!sessionUser || !sessionUser.id) {
+      console.log('No user session found, redirecting to login');
+      return res.redirect('/login');
+    }
+    
+    const userId = sessionUser.id;
     
     // Ensure user has a referral code
     await ensureReferralCode(userId);
     
     // Get fresh user data with referral code
     const user = await User.findById(userId);
+    
+    if (!user) {
+      console.log('User not found in database, redirecting to login');
+      return res.redirect('/login');
+    }
     
     // Get real order count
     const orderCount = await Order.countDocuments({ user: userId });
@@ -668,16 +681,19 @@ const getProfile = async (req, res) => {
 
 // Get address page
 const getAddress = async (req, res) => {
-  if (!req.session.user) {
+  // Handle both session structures for compatibility
+  const sessionUser = req.session.user || req.session.userData;
+  
+  if (!sessionUser || !sessionUser.id) {
     return res.redirect('/login');
   }
   
   try {
     // Fetch user's addresses from the database
-    const addresses = await Address.find({ userId: req.session.user._id });
+    const addresses = await Address.find({ userId: sessionUser.id });
     
     res.render('user/address', {
-      user: req.session.user,
+      user: sessionUser,
       addresses: addresses,
       success: req.flash('success'),
       error: req.flash('error'),
@@ -687,7 +703,7 @@ const getAddress = async (req, res) => {
     console.error('Error fetching addresses:', error);
     req.flash('error', 'Failed to load addresses. Please try again.');
     res.render('user/address', {
-      user: req.session.user,
+      user: sessionUser,
       addresses: [],
       success: req.flash('success'),
       error: req.flash('error'),
@@ -698,7 +714,10 @@ const getAddress = async (req, res) => {
 
 // Add new address
 const addAddress = async (req, res) => {
-  if (!req.session.user) {
+  // Handle both session structures for compatibility
+  const sessionUser = req.session.user || req.session.userData;
+  
+  if (!sessionUser || !sessionUser.id) {
     // Check if it's an AJAX request
     if (req.headers['content-type'] === 'application/json') {
       return res.status(401).json({ success: false, message: 'User not authenticated' });
@@ -776,7 +795,7 @@ const addAddress = async (req, res) => {
     
     // Create new address
     const newAddress = new Address({
-      userId: req.session.user._id,
+      userId: sessionUser.id,
       fullName,
       phone,
       addressLine1,

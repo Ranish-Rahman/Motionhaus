@@ -2,11 +2,18 @@ import express from 'express';
 import passport from 'passport';
 import { isAuthenticated, isNotAuthenticated } from '../middleware/authMiddleware.js';
 import { sessionCheck } from '../middleware/sessionMiddleware.js';
+import User from '../models/userModel.js';
 
 const router = express.Router();
 
 // Auth status route - must be defined before other routes
 router.get('/auth/status', (req, res) => {
+  console.log('Session Check - Current session:', {
+    hasSession: !!req.session,
+    userData: req.session?.user,
+    path: req.path
+  });
+
   res.json({
     authenticated: !!req.session?.user,
     user: req.session?.user || null
@@ -41,48 +48,54 @@ router.get('/auth/google/callback',
     passport.authenticate('google', { 
       failureRedirect: '/login',
       failureFlash: true
-    }, (err, user, info) => {
+    }, async (err, user, info) => {
       if (err) {
         console.error('Authentication error:', err);
         return res.redirect('/login?error=auth_failed');
       }
       
-      // If this is a signup flow and user exists, redirect to signup with error
-      if (req.session.isSignup && user) {
-        console.log('User already exists during signup');
-        return res.redirect('/signup?error=user_exists');
-      }
-      
-      // If this is a login flow and no user exists, redirect to signup
-      if (!req.session.isSignup && !user) {
-        console.log('No user found during login');
-        return res.redirect('/signup?error=no_user');
-      }
-      
-      // Set user in session
-      req.session.user = {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      };
-      
-      // Update last login time
-      user.lastLogin = new Date();
-      user.save();
-      
-      console.log('User logged in successfully:', user.email);
-      const returnTo = req.session.returnTo || '/home';
-      delete req.session.returnTo;
-      delete req.session.isSignup;
-      
-      // Save session and redirect
-      req.session.save((err) => {
-        if (err) {
-          console.error('Error saving session:', err);
-          return res.redirect('/login?error=session_error');
+      try {
+        // If this is a signup flow and user exists, redirect to signup with error
+        if (req.session.isSignup && user) {
+          console.log('User already exists during signup');
+          return res.redirect('/signup?error=user_exists');
         }
-        return res.redirect(returnTo);
-      });
+        
+        // If this is a login flow and no user exists, redirect to signup
+        if (!req.session.isSignup && !user) {
+          console.log('No user found during login');
+          return res.redirect('/signup?error=no_user');
+        }
+        
+        // Set user in session
+        req.session.user = {
+          id: user._id,
+          username: user.username,
+          email: user.email
+        };
+        
+        // Update last login time
+        user.lastLogin = new Date();
+        await user.save();
+        
+        console.log('User logged in successfully:', user.email);
+        const returnTo = req.session.returnTo || '/home';
+        delete req.session.returnTo;
+        delete req.session.isSignup;
+        
+        // Save session and redirect
+        req.session.save((err) => {
+          if (err) {
+            console.error('Error saving session:', err);
+            return res.redirect('/login?error=session_error');
+          }
+          return res.redirect(returnTo);
+        });
+        
+      } catch (error) {
+        console.error('Error in Google callback:', error);
+        return res.redirect('/login?error=internal');
+      }
     })(req, res, next);
   }
 );

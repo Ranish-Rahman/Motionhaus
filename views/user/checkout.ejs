@@ -794,16 +794,24 @@
                 <%= cart.finalAmount > 1000 ? 'Not available for orders above ₹1000' : 'Available' %>
               </small>
             </label>
-            <label>
-              <input type="radio" name="paymentMethod" value="wallet" <%= cart.finalAmount > 1000 ? 'checked' : '' %>>
-              <span>Pay with Wallet</span>
-              <small style="display: block; margin-top: 4px;" class="<%= user.wallet?.balance >= cart.subtotal ? 'text-success' : 'text-danger' %>">
-                Balance: ₹<%= Number(user.wallet?.balance || 0).toFixed(2) %>
-                <% if (!user.wallet?.balance || user.wallet.balance < cart.subtotal) { %>
-                  (Insufficient Balance)
-                <% } %>
-              </small>
-            </label>
+<label>
+  <input type="radio" name="paymentMethod" value="wallet" <%= cart.finalAmount > 1000 ? 'checked' : '' %>>
+  <span>Pay with Wallet</span>
+
+  <% if (user && user.wallet) { %>
+    <small style="display: block; margin-top: 4px;" class="<%= user.wallet.balance >= cart.subtotal ? 'text-success' : 'text-danger' %>">
+      Balance: ₹<%= Number(user.wallet.balance).toFixed(2) %>
+      <% if (user.wallet.balance < cart.subtotal) { %>
+        (Insufficient Balance)
+      <% } %>
+    </small>
+  <% } else { %>
+    <small style="display: block; margin-top: 4px;" class="text-danger">
+      Wallet not available
+    </small>
+  <% } %>
+ </label>
+
             <label>
               <input type="radio" name="paymentMethod" value="razorpay" <%= cart.finalAmount > 1000 ? '' : '' %>>
               <span>Pay with Razorpay</span>

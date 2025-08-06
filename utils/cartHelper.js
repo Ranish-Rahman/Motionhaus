@@ -13,14 +13,14 @@ async function getBestOffer(productId) {
   const now = new Date();
   
   // Find product-specific offers
-  const productOffers = await Offer.find({
+  const productOffers = await Offer.find({ 
     'products.productId': productId,
     startDate: { $lte: now },
     endDate: { $gte: now },
     isBlocked: false,
   }).lean();
 
-  if (productOffers.length > 0) {
+  if (productOffers.length > 0) { 
     // Return the product-specific offer with the highest discount
     return productOffers.reduce((best, current) => (current.discount > best.discount ? current : best), productOffers[0]);
   }

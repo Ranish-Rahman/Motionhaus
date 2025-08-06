@@ -617,8 +617,7 @@ form input {
             const data = await response.json();
             
             if (data.success) {
-              otpModal.classList.remove('hidden');
-              otpInputs[0].focus();
+              showOtpModal();
             } else {
               // Display server-side validation errors
               if (data.message.includes('Username')) {
@@ -722,14 +721,43 @@ form input {
         }
       });
       
-      // Resend OTP logic
+      // OTP Timer Implementation (with debug logs)
+      let otpTimerInterval;
+      function startOtpTimer(duration = 30) {
+        let timeLeft = duration;
+        resendBtn.disabled = true;
+        resendTimer.textContent = `Resend available in ${timeLeft}s`;
+        resendTimer.classList.remove('hidden'); // Always show timer
+        resendBtn.classList.add('disabled');
+        if (otpTimerInterval) clearInterval(otpTimerInterval);
+        console.log('[OTP TIMER] Starting timer for', timeLeft, 'seconds');
+        otpTimerInterval = setInterval(() => {
+          timeLeft--;
+          resendTimer.textContent = `Resend available in ${timeLeft}s`;
+          if (timeLeft <= 0) {
+            clearInterval(otpTimerInterval);
+            resendTimer.classList.add('hidden');
+            resendBtn.disabled = false;
+            resendBtn.classList.remove('disabled');
+            console.log('[OTP TIMER] Timer finished, Resend enabled');
+          }
+        }, 1000);
+      }
+
+      // Show OTP modal and start timer when OTP is sent
+      function showOtpModal() {
+        otpModal.classList.remove('hidden');
+        otpInputs[0].focus();
+        resendTimer.classList.remove('hidden'); // Always show timer when modal opens
+        startOtpTimer(30);
+      }
+
+      // Resend OTP logic (reset timer on resend)
       resendBtn.addEventListener('click', async () => {
         if (resendBtn.disabled) return;
-
         resendBtn.disabled = true;
         resendMessage.classList.add('hidden');
         resendTimer.classList.remove('hidden');
-        
         try {
           const response = await fetch('/resend-otp', {
             method: 'POST',
@@ -737,26 +765,16 @@ form input {
               'Content-Type': 'application/json'
             }
           });
-
           const data = await response.json();
-          
           if (data.success) {
             resendMessage.textContent = 'New OTP has been sent to your email.';
-            if (data.remainingResends === 0) {
-              resendMessage.textContent += ' No more resends available.';
-              resendBtn.style.display = 'none';
-            } else {
-              resendMessage.textContent += ` (${data.remainingResends} resends remaining)`;
-            }
-            startResendTimer();
+            resendMessage.classList.remove('hidden');
+            startOtpTimer(30); // Restart timer on resend
           } else {
             resendMessage.textContent = data.message;
-            if (data.message.includes('Maximum resend attempts')) {
-              resendBtn.style.display = 'none';
-            }
+            resendMessage.classList.remove('hidden');
+            resendBtn.disabled = false;
           }
-          resendMessage.classList.remove('hidden');
-          
         } catch (error) {
           console.error('Error:', error);
           resendMessage.textContent = 'Failed to resend OTP. Please try again.';
@@ -764,23 +782,6 @@ form input {
           resendBtn.disabled = false;
         }
       });
-
-      // Timer function for resend cooldown
-      function startResendTimer() {
-        let timeLeft = 30;
-        resendTimer.textContent = `Resend available in ${timeLeft}s`;
-        
-        const countdown = setInterval(() => {
-          timeLeft--;
-          resendTimer.textContent = `Resend available in ${timeLeft}s`;
-          
-          if (timeLeft <= 0) {
-            clearInterval(countdown);
-            resendTimer.classList.add('hidden');
-            resendBtn.disabled = false;
-          }
-        }, 1000);
-      }
 
       // Cancel OTP modal
 const cancelOtpBtn = document.getElementById('cancelOtp');
