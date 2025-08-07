@@ -724,10 +724,10 @@ const getAddress = async (req, res) => {
 
 // Add new address
 const addAddress = async (req, res) => {
-  // Handle both session structures for compatibility
-  const sessionUser = req.session.user || req.session.userData;
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
   
-  if (!sessionUser || !sessionUser.id) {
+  if (!sessionUser || !(sessionUser._id || sessionUser.id)) {
     // Check if it's an AJAX request
     if (req.headers['content-type'] === 'application/json') {
       return res.status(401).json({ success: false, message: 'User not authenticated' });
@@ -805,7 +805,7 @@ const addAddress = async (req, res) => {
     
     // Create new address
     const newAddress = new Address({
-      userId: sessionUser.id,
+      userId: sessionUser._id || sessionUser.id,
       fullName,
       phone,
       addressLine1,
@@ -1003,7 +1003,9 @@ const updateAddress = async (req, res) => {
 
 // Delete address
 const deleteAddress = async (req, res) => {
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  if (!sessionUser) {
     return res.redirect('/login');
   }
   
@@ -1013,7 +1015,7 @@ const deleteAddress = async (req, res) => {
     // Find and delete the address, ensuring it belongs to the current user
     const result = await Address.findOneAndDelete({
       _id: addressId,
-      userId: req.session.user._id
+      userId: sessionUser._id || sessionUser.id
     });
     
     if (!result) {
@@ -1032,7 +1034,9 @@ const deleteAddress = async (req, res) => {
 
 // Set address as default
 const setDefaultAddress = async (req, res) => {
-  if (!req.session.user) {
+  // Use standardized session accessor
+  const sessionUser = req.user || req.session.user || req.session.userData;
+  if (!sessionUser) {
     // Check if it's an AJAX request
     if (req.headers['content-type'] === 'application/json') {
       return res.status(401).json({ success: false, message: 'User not authenticated' });
@@ -1046,7 +1050,7 @@ const setDefaultAddress = async (req, res) => {
     // Find the address and ensure it belongs to the current user
     const address = await Address.findOne({
       _id: addressId,
-      userId: req.session.user._id
+      userId: sessionUser._id || sessionUser.id
     });
     
     if (!address) {
@@ -1440,7 +1444,13 @@ const requestReturn = async (req, res) => {
 const sendProfileOTP = async (req, res) => {
   try {
     const { email } = req.body;
-    const userId = req.session.user._id;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = sessionUser._id || sessionUser.id;
 
     // Enhanced email validation
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -1577,7 +1587,9 @@ const verifyProfileOTP = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const { username, email, phone } = req.body;
-    const sessionUser = req.session.user || req.session.userData;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
     const userId = sessionUser && (sessionUser._id || sessionUser.id);
 
     console.log('Update Profile Request:', { username, email, phone, userId });
@@ -1867,7 +1879,13 @@ const getProfileData = async (req, res) => {
 export const handlePaymentFailure = async (req, res) => {
   try {
     const { orderID, razorpayOrderId, error } = req.body;
-    const userId = req.session.user._id;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = sessionUser._id || sessionUser.id;
 
     console.log('Handling failed payment:', { orderID, razorpayOrderId, error });
 
@@ -1947,7 +1965,13 @@ export const handlePaymentFailure = async (req, res) => {
 export const cancelRazorpayOrder = async (req, res) => {
   try {
     const { orderID, razorpayOrderId } = req.body;
-    const userId = req.session.user._id;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = sessionUser._id || sessionUser.id;
 
     console.log('[Debug] Cancelling Razorpay order:', { orderID, razorpayOrderId });
 
@@ -2262,7 +2286,13 @@ export const getOrderFailure = async (req, res) => {
 const createOrder = async (req, res) => {
   try {
     const { addressId, finalAmount, paymentMethod } = req.body;
-    const userId = req.session.user._id;
+    
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+    const userId = sessionUser._id || sessionUser.id;
 
     console.log('Received addressId in createOrder:', addressId);
 
@@ -2413,14 +2443,16 @@ const createOrder = async (req, res) => {
 // Get referral statistics for a user
 const getReferralStats = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({
         success: false,
         message: 'Not authenticated'
       });
     }
 
-    const userId = req.session.user._id;
+    const userId = sessionUser._id || sessionUser.id;
     const user = await User.findById(userId);
     
     if (!user) {
@@ -2499,14 +2531,16 @@ const checkReferralCodeValidity = async (req, res) => {
 // Get user's referral code for sharing
 const getMyReferralCode = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({
         success: false,
         message: 'Not authenticated'
       });
     }
 
-    const user = await User.findById(req.session.user._id);
+    const user = await User.findById(sessionUser._id || sessionUser.id);
     if (!user) {
       return res.status(404).json({
         success: false,
