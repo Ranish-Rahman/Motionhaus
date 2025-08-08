@@ -54,104 +54,73 @@ export const getSalesReportPage = (req, res) => {
 // Fetch sales report data (AJAX)
 export const getSalesReport = async (req, res) => {
   try {
-    const { range, startDate, endDate, page = 1, limit = 10 } = req.query;
-    let start, end;
+    const orders = await Order.find({
+      createdAt: {
+        $gte: moment().startOf('month').toDate(),
+        $lte: moment().endOf('month').toDate(),
+      }
+    }).populate('user', 'name email')
+      .populate('items.product', 'name');
 
-    // Convert page and limit to numbers
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    const skip = (pageNum - 1) * limitNum;
+    let tableData = [];
+    let totalSales = 0;
+    let totalOrders = 0;
+    let totalDiscount = 0;
 
-    if (range === 'daily') {
-      start = moment().tz(TIMEZONE).startOf('day');
-      end = moment().tz(TIMEZONE).endOf('day');
-    } else if (range === 'weekly') {
-      start = moment().tz(TIMEZONE).startOf('week');
-      end = moment().tz(TIMEZONE).endOf('week');
-    } else if (range === 'yearly') {
-      start = moment().tz(TIMEZONE).startOf('year');
-      end = moment().tz(TIMEZONE).endOf('year');
-    } else if (range === 'custom' && startDate && endDate) {
-      start = moment.tz(startDate, TIMEZONE).startOf('day');
-      end = moment.tz(endDate, TIMEZONE).endOf('day');
-    } else {
-      return res.status(400).json({ error: 'Invalid range or dates' });
+    for (const order of orders) {
+      let orderHasSale = false;
+
+     for (const item of order.items) {
+  if (item.status === 'Delivered' || item.status === 'Completed') {
+    orderHasSale = true;
+
+    const itemTotal = item.paidPrice * item.quantity;
+    totalSales += itemTotal;
+
+    tableData.push({
+      id: order.orderID,
+      date: moment(order.createdAt).tz("Asia/Kolkata").format("DD/MM/YYYY, h:mm A"),
+      customer: order.user?.name || order.user?.email || 'N/A',
+      product: item.product?.name || 'Unknown Product',
+      quantity: item.quantity,
+      price: item.paidPrice,
+      total: itemTotal,
+      status: item.status,
+      paymentMethod: order.paymentMethod
+    });
+  }
+}
+
+
+      if (orderHasSale) {
+        totalOrders++;
+        totalDiscount += order.discountAmount || 0;
+      }
     }
 
-    const matchStage = {
-      createdAt: { $gte: start.toDate(), $lte: end.toDate() },
-      status: { $in: ['Delivered', 'Completed'] },
-    };
-
-    // --- New Aggregation for Summary ---
-    const summaryData = await Order.aggregate([
-      { $match: matchStage },
-      {
-        $group: {
-          _id: null,
-          totalSales: { $sum: "$totalAmount" },
-          totalDiscount: { $sum: { $ifNull: ["$discountAmount", 0] } },
-          totalOrders: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const summary = summaryData[0] || {
-      totalSales: 0,
-      totalDiscount: 0,
-      totalOrders: 0
-    };
-    // --- End New Aggregation ---
-
-    // Fetch orders for the current page
-    const orders = await Order.find(matchStage)
-      .populate('user', 'name email')
-      .populate('items.product', 'name')
-      .populate('coupon', 'code')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum);
-
-    // Prepare table data
-    const tableData = orders.map(order => {
-      // Calculate discount offer information
-      const couponDiscount = order.coupon ? (order.discountAmount || 0) : 0;
-      const offerDiscount = order.discountAmount ? (order.discountAmount - couponDiscount) : 0;
-      const discountOffer = `₹${offerDiscount} ₹${couponDiscount}`;
-      
-      return {
-        id: order.orderID || order._id,
-        date: moment(order.createdAt).tz(TIMEZONE).format('DD/MM/YYYY, h:mm a'),
-        customer: order.user?.name || order.user?.email || 'N/A',
-        total: order.totalAmount,
-        status: order.status,
-        coupon: order.coupon?.code || '-',
-        discountOffer: discountOffer
-      };
-    });
-
-    // Calculate pagination info
-    const totalPages = Math.ceil(summary.totalOrders / limitNum);
-    const hasNextPage = pageNum < totalPages;
-    const hasPrevPage = pageNum > 1;
-
     res.json({
-      summary,
+      summary: {
+        totalSales,
+        totalOrders,
+        totalDiscount
+      },
       tableData,
       pagination: {
-        currentPage: pageNum,
-        totalPages,
-        hasNextPage,
-        hasPrevPage,
-        totalOrders: summary.totalOrders,
-        limit: limitNum
+        currentPage: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+        totalOrders,
+        limit: tableData.length
       }
     });
+
   } catch (err) {
     console.error('Sales report error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 
 // Download PDF sales report
 export const downloadPdfReport = async (req, res) => {
