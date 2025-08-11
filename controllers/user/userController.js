@@ -1737,7 +1737,6 @@ const updateProfile = async (req, res) => {
 
 // Generate invoice
 export const generateInvoice = async (req, res) => {
-  let browser;
   try {
     // Use standardized session accessor
     const sessionUser = req.user || req.session.user || req.session.userData;
@@ -1772,103 +1771,59 @@ export const generateInvoice = async (req, res) => {
       return res.redirect('/profile/orders');
     }
 
-    // Render the invoice template to HTML once (used by Puppeteer)
-    const htmlContent = await ejs.renderFile('views/user/invoice.ejs', { order });
+    // Fallback-only implementation using PDFKit (no Chromium required)
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.orderID}.pdf`);
 
-    // Try Puppeteer first
-    try {
-      browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-zygote',
-          '--single-process'
-        ]
-      });
+    doc.fontSize(20).text('MotionHaus', { align: 'left' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).text(`Invoice #: ${order.orderID}`);
+    doc.text(`Date: ${new Date(order.orderDate).toLocaleDateString()}`);
+    doc.text(`Customer: ${order.user?.name || ''}`);
+    doc.text(`Email: ${order.user?.email || ''}`);
+    doc.moveDown();
 
-      const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    doc.fontSize(12).text('Items:', { underline: true });
+    doc.moveDown(0.5);
+    order.items.forEach((item) => {
+      const name = item.product?.name || 'Product';
+      const qty = item.quantity || 1;
+      const price = (item.finalPrice !== undefined ? item.finalPrice : item.price) || 0;
+      const total = price * qty;
+      doc.text(`${name}  x${qty}  -  ₹${price.toFixed(2)}  =  ₹${total.toFixed(2)}`);
+    });
 
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
-      });
+    doc.moveDown();
+    doc.text(`Subtotal: ₹${order.originalAmount.toFixed(2)}`);
 
-      await browser.close();
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.orderID}.pdf`);
-      return res.send(pdfBuffer);
-    } catch (pptrError) {
-      // Ensure browser is closed if partially launched
-      if (browser) {
-        try { await browser.close(); } catch (_) {}
+    let totalOfferDiscount = 0;
+    order.items.forEach(item => {
+      if (item.originalPrice && item.originalPrice > item.price) {
+        totalOfferDiscount += (item.originalPrice - item.price) * item.quantity;
       }
-      console.error('Puppeteer failed, falling back to PDFKit:', pptrError.message);
+    });
+    const couponDiscount = (order.discountAmount || 0) - totalOfferDiscount;
 
-      // Fallback: generate a simple PDF via PDFKit
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.orderID}.pdf`);
-
-      doc.fontSize(20).text('MotionHaus', { align: 'left' });
-      doc.moveDown(0.5);
-      doc.fontSize(12).text(`Invoice #: ${order.orderID}`);
-      doc.text(`Date: ${new Date(order.orderDate).toLocaleDateString()}`);
-      doc.text(`Customer: ${order.user?.name || ''}`);
-      doc.text(`Email: ${order.user?.email || ''}`);
-      doc.moveDown();
-
-      // Table header
-      doc.fontSize(12).text('Items:', { underline: true });
-      doc.moveDown(0.5);
-      order.items.forEach((item) => {
-        const name = item.product?.name || 'Product';
-        const qty = item.quantity || 1;
-        const price = (item.finalPrice !== undefined ? item.finalPrice : item.price) || 0;
-        const total = price * qty;
-        doc.text(`${name}  x${qty}  -  ₹${price.toFixed(2)}  =  ₹${total.toFixed(2)}`);
-      });
-
-      doc.moveDown();
-      doc.text(`Subtotal: ₹${order.originalAmount.toFixed(2)}`);
-
-      // Compute offer and coupon discounts similarly to UI
-      let totalOfferDiscount = 0;
-      order.items.forEach(item => {
-        if (item.originalPrice && item.originalPrice > item.price) {
-          totalOfferDiscount += (item.originalPrice - item.price) * item.quantity;
-        }
-      });
-      const couponDiscount = (order.discountAmount || 0) - totalOfferDiscount;
-
-      if (totalOfferDiscount > 0) {
-        doc.text(`Offer Discount: -₹${totalOfferDiscount.toFixed(2)}`);
-      }
-      if (order.coupon && couponDiscount > 0) {
-        doc.text(`Coupon (${order.coupon.code}): -₹${couponDiscount.toFixed(2)}`);
-      }
-
-      doc.text('Shipping: Free');
-      doc.moveDown(0.5);
-      doc.fontSize(14).text(`Total: ₹${order.totalAmount.toFixed(2)}`, { align: 'right' });
-
-      doc.moveDown();
-      doc.fontSize(10).text('* This invoice includes all items in the order, regardless of their current status.');
-      doc.fontSize(10).text('This is a computer-generated invoice, no signature required.');
-
-      doc.end();
-      return doc.pipe(res);
+    if (totalOfferDiscount > 0) {
+      doc.text(`Offer Discount: -₹${totalOfferDiscount.toFixed(2)}`);
     }
+    if (order.coupon && couponDiscount > 0) {
+      doc.text(`Coupon (${order.coupon.code}): -₹${couponDiscount.toFixed(2)}`);
+    }
+
+    doc.text('Shipping: Free');
+    doc.moveDown(0.5);
+    doc.fontSize(14).text(`Total: ₹${order.totalAmount.toFixed(2)}`, { align: 'right' });
+
+    doc.moveDown();
+    doc.fontSize(10).text('* This invoice includes all items in the order, regardless of their current status.');
+    doc.fontSize(10).text('This is a computer-generated invoice, no signature required.');
+
+    doc.end();
+    return doc.pipe(res);
   } catch (error) {
     console.error('Error generating invoice:', error);
-    if (browser) {
-      try { await browser.close(); } catch (_) {}
-    }
     req.flash('error', 'Failed to generate invoice');
     return res.redirect('/profile/orders');
   }
