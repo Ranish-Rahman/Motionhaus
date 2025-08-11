@@ -7,7 +7,6 @@ import Wishlist from '../../models/wishlistModel.js';
 import Cart from '../../models/cartModel.js';
 import Order from '../../models/orderModel.js';
 import { validatePassword } from '../../utils/passwordValidation.js';
-import puppeteer from 'puppeteer';
 import ejs from 'ejs';
 import razorpay from '../../utils/razorpay.js';
 import { nanoid } from 'nanoid';
