@@ -137,8 +137,8 @@ router.post('/profile/address/set-default/:id', setDefaultAddress);
 
 // Order-related routes
 router.get('/profile/orders', getOrders);
-router.get('/profile/orders/:id', getOrderDetails);
 router.get('/profile/orders/:id/invoice', generateInvoice);
+router.get('/profile/orders/:id', getOrderDetails);
 
 // Product-related routes
 router.get('/products', listProducts);

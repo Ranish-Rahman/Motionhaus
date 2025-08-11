@@ -1738,7 +1738,9 @@ const updateProfile = async (req, res) => {
 export const generateInvoice = async (req, res) => {
   let browser;
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.redirect('/login');
     }
 
@@ -1753,7 +1755,7 @@ export const generateInvoice = async (req, res) => {
     }
 
     // Check if the order belongs to the current user
-    const userId = req.session.user._id || req.session.user.id;
+    const userId = sessionUser._id || sessionUser.id;
     if (order.user._id.toString() !== userId.toString()) {
       req.flash('error', 'You are not authorized to view this invoice');
       return res.redirect('/profile/orders');
@@ -1821,14 +1823,17 @@ export const generateInvoice = async (req, res) => {
 // Get profile data
 const getProfileData = async (req, res) => {
   try {
-    if (!req.session.user) {
+    // Use standardized session accessor
+    const sessionUser = req.user || req.session.user || req.session.userData;
+    if (!sessionUser) {
       return res.status(401).json({
         success: false,
         message: 'Not authenticated'
       });
     }
 
-    const user = await User.findById(req.session.user._id);
+    const userId = sessionUser._id || sessionUser.id;
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -1836,19 +1841,21 @@ const getProfileData = async (req, res) => {
       });
     }
 
-    // Update session with latest user data
-    req.session.user = {
-      ...req.session.user,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      _id: user._id,
-      role: user.role,
-      isVerified: user.isVerified,
-      isBlocked: user.isBlocked,
-      status: user.status,
-      wallet: user.wallet
-    };
+    // Update session with latest user data (maintain compatibility)
+    if (req.session.user) {
+      req.session.user = {
+        ...req.session.user,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        _id: user._id,
+        role: user.role,
+        isVerified: user.isVerified,
+        isBlocked: user.isBlocked,
+        status: user.status,
+        wallet: user.wallet
+      };
+    }
 
     // Save session explicitly
     await new Promise((resolve, reject) => {
