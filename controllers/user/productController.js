@@ -67,7 +67,7 @@ export const listProducts = async (req, res) => {
   try {
     // Get query parameters with defaults
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 12;
+    const limit = parseInt(req.query.limit) || 12; // Changed back to 12
     const { search, sort, minPrice, maxPrice, category, size } = req.query;
     
     // Build query

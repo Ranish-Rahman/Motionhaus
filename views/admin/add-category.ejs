@@ -138,7 +138,7 @@
       color: #dc3545;
       font-size: 12px;
       margin-top: 4px;
-      display: block;
+      display: none; /* hidden until invalid */
     }
 
     .form-control.error {
@@ -185,13 +185,13 @@
             <input type="text" id="name" name="name" class="form-control" required
                    minlength="2" maxlength="50" pattern="[a-zA-Z0-9\s-]+"
                    title="Category name can only contain letters, numbers, spaces, and hyphens">
-            <div class="error-message" id="nameError">Category name must contain only letters, numbers, spaces, and hyphens (2-50 characters)</div>
+            <div class="error-message" id="nameError" aria-live="polite"></div>
           </div>
 
           <div class="form-group">
             <label for="description">Description (Optional)</label>
             <textarea id="description" name="description" class="form-control" rows="4" maxlength="500"></textarea>
-            <div class="error-message" id="descriptionError">Description cannot exceed 500 characters</div>
+            <div class="error-message" id="descriptionError" aria-live="polite"></div>
           </div>
 
           <button type="submit" class="submit-btn">Add Category</button>
@@ -230,53 +230,56 @@
     function validateName() {
       const name = nameInput.value.trim();
       nameError.textContent = '';
+      nameError.style.display = 'none';
       nameInput.classList.remove('error', 'valid');
 
       if (!name) {
         nameError.textContent = 'Category name is required';
+        nameError.style.display = 'block';
         nameInput.classList.add('error');
         return false;
       }
 
       if (name.length < 2) {
         nameError.textContent = 'Category name must be at least 2 characters long';
+        nameError.style.display = 'block';
         nameInput.classList.add('error');
         return false;
       }
 
       if (name.length > 50) {
         nameError.textContent = 'Category name cannot exceed 50 characters';
+        nameError.style.display = 'block';
         nameInput.classList.add('error');
         return false;
       }
 
       if (!/^[a-zA-Z0-9\s-]+$/.test(name)) {
         nameError.textContent = 'Category name can only contain letters, numbers, spaces, and hyphens';
+        nameError.style.display = 'block';
         nameInput.classList.add('error');
         return false;
       }
 
       nameInput.classList.add('valid');
-      nameError.textContent = 'Category name is valid';
-      nameError.style.color = '#198754';
       return true;
     }
 
     function validateDescription() {
       const description = descriptionInput.value.trim();
       descriptionError.textContent = '';
+      descriptionError.style.display = 'none';
       descriptionInput.classList.remove('error', 'valid');
 
       if (description.length > 500) {
         descriptionError.textContent = 'Description cannot exceed 500 characters';
+        descriptionError.style.display = 'block';
         descriptionInput.classList.add('error');
         return false;
       }
 
       if (description.length > 0) {
         descriptionInput.classList.add('valid');
-        descriptionError.textContent = 'Description is valid';
-        descriptionError.style.color = '#198754';
       }
       return true;
     }
@@ -358,9 +361,7 @@
       }
     });
 
-    // Initial validation
-    validateName();
-    validateDescription();
+    // Do not run initial validation to avoid showing messages before typing
   </script>
 </body>
 </html> 

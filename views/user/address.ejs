@@ -478,6 +478,52 @@
     .swal2-loading .swal2-confirm {
       display: none !important;
     }
+
+    /* Inline Validation Styles */
+    .form-control.is-invalid {
+      border-color: #ff7675 !important;
+      box-shadow: 0 0 0 0.2rem rgba(255, 118, 117, 0.25) !important;
+    }
+
+    .form-control.is-valid {
+      border-color: #00b894 !important;
+      box-shadow: 0 0 0 0.2rem rgba(0, 184, 148, 0.25) !important;
+    }
+
+    .form-select.is-invalid {
+      border-color: #ff7675 !important;
+      box-shadow: 0 0 0 0.2rem rgba(255, 118, 117, 0.25) !important;
+    }
+
+    .form-select.is-valid {
+      border-color: #00b894 !important;
+      box-shadow: 0 0 0 0.2rem rgba(0, 184, 148, 0.25) !important;
+    }
+
+    .invalid-feedback {
+      display: block !important;
+      color: #ff7675 !important;
+      font-size: 0.875rem !important;
+      margin-top: 0.25rem !important;
+      font-weight: 500 !important;
+    }
+
+    .valid-feedback {
+      display: block !important;
+      color: #00b894 !important;
+      font-size: 0.875rem !important;
+      margin-top: 0.25rem !important;
+      font-weight: 500 !important;
+    }
+
+    /* Form validation states */
+    .form-control:focus.is-invalid {
+      box-shadow: 0 0 0 0.2rem rgba(255, 118, 117, 0.25) !important;
+    }
+
+    .form-control:focus.is-valid {
+      box-shadow: 0 0 0 0.2rem rgba(0, 184, 148, 0.25) !important;
+    }
   </style>
 </head>
 <body>
@@ -513,53 +559,54 @@
             </div>
 
             <!-- Add New Address Form -->
-            <form action="/profile/address/add" method="POST" class="row g-4 mb-5" id="addressForm">
+            <form action="/profile/address/add" method="POST" class="row g-4 mb-5" id="addressForm" novalidate>
               <div class="col-md-6">
                 <label for="fullName" class="form-label text-white">Full Name</label>
                 <input type="text" class="form-control" id="fullName" name="fullName" 
-                  minlength="2" maxlength="50">
-                <div class="invalid-feedback">Please enter a valid name (2-50 characters, letters only)</div>
+                  minlength="2" maxlength="50" required>
+                <div class="invalid-feedback" id="fullName-error"></div>
               </div>
               <div class="col-md-6">
                 <label for="phone" class="form-label text-white">Phone Number</label>
                 <input type="tel" class="form-control" id="phone" name="phone" 
-                  minlength="10" maxlength="15">
-                <div class="invalid-feedback">Please enter a valid phone number (10-15 digits)</div>
+                  minlength="10" maxlength="15" required>
+                <div class="invalid-feedback" id="phone-error"></div>
               </div>
               <div class="col-12">
                 <label for="addressLine1" class="form-label text-white">Address Line 1</label>
                 <input type="text" class="form-control" id="addressLine1" name="addressLine1" 
                   placeholder="Street address, P.O. box, company name" 
-                  minlength="5" maxlength="100">
-                <div class="invalid-feedback">Please enter a valid address (5-100 characters)</div>
+                  minlength="5" maxlength="100" required>
+                <div class="invalid-feedback" id="addressLine1-error"></div>
               </div>
               <div class="col-12">
                 <label for="addressLine2" class="form-label text-white">Address Line 2</label>
                 <input type="text" class="form-control" id="addressLine2" name="addressLine2" 
                   placeholder="Apartment, suite, unit, building, floor, etc."
                   maxlength="100">
+                <div class="invalid-feedback" id="addressLine2-error"></div>
               </div>
               <div class="col-md-4">
                 <label for="city" class="form-label text-white">City</label>
                 <input type="text" class="form-control" id="city" name="city" 
-                  minlength="2" maxlength="50">
-                <div class="invalid-feedback">Please enter a valid city name (2-50 characters)</div>
+                  minlength="2" maxlength="50" required>
+                <div class="invalid-feedback" id="city-error"></div>
               </div>
               <div class="col-md-4">
                 <label for="state" class="form-label text-white">State/Province</label>
                 <input type="text" class="form-control" id="state" name="state" 
-                  minlength="2" maxlength="50">
-                <div class="invalid-feedback">Please enter a valid state/province (2-50 characters)</div>
+                  minlength="2" maxlength="50" required>
+                <div class="invalid-feedback" id="state-error"></div>
               </div>
               <div class="col-md-4">
                 <label for="zipCode" class="form-label text-white">ZIP/Postal Code</label>
                 <input type="text" class="form-control" id="zipCode" name="zipCode" 
-                  minlength="3" maxlength="10">
-                <div class="invalid-feedback">Please enter a valid ZIP/postal code (3-10 characters)</div>
+                  minlength="3" maxlength="10" required>
+                <div class="invalid-feedback" id="zipCode-error"></div>
               </div>
               <div class="col-md-6">
                 <label for="country" class="form-label text-white">Country</label>
-                <select class="form-select" id="country" name="country">
+                <select class="form-select" id="country" name="country" required>
                   <option value="" disabled selected>Select a country</option>
                   <option value="US">United States</option>
                   <option value="CA">Canada</option>
@@ -568,7 +615,7 @@
                   <option value="IND">India</option>
                   <!-- Add more countries as needed -->
                 </select>
-                <div class="invalid-feedback">Please select a country</div>
+                <div class="invalid-feedback" id="country-error"></div>
               </div>
               <div class="col-md-6">
                 <label for="addressType" class="form-label text-white">Address Type</label>
@@ -651,6 +698,155 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      // Form validation functions
+      const validators = {
+        fullName: (value) => {
+          if (!value) return 'Full name is required';
+          if (value.length < 2) return 'Full name must be at least 2 characters';
+          if (value.length > 50) return 'Full name must be less than 50 characters';
+          if (!/^[a-zA-Z\s]+$/.test(value)) return 'Full name should contain only letters and spaces';
+          return null;
+        },
+        phone: (value) => {
+          if (!value) return 'Phone number is required';
+          if (value.length < 10) return 'Phone number must be at least 10 digits';
+          if (value.length > 15) return 'Phone number must be less than 15 digits';
+          if (!/^\d+$/.test(value)) return 'Phone number should contain only digits';
+          return null;
+        },
+        addressLine1: (value) => {
+          if (!value) return 'Address line 1 is required';
+          if (value.length < 5) return 'Address must be at least 5 characters';
+          if (value.length > 100) return 'Address must be less than 100 characters';
+          return null;
+        },
+        addressLine2: (value) => {
+          if (value && value.length > 100) return 'Address line 2 must be less than 100 characters';
+          return null;
+        },
+        city: (value) => {
+          if (!value) return 'City is required';
+          if (value.length < 2) return 'City must be at least 2 characters';
+          if (value.length > 50) return 'City must be less than 50 characters';
+          if (!/^[a-zA-Z\s]+$/.test(value)) return 'City should contain only letters and spaces';
+          return null;
+        },
+        state: (value) => {
+          if (!value) return 'State/Province is required';
+          if (value.length < 2) return 'State/Province must be at least 2 characters';
+          if (value.length > 50) return 'State/Province must be less than 50 characters';
+          if (!/^[a-zA-Z\s]+$/.test(value)) return 'State/Province should contain only letters and spaces';
+          return null;
+        },
+        zipCode: (value) => {
+          if (!value) return 'ZIP/Postal code is required';
+          if (value.length < 3) return 'ZIP/Postal code must be at least 3 characters';
+          if (value.length > 10) return 'ZIP/Postal code must be less than 10 characters';
+          return null;
+        },
+        country: (value) => {
+          if (!value) return 'Country is required';
+          return null;
+        }
+      };
+
+      // Function to show error message
+      function showError(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        const errorDiv = document.getElementById(fieldId + '-error');
+        
+        field.classList.remove('is-valid');
+        field.classList.add('is-invalid');
+        
+        if (errorDiv) {
+          errorDiv.textContent = message;
+          errorDiv.style.display = 'block';
+        }
+      }
+
+      // Function to show success message
+      function showSuccess(fieldId) {
+        const field = document.getElementById(fieldId);
+        const errorDiv = document.getElementById(fieldId + '-error');
+        
+        field.classList.remove('is-invalid');
+        field.classList.add('is-valid');
+        
+        if (errorDiv) {
+          errorDiv.style.display = 'none';
+        }
+      }
+
+      // Function to validate a single field
+      function validateField(fieldId) {
+        const field = document.getElementById(fieldId);
+        const value = field.value.trim();
+        const validator = validators[fieldId];
+        
+        if (validator) {
+          const error = validator(value);
+          if (error) {
+            showError(fieldId, error);
+            return false;
+          } else {
+            showSuccess(fieldId);
+            return true;
+          }
+        }
+        return true;
+      }
+
+      // Add real-time validation to all form fields
+      Object.keys(validators).forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+          // Validate on blur
+          field.addEventListener('blur', () => validateField(fieldId));
+          
+          // Validate on input (for real-time feedback)
+          field.addEventListener('input', () => {
+            if (field.classList.contains('is-invalid')) {
+              validateField(fieldId);
+            }
+          });
+        }
+      });
+
+      // Form submission validation
+      document.getElementById('addressForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        let isValid = true;
+        const errors = [];
+        
+        // Validate all fields
+        Object.keys(validators).forEach(fieldId => {
+          if (!validateField(fieldId)) {
+            isValid = false;
+            const field = document.getElementById(fieldId);
+            const errorDiv = document.getElementById(fieldId + '-error');
+            if (errorDiv && errorDiv.textContent) {
+              errors.push(errorDiv.textContent);
+            }
+          }
+        });
+        
+        if (isValid) {
+          // Form is valid, submit it
+          this.submit();
+        } else {
+          // Show first error in a toast or alert
+          if (errors.length > 0) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Validation Error',
+              text: errors[0],
+              confirmButtonColor: '#ff7675'
+            });
+          }
+        }
+      });
+
       // Handle edit address buttons
       document.querySelectorAll('.edit-address-btn').forEach(button => {
         button.addEventListener('click', function(e) {

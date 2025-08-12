@@ -241,7 +241,7 @@
                       </button>
                     </form>
                     <% } else { %>
-                      <form action="/admin/categories/restore/<%= category._id %>" method="POST" style="display: inline;">
+                      <form action="/admin/categories/<%= category._id %>/restore" method="POST" style="display: inline;">
                         <button type="submit" class="restore-btn">
                           <i class="bi bi-arrow-counterclockwise"></i>
                           Restore

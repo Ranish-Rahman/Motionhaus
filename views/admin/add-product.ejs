@@ -295,7 +295,7 @@
       color: #dc3545;
       font-size: 12px;
       margin-top: 5px;
-      display: block;
+      display: none; /* hidden until invalid */
     }
 
     .form-control.error {
@@ -519,19 +519,19 @@
           <div class="form-group">
             <label for="name">Product Name</label>
             <input type="text" id="name" name="name" class="form-control">
-            <div class="error-message" id="nameError"></div>
+            <div class="error-message" id="nameError" aria-live="polite"></div>
           </div>
 
           <div class="form-group">
             <label for="description">Description</label>
             <textarea id="description" name="description" class="form-control" rows="4"></textarea>
-            <div class="error-message" id="descriptionError"></div>
+            <div class="error-message" id="descriptionError" aria-live="polite"></div>
           </div>
 
           <div class="form-group">
             <label for="price">Price</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01">
-            <div class="error-message" id="priceError"></div>
+            <div class="error-message" id="priceError" aria-live="polite"></div>
           </div>
 
           <div class="form-group">
@@ -545,7 +545,7 @@
                 <option value="" disabled selected>No categories available. Please add a category first.</option>
               <% } %>
             </select>
-            <div class="error-message" id="categoryError"></div>
+            <div class="error-message" id="categoryError" aria-live="polite"></div>
             <% if (!categories || categories.length === 0) { %>
               <div class="alert alert-error" style="margin-top: 10px;">
                 <i class="bi bi-exclamation-triangle"></i>
@@ -569,7 +569,7 @@
                 </div>
               <% }) %>
             </div>
-            <div class="error-message" id="sizeQuantityError"></div>
+            <div class="error-message" id="sizeQuantityError" aria-live="polite"></div>
             <small class="text-muted" style="display: block; margin-top: 8px; color: #a0aec0;">
               Enter stock quantity for each available size. Leave 0 if not available.
             </small>
@@ -589,7 +589,7 @@
                 </label>
               </div>
             </div>
-            <div class="error-message" id="imagesError"></div>
+            <div class="error-message" id="imagesError" aria-live="polite"></div>
           </div>
 
           <button type="submit" class="submit-btn">Add Product</button>
@@ -630,16 +630,19 @@
       function validateName() {
         const name = nameInput.value.trim();
         nameError.textContent = '';
+        nameError.style.display = 'none';
         nameInput.classList.remove('error', 'valid');
 
         if (!name) {
           nameError.textContent = 'Product name is required';
+          nameError.style.display = 'block';
           nameInput.classList.add('error');
           return false;
         }
 
         if (name.length < 3) {
           nameError.textContent = 'Product name must be at least 3 characters long';
+          nameError.style.display = 'block';
           nameInput.classList.add('error');
           return false;
         }
@@ -651,16 +654,19 @@
       function validateDescription() {
         const description = descriptionInput.value.trim();
         descriptionError.textContent = '';
+        descriptionError.style.display = 'none';
         descriptionInput.classList.remove('error', 'valid');
 
         if (!description) {
           descriptionError.textContent = 'Product description is required';
+          descriptionError.style.display = 'block';
           descriptionInput.classList.add('error');
           return false;
         }
 
         if (description.length < 10) {
           descriptionError.textContent = 'Product description must be at least 10 characters long';
+          descriptionError.style.display = 'block';
           descriptionInput.classList.add('error');
           return false;
         }
@@ -672,10 +678,12 @@
       function validatePrice() {
         const price = priceInput.value;
         priceError.textContent = '';
+        priceError.style.display = 'none';
         priceInput.classList.remove('error', 'valid');
 
         if (!price) {
           priceError.textContent = 'Product price is required';
+          priceError.style.display = 'block';
           priceInput.classList.add('error');
           return false;
         }
@@ -683,12 +691,14 @@
         const priceNum = parseFloat(price);
         if (isNaN(priceNum)) {
           priceError.textContent = 'Price must be a valid number';
+          priceError.style.display = 'block';
           priceInput.classList.add('error');
           return false;
         }
 
         if (priceNum <= 0) {
           priceError.textContent = 'Price must be greater than 0';
+          priceError.style.display = 'block';
           priceInput.classList.add('error');
           return false;
         }
@@ -700,10 +710,12 @@
       function validateCategory() {
         const category = categoryInput.value;
         categoryError.textContent = '';
+        categoryError.style.display = 'none';
         categoryInput.classList.remove('error', 'valid');
 
         if (!category) {
           categoryError.textContent = 'Product category is required';
+          categoryError.style.display = 'block';
           categoryInput.classList.add('error');
           return false;
         }
@@ -717,6 +729,7 @@
         const sizeQuantityError = document.getElementById('sizeQuantityError');
         let atLeastOneValid = false;
         sizeQuantityError.textContent = '';
+        sizeQuantityError.style.display = 'none';
 
         inputs.forEach(input => {
           const qty = parseInt(input.value);
@@ -733,6 +746,7 @@
 
         if (!atLeastOneValid) {
           sizeQuantityError.textContent = 'Enter quantity for at least one size.';
+          sizeQuantityError.style.display = 'block';
           return false;
         }
 
@@ -741,16 +755,19 @@
 
       function validateImages() {
         imagesError.textContent = '';
+        imagesError.style.display = 'none';
         imagePreviewGrid.classList.remove('error', 'valid');
 
         if (uploadedImages.length < 3) {
           imagesError.textContent = 'At least 3 images are required';
+          imagesError.style.display = 'block';
           imagePreviewGrid.classList.add('error');
           return false;
         }
 
         if (uploadedImages.length > 10) {
           imagesError.textContent = 'Maximum 10 images allowed';
+          imagesError.style.display = 'block';
           imagePreviewGrid.classList.add('error');
           return false;
         }
@@ -1046,13 +1063,7 @@
         });
       });
 
-      // Initial validation
-      validateName();
-      validateDescription();
-      validatePrice();
-      validateCategory();
-      validateSizesWithQuantities();
-      validateImages();
+      // Do not run initial validation to avoid showing messages before typing
     });
   </script>
 </body>

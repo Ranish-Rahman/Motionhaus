@@ -18,8 +18,11 @@
         <ul class="motion-nav-list motion-right">
             <li class="motion-nav-item motion-icon-item">
                 <div class="motion-profile-dropdown">
-                    <a href="javascript:void(0)" class="motion-icon-link" id="profileDropdownToggle">
-                        <i class="fas fa-user"></i>
+                    <a href="javascript:void(0)" class="motion-icon-link" id="profileDropdownToggle" title="Profile">
+                        <!-- Larger Person Icon -->
+                        <svg class="motion-icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3-3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                        </svg>
                     </a>
                     <div class="motion-dropdown-content" id="profileDropdown">
                         <a href="/profile">Profile</a>
@@ -28,16 +31,25 @@
                 </div>
             </li>
             <li class="motion-nav-item motion-icon-item">
-                <a href="/wishlist" class="motion-icon-link">
-                    <i class="fas fa-heart"></i>
+                <a href="/wishlist" class="motion-icon-link" title="Wishlist">
+                    <!-- Modern Heart Icon -->
+                    <svg class="motion-icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
                     <% if (locals.wishlistCount && locals.wishlistCount > 0) { %>
                         <span class="motion-count-badge"><%= locals.wishlistCount %></span>
                     <% } %>
                 </a>
             </li>
             <li class="motion-nav-item motion-icon-item">
-                <a href="/cart" class="motion-icon-link">
-                    <i class="fas fa-shopping-bag"></i>
+                <a href="/cart" class="motion-icon-link" title="Cart">
+                    <!-- Modern Shopping Bag Icon -->
+                    <svg class="motion-icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M19 7h-3V6c0-2.76-2.24-5-5-5S6 3.24 6 6v1H5c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM8 6c0-1.66 1.34-3 3-3s3 1.34 3 3v1H8V6zm11 14H5V9h14v11z"/>
+                      <circle cx="9" cy="12" r="1"/>
+                      <circle cx="15" cy="12" r="1"/>
+                    </svg>
                     <% if (locals.cartCount && locals.cartCount > 0) { %>
                         <span class="motion-count-badge"><%= locals.cartCount %></span>
                     <% } %>
@@ -48,25 +60,33 @@
 </nav>
 
 <style>
+/* Import Google Fonts for better typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 .motion-navbar {
-    background: white !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
     border-bottom: 1px solid rgba(0,0,0,0.08) !important;
-    padding: 12px 0 !important;
+    padding: 0 !important;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     z-index: 1000 !important;
-    font-family: 'Inter', sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    height: 64px !important;
 }
 
 .motion-navbar .motion-nav-container {
     max-width: 1400px !important;
     margin: 0 auto !important;
-    padding: 0 20px !important;
+    padding: 0 24px !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
+    height: 100% !important;
     gap: 32px !important;
 }
 
@@ -75,20 +95,22 @@
 }
 
 .motion-navbar .motion-brand-link {
-    color: #000 !important;
+    color: #111827 !important;
     text-decoration: none !important;
     font-size: 20px !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.5px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.025em !important;
     background: none !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    transition: all 0.2s ease !important;
 }
 
 .motion-navbar .motion-brand-link:hover {
-    opacity: 0.7 !important;
+    color: #374151 !important;
     text-decoration: none !important;
+    transform: translateY(-1px) !important;
 }
 
 .motion-navbar .motion-nav-list {
@@ -102,17 +124,14 @@
     border: none !important;
     box-shadow: none !important;
 }
-.motion-navbar .motion-nav-list .motion-nav-item:not(:last-child) {
-    margin-right: 32px !important;
-}
 
 .motion-navbar .motion-left {
     margin-left: 48px !important;
 }
 
 .motion-navbar .motion-nav-item {
-    font-size: 11px !important;
-    letter-spacing: 0.5px !important;
+    font-size: 13px !important;
+    letter-spacing: 0.025em !important;
     background: none !important;
     border: none !important;
     box-shadow: none !important;
@@ -120,59 +139,93 @@
 }
 
 .motion-navbar .motion-nav-list .motion-nav-item a {
-    color: #000 !important;
+    color: #374151 !important;
     text-decoration: none !important;
-    font-size: 11px !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
-    letter-spacing: 0.5px !important;
+    letter-spacing: 0.025em !important;
     background: none !important;
-    padding: 0 !important;
+    padding: 8px 12px !important;
     border: none !important;
     box-shadow: none !important;
-    transition: opacity 0.2s !important;
-    line-height: 1.2 !important;
-    display: inline;
-}
-.motion-navbar .motion-nav-list .motion-nav-item a:hover {
-    opacity: 0.7 !important;
-    text-decoration: none !important;
-}
-
-/* Icon styles */
-.motion-navbar .motion-icon-item {
+    transition: all 0.2s ease !important;
+    line-height: 1.4 !important;
+    display: inline-block !important;
+    border-radius: 6px !important;
     position: relative !important;
 }
 
-.motion-navbar .motion-icon-link {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 32px !important;
-    height: 32px !important;
+.motion-navbar .motion-nav-list .motion-nav-item a:hover {
+    color: #111827 !important;
     text-decoration: none !important;
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    border-radius: 50% !important;
-    transition: all 0.2s ease !important;
-}
-
-.motion-navbar .motion-icon-link:hover {
-    background-color: rgba(0,0,0,0.05) !important;
+    background: rgba(0,0,0,0.04) !important;
     transform: translateY(-1px) !important;
 }
 
-.motion-navbar .motion-icon-link i {
-    font-size: 16px !important;
-    color: #333 !important;
+.motion-navbar .motion-nav-list .motion-nav-item a::after {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    width: 0 !important;
+    height: 2px !important;
+    background: #111827 !important;
+    transition: all 0.3s ease !important;
+    transform: translateX(-50%) !important;
+}
+
+.motion-navbar .motion-nav-list .motion-nav-item a:hover::after {
+    width: 80% !important;
+}
+
+/* Enhanced Icon styles */
+.motion-icon-svg { 
+    width: 18px !important; 
+    height: 18px !important; 
+    fill: #374151 !important; 
+    display: block !important; 
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: all 0.2s ease !important;
+}
+
+.motion-navbar .motion-icon-item { 
+    position: relative !important; 
+    display: block !important;
+    visibility: visible !important;
+}
+
+.motion-navbar .motion-icon-link { 
+    display: flex !important; 
+    align-items: center !important; 
+    justify-content: center !important; 
+    width: 36px !important; 
+    height: 36px !important; 
+    border-radius: 8px !important; 
+    transition: all 0.2s ease !important;
+    background: rgba(0,0,0,0.03) !important;
+    border: 1px solid rgba(0,0,0,0.06) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.motion-navbar .motion-icon-link:hover { 
+    background-color: rgba(0,0,0,0.06) !important; 
+    transform: translateY(-1px) !important; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    border-color: rgba(0,0,0,0.1) !important;
+}
+
+.motion-navbar .motion-icon-link:hover .motion-icon-svg {
+    fill: #111827 !important;
+    transform: scale(1.05) !important;
 }
 
 .motion-navbar .motion-count-badge {
     position: absolute !important;
-    top: -8px !important;
-    right: -8px !important;
-    background: #000 !important;
+    top: -4px !important;
+    right: -4px !important;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
     color: #fff !important;
     width: 16px !important;
     height: 16px !important;
@@ -181,122 +234,123 @@
     align-items: center !important;
     justify-content: center !important;
     font-size: 10px !important;
+    font-weight: 600 !important;
+    border: 2px solid #fff !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
 }
 
-/* Profile Dropdown Styles */
-.motion-navbar .motion-profile-dropdown {
-    position: relative !important;
-    display: inline-block !important;
+/* Enhanced Profile Dropdown Styles */
+.motion-navbar .motion-profile-dropdown { 
+    position: relative !important; 
+    display: inline-block !important; 
 }
 
-.motion-navbar .motion-dropdown-content {
-    display: none !important;
-    position: absolute !important;
-    right: 0 !important;
-    top: 100% !important;
-    background-color: white !important;
-    min-width: 180px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
-    z-index: 1001 !important;
-    border-radius: 12px !important;
-    margin-top: 12px !important;
-    padding: 8px 0 !important;
-    border: 1px solid rgba(0,0,0,0.08) !important;
-    transform-origin: top right !important;
-    transform: scale(0.95) !important;
-    opacity: 0 !important;
-    transition: all 0.2s ease-in-out !important;
+.motion-navbar .motion-dropdown-content { 
+    display: none !important; 
+    position: absolute !important; 
+    right: 0 !important; 
+    top: 100% !important; 
+    background-color: rgba(255, 255, 255, 0.98) !important; 
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    min-width: 180px !important; 
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important; 
+    z-index: 1001 !important; 
+    border-radius: 12px !important; 
+    margin-top: 12px !important; 
+    padding: 8px 0 !important; 
+    border: 1px solid rgba(0,0,0,0.08) !important; 
+    transform-origin: top right !important; 
+    transform: scale(0.95) !important; 
+    opacity: 0 !important; 
+    transition: all 0.2s ease !important; 
 }
 
-.motion-navbar .motion-dropdown-content::before {
-    content: '' !important;
-    position: absolute !important;
-    top: -6px !important;
-    right: 10px !important;
-    width: 12px !important;
-    height: 12px !important;
-    background: white !important;
-    transform: rotate(45deg) !important;
-    border-left: 1px solid rgba(0,0,0,0.08) !important;
-    border-top: 1px solid rgba(0,0,0,0.08) !important;
+.motion-navbar .motion-dropdown-content::before { 
+    content: ''; 
+    position: absolute; 
+    top: -6px; 
+    right: 12px; 
+    width: 12px; 
+    height: 12px; 
+    background: rgba(255, 255, 255, 0.98); 
+    transform: rotate(45deg); 
+    border-left: 1px solid rgba(0,0,0,0.08); 
+    border-top: 1px solid rgba(0,0,0,0.08); 
 }
 
-.motion-navbar .motion-dropdown-content a {
-    color: #000 !important;
-    padding: 12px 20px !important;
-    text-decoration: none !important;
-    display: flex !important;
-    align-items: center !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    position: relative !important;
+.motion-navbar .motion-dropdown-content a { 
+    color: #374151; 
+    padding: 12px 20px; 
+    text-decoration: none; 
+    display: flex; 
+    align-items: center; 
+    font-size: 14px; 
+    font-weight: 500; 
+    transition: all 0.2s ease; 
+    border-radius: 6px; 
+    margin: 0 8px; 
 }
 
-.motion-navbar .motion-dropdown-content a:hover {
-    background-color: rgba(0,0,0,0.03) !important;
-    padding-left: 24px !important;
+.motion-navbar .motion-dropdown-content a:hover { 
+    background-color: rgba(0,0,0,0.04); 
+    color: #111827; 
+    transform: translateX(2px); 
 }
 
-.motion-navbar .motion-dropdown-content a:not(:last-child) {
-    border-bottom: 1px solid rgba(0,0,0,0.04) !important;
+.motion-navbar .motion-dropdown-content a:not(:last-child) { 
+    border-bottom: 1px solid rgba(0,0,0,0.04); 
+    margin-bottom: 2px; 
 }
 
-.motion-navbar .motion-dropdown-content.show {
-    display: block !important;
-    transform: scale(1) !important;
-    opacity: 1 !important;
+.motion-navbar .motion-dropdown-content.show { 
+    display: block !important; 
+    transform: scale(1) !important; 
+    opacity: 1 !important; 
 }
 
+/* Responsive Design */
 @media (max-width: 991.98px) {
-    .motion-navbar .motion-nav-list {
-        gap: 20px !important;
-    }
-    .motion-navbar .motion-left {
-        margin-left: 24px !important;
-    }
+    .motion-navbar .motion-nav-list { gap: 24px !important; }
+    .motion-navbar .motion-left { margin-left: 32px !important; }
+    .motion-navbar .motion-nav-container { gap: 24px !important; }
 }
 
 @media (max-width: 768px) {
-    .motion-navbar .motion-nav-container {
-        flex-wrap: wrap !important;
-        gap: 15px !important;
+    .motion-navbar { height: 56px !important; }
+    .motion-navbar .motion-nav-container { 
+        flex-wrap: wrap !important; 
+        gap: 16px !important; 
+        padding: 0 16px !important;
     }
-    .motion-navbar .motion-nav-list {
-        gap: 15px !important;
+    .motion-navbar .motion-nav-list { gap: 16px !important; }
+    .motion-navbar .motion-left { 
+        margin-left: 0 !important; 
+        order: 2 !important; 
+        width: 100% !important; 
+        justify-content: center !important; 
     }
-    .motion-navbar .motion-left {
-        margin-left: 0 !important;
-        order: 2 !important;
-        width: 100% !important;
-        justify-content: center !important;
+    .motion-navbar .motion-right { order: 1 !important; }
+    .motion-navbar .motion-brand-link { font-size: 18px !important; }
+    .motion-navbar .motion-icon-link { 
+        width: 32px !important; 
+        height: 32px !important; 
     }
-    .motion-navbar .motion-right {
-        order: 1 !important;
+    .motion-navbar .motion-icon-svg { 
+        width: 16px !important; 
+        height: 16px !important; 
+    }
+}
+
+@media (max-width: 480px) {
+    .motion-navbar .motion-nav-container { padding: 0 12px !important; }
+    .motion-navbar .motion-nav-list { gap: 12px !important; }
+    .motion-navbar .motion-nav-list .motion-nav-item a { 
+        font-size: 12px !important; 
+        padding: 6px 8px !important; 
     }
 }
 </style>
-
-<!-- Search Modal -->
-<div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-body">
-                <form action="/search" method="GET">
-                    <div class="input-group">
-                        <input type="search" class="form-control" name="q" placeholder="Search products..." aria-label="Search">
-                        <button class="btn btn-outline-dark" type="submit">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -321,24 +375,11 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         fetch('/logout', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
         })
-        .then(response => {
-            if (response.ok) {
-                // Clear any client-side storage
-                localStorage.clear();
-                sessionStorage.clear();
-                
-                // Force a hard redirect to login page
-                window.location.replace('/login');
-            }
-        })
-        .catch(error => {
-            console.error('Logout error:', error);
-        });
+        .then(response => { if (response.ok) { localStorage.clear(); sessionStorage.clear(); window.location.replace('/login'); } })
+        .catch(error => { console.error('Logout error:', error); });
     });
 });
 </script> 
