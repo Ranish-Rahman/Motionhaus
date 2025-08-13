@@ -167,13 +167,9 @@ export const placeOrder = async (req, res) => {
                 });
             }
             
-            // Check if user has already used this coupon
-            if (coupon.usedBy && coupon.usedBy.includes(userId)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'You have already used this coupon.'
-                });
-            }
+            // NOTE: We no longer check if user has already used this coupon here
+            // since coupon usage is only tracked after successful order placement
+            // This allows users to retry failed orders
             
             couponId = coupon._id;
         }
@@ -264,6 +260,37 @@ const order = new Order({
               'sizes.$.quantity': -item.quantity
             }
           });
+        }
+
+        // 6.5. IMPORTANT: Now that order is successfully placed, track coupon usage
+        if (sourceData.couponCode) {
+          try {
+            console.log(`[Debug] Tracking coupon usage for: ${sourceData.couponCode}`);
+            const coupon = await Coupon.findOne({ code: sourceData.couponCode });
+            if (coupon) {
+              console.log(`[Debug] Found coupon: ${coupon.code}, current usage: ${coupon.usageCount}, usedBy: ${coupon.usedBy?.length || 0}`);
+              
+              // Increment usage count and add user to usedBy list
+              const updateResult = await Coupon.findByIdAndUpdate(coupon._id, {
+                $inc: { usageCount: 1 },
+                $push: { usedBy: userId }
+              }, { new: true });
+              
+              console.log(`[Debug] Coupon usage tracked successfully for ${sourceData.couponCode} by user ${userId}`);
+              console.log(`[Debug] Updated coupon data:`, {
+                code: updateResult.code,
+                usageCount: updateResult.usageCount,
+                usedByCount: updateResult.usedBy?.length || 0
+              });
+            } else {
+              console.log(`[Debug] Coupon not found for code: ${sourceData.couponCode}`);
+            }
+          } catch (couponError) {
+            console.error('[Debug] Error tracking coupon usage:', couponError);
+            // Don't fail the order if coupon tracking fails
+          }
+        } else {
+          console.log('[Debug] No coupon code found in sourceData');
         }
 
         // 7. Clear user cart and session data

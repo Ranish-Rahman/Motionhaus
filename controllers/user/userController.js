@@ -1343,17 +1343,35 @@ const getCheckout = async (req, res) => {
 
     // Fetch all valid coupons
     const now = new Date();
-    const availableCoupons = await Coupon.find({
+    
+    // Use start and end of day to avoid timezone issues
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    
+    let availableCoupons = await Coupon.find({
       isActive: true,
-      validFrom: { $lte: now },
-      validUntil: { $gte: now },
-      $expr: {
-        $or: [
-          { $eq: ["$usageLimit", null] },
-          { $lt: ["$usageCount", "$usageLimit"] }
-        ]
-      }
+      validFrom: { $lte: endOfDay },
+      validUntil: { $gte: startOfDay }
     }).lean();
+    
+    // Then filter by usage limits in JavaScript for better control
+    availableCoupons = availableCoupons.filter(coupon => {
+      // If no usage limit is set, coupon is always available
+      if (!coupon.usageLimit) {
+        return true;
+      }
+      
+      // If usage limit is set, check if current usage is below limit
+      // Ensure both values are numbers for proper comparison
+      const usageCount = Number(coupon.usageCount || 0);
+      const usageLimit = Number(coupon.usageLimit);
+      
+      return usageCount < usageLimit;
+    });
+    
+
+    
+
 
     // Use the centralized calculator to get all totals
     // IMPORTANT: Ensure the cart is fully populated before calculating
@@ -1958,6 +1976,24 @@ export const handlePaymentFailure = async (req, res) => {
       console.log('Updated existing order status:', order.orderID);
     }
 
+    // IMPORTANT: Revert coupon usage if payment failed
+    if (req.session.pendingOrder && req.session.pendingOrder.couponCode) {
+      try {
+        const coupon = await Coupon.findOne({ code: req.session.pendingOrder.couponCode });
+        if (coupon) {
+          // Revert the coupon usage that was tracked during order creation
+          await Coupon.findByIdAndUpdate(coupon._id, {
+            $inc: { usageCount: -1 },
+            $pull: { usedBy: userId }
+          });
+          console.log(`[Debug] Coupon usage reverted for ${req.session.pendingOrder.couponCode} due to payment failure`);
+        }
+      } catch (couponError) {
+        console.error('[Debug] Error reverting coupon usage:', couponError);
+        // Don't fail the payment failure handling if coupon reversion fails
+      }
+    }
+
     // Restore product stock and clear cart
     await handleOrderCleanup(userId, req.session);
 
@@ -2116,6 +2152,24 @@ export const cancelRazorpayOrder = async (req, res) => {
       } catch (razorpayError) {
         console.error('[Debug] Error cancelling Razorpay order:', razorpayError);
         // We continue even if Razorpay cancellation fails
+      }
+
+      // IMPORTANT: Revert coupon usage if payment was cancelled
+      if (orderData && orderData.couponCode) {
+        try {
+          const coupon = await Coupon.findOne({ code: orderData.couponCode });
+          if (coupon) {
+            // Revert the coupon usage that was tracked during order creation
+            await Coupon.findByIdAndUpdate(coupon._id, {
+              $inc: { usageCount: -1 },
+              $pull: { usedBy: userId }
+            });
+            console.log(`[Debug] Coupon usage reverted for ${orderData.couponCode} due to payment cancellation`);
+          }
+        } catch (couponError) {
+          console.error('[Debug] Error reverting coupon usage:', couponError);
+          // Don't fail the cancellation if coupon reversion fails
+        }
       }
 
       // Clear the pending order from session

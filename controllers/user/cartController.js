@@ -167,19 +167,16 @@ const checkAndUpdateCoupon = async (cart) => {
     removalReason = `The previously applied coupon was removed because your order total is now below the minimum requirement of ₹${coupon.minAmount}.`;
   }
 
-  if (removalReason) {
-    // Revert coupon usage stats
-    await Coupon.findByIdAndUpdate(coupon._id, {
-      $pull: { usedBy: cart.user }, // Remove user from the usedBy list
-      $inc: { usageCount: -1 } // Decrement the usage count
-    });
+          if (removalReason) {
+            // NOTE: We no longer need to revert coupon usage stats
+            // since these are only tracked after successful order placement
+            
+            // Remove coupon from cart
+            cart.coupon = null;
+            cart.couponCode = null;
 
-    // Remove coupon from cart
-    cart.coupon = null;
-    cart.couponCode = null;
-
-    return removalReason;
-  }
+            return removalReason;
+        }
 
   return null; // Coupon is still valid
 };
@@ -433,13 +430,9 @@ export const applyCoupon = async (req, res) => {
             });
         }
 
-        // 4. Check if coupon has been used by this user before
-        if (coupon.usedBy && coupon.usedBy.includes(userId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'You have already redeemed this coupon.'
-            });
-        }
+        // NOTE: We no longer check if user has already used this coupon here
+        // since coupon usage is only tracked after successful order placement
+        // This allows users to retry failed payments
 
         // 5. Check minimum purchase amount
         const subtotal = cart.subtotal;
@@ -452,18 +445,13 @@ export const applyCoupon = async (req, res) => {
 
         // --- End Advanced Validation ---
 
-        // If all checks pass, apply the coupon
+        // If all checks pass, apply the coupon to cart
+        // NOTE: We do NOT increment usage count or add user to usedBy here
+        // This will only happen when the order is successfully placed
         cart.coupon = coupon._id;
         cart.couponCode = coupon.code; // Store for display purposes
         
-        // IMPORTANT: Increment usage count and add user to usedBy list
-        coupon.usageCount += 1;
-        if (!coupon.usedBy) {
-            coupon.usedBy = [];
-        }
-        coupon.usedBy.push(userId);
-        
-        await Promise.all([cart.save(), coupon.save()]);
+        await cart.save();
 
         // We must re-populate the cart object to get the latest data with relations
         await cart.populate(['items.product', 'coupon']);
@@ -530,13 +518,9 @@ export const removeCoupon = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No coupon to remove.' });
     }
 
-    // IMPORTANT: Decrement usage count and remove user from usedBy list
-    if (cart.coupon) {
-      await Coupon.findByIdAndUpdate(cart.coupon._id, {
-        $pull: { usedBy: userId }, // Remove user from the usedBy list
-        $inc: { usageCount: -1 } // Decrement the usage count
-      });
-    }
+    // NOTE: We no longer need to decrement usage count or remove from usedBy
+    // since these are only tracked after successful order placement
+    // Just clear the coupon from cart
 
     // Clear coupon from cart
     cart.coupon = null;

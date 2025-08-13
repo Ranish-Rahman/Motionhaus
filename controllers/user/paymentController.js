@@ -462,13 +462,9 @@ export const verifyPayment = async (req, res) => {
                     });
                 }
                 
-                // Check if user has already used this coupon
-                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'You have already used this coupon.'
-                    });
-                }
+                // NOTE: We no longer check if user has already used this coupon here
+                // since coupon usage is only tracked after successful order placement
+                // This allows users to retry failed payments
                 
                 couponId = coupon._id;
             }
@@ -656,6 +652,37 @@ export const verifyPayment = async (req, res) => {
           }
         }
 
+        // IMPORTANT: Now that order is successfully placed, track coupon usage
+        if (pendingOrder.couponCode) {
+          try {
+            console.log(`[Debug] Tracking coupon usage for: ${pendingOrder.couponCode}`);
+            const coupon = await Coupon.findOne({ code: pendingOrder.couponCode });
+            if (coupon) {
+              console.log(`[Debug] Found coupon: ${coupon.code}, current usage: ${coupon.usageCount}, usedBy: ${coupon.usedBy?.length || 0}`);
+              
+              // Increment usage count and add user to usedBy list
+              const updateResult = await Coupon.findByIdAndUpdate(coupon._id, {
+                $inc: { usageCount: 1 },
+                $push: { usedBy: userId }
+              }, { new: true });
+              
+              console.log(`[Debug] Coupon usage tracked successfully for ${pendingOrder.couponCode} by user ${userId}`);
+              console.log(`[Debug] Updated coupon data:`, {
+                code: updateResult.code,
+                usageCount: updateResult.usageCount,
+                usedByCount: updateResult.usedBy?.length || 0
+              });
+            } else {
+              console.log(`[Debug] Coupon not found for code: ${pendingOrder.couponCode}`);
+            }
+          } catch (couponError) {
+            console.error('[Debug] Error tracking coupon usage:', couponError);
+            // Don't fail the order if coupon tracking fails
+          }
+        } else {
+          console.log('[Debug] No coupon code found in pendingOrder');
+        }
+
         await Cart.findOneAndUpdate(
             { user: userId },
             { $set: { items: [], couponDiscount: 0, coupon: null } }
@@ -731,6 +758,24 @@ export const handlePaymentFailure = async (req, res) => {
       }
     } else {
       console.log('[Debug] Skipping stock restoration - this was a retry payment');
+    }
+
+    // IMPORTANT: Revert coupon usage if payment failed
+    if (req.session.pendingOrder && req.session.pendingOrder.couponCode) {
+      try {
+        const coupon = await Coupon.findOne({ code: req.session.pendingOrder.couponCode });
+        if (coupon) {
+          // Revert the coupon usage that was tracked during order creation
+          await Coupon.findByIdAndUpdate(coupon._id, {
+            $inc: { usageCount: -1 },
+            $pull: { usedBy: userId }
+          });
+          console.log(`[Debug] Coupon usage reverted for ${req.session.pendingOrder.couponCode} due to payment failure`);
+        }
+      } catch (couponError) {
+        console.error('[Debug] Error reverting coupon usage:', couponError);
+        // Don't fail the payment failure handling if coupon reversion fails
+      }
     }
 
     // Use findOneAndUpdate with upsert to prevent double order creation

@@ -988,6 +988,11 @@
                     <% if (coupon.minAmount) { %>
                       <span style="color: #888;">Min. Cart: ₹<%= coupon.minAmount %></span>
                     <% } %>
+                    <% if (coupon.usageLimit) { %>
+                      <span style="color: #007bff;">Usage: <%= coupon.usageCount || 0 %>/<%= coupon.usageLimit %></span>
+                    <% } else { %>
+                      <span style="color: #28a745;">Unlimited Usage</span>
+                    <% } %>
                     <% if (coupon.validUntil) { %>
                       <span style="color: #e74c3c;">Expires: <%= new Date(coupon.validUntil).toLocaleDateString() %></span>
                     <% } %>
@@ -997,7 +1002,7 @@
             </ul>
           </div>
         <% } %>
-
+        
         <div class="summary-row" id="subtotal-row">
           <span>Subtotal</span>
           <span id="subtotal-amount">

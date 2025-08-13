@@ -389,7 +389,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addCouponForm">
+                    <form id="addCouponForm" method="POST" action="/admin/coupons">
                         <div class="mb-3">
                             <label class="form-label">Coupon Code</label>
                             <div class="input-group">
@@ -462,7 +462,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editCouponForm">
+                    <form id="editCouponForm" method="POST" action="/admin/coupons">
                         <input type="hidden" name="couponId">
                         <div class="mb-3">
                             <label class="form-label">Coupon Code</label>
@@ -543,8 +543,20 @@
     document.getElementById('createCoupon').addEventListener('click', async function() {
         const form = document.getElementById('addCouponForm');
         clearFieldErrors();
+        
+        // Get form data and convert to proper format
         const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
+        const data = {};
+        
+        // Convert FormData to regular object, handling empty values properly
+        for (let [key, value] of formData.entries()) {
+            if (value === '') {
+                data[key] = null;
+            } else {
+                data[key] = value;
+            }
+        }
+        
         const errors = {};
 
         // --- Client-side Validation ---
@@ -619,12 +631,27 @@
 
         // --- End Validation ---
 
+        // Debug: Log the data being sent
+        console.log('Sending coupon data:', data);
+        console.log('JSON stringified data:', JSON.stringify(data));
+
         try {
             const response = await fetch('/admin/coupons', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
+            
+            console.log('Response status:', response.status);
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const textResponse = await response.text();
+                console.error('Non-JSON response:', textResponse);
+                throw new Error('Server returned non-JSON response. Please check the console for details.');
+            }
+            
             const result = await response.json();
             if (result.errors) {
                 showFieldErrors(result.errors);
@@ -689,9 +716,21 @@
     document.getElementById('updateCoupon').addEventListener('click', async function() {
         const form = document.getElementById('editCouponForm');
         clearFieldErrors('edit-');
+        
+        // Get form data and convert to proper format
         const formData = new FormData(form);
-        const couponId = formData.get('couponId');
-        const data = Object.fromEntries(formData.entries());
+        const data = {};
+        
+        // Convert FormData to regular object, handling empty values properly
+        for (let [key, value] of formData.entries()) {
+            if (value === '') {
+                data[key] = null;
+            } else {
+                data[key] = value;
+            }
+        }
+        
+        const couponId = data.couponId;
         const errors = {};
 
         // --- Client-side Validation ---
@@ -764,6 +803,10 @@
 
         delete data.couponId;
 
+        // Debug: Log the data being sent
+        console.log('Updating coupon data:', data);
+        console.log('JSON stringified data:', JSON.stringify(data));
+
         try {
             const response = await fetch(`/admin/coupons/${couponId}`, {
                 method: 'PUT',
@@ -771,6 +814,16 @@
                 body: JSON.stringify(data)
             });
 
+            console.log('Update response status:', response.status);
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const textResponse = await response.text();
+                console.error('Non-JSON response:', textResponse);
+                throw new Error('Server returned non-JSON response. Please check the console for details.');
+            }
+            
             const result = await response.json();
 
             if (result.errors) {
