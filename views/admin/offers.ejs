@@ -331,9 +331,31 @@
       if (data.discount < 1 || data.discount > 99) errors.discount = 'Discount must be between 1 and 99.';
       if (!data.startDate) errors.startDate = 'Start date is required.';
       if (!data.endDate) errors.endDate = 'End date is required.';
-      if (data.startDate && data.endDate && new Date(data.endDate) < new Date(data.startDate)) {
-        errors.endDate = 'End date cannot be before the start date.';
+      
+      // Date validation
+      if (data.startDate && data.endDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to start of day
+        
+        const startDate = new Date(data.startDate);
+        const endDate = new Date(data.endDate);
+        
+        // Check if start date is in the past
+        if (startDate < today) {
+          errors.startDate = 'Start date cannot be in the past.';
+        }
+        
+        // Check if end date is before start date
+        if (endDate < startDate) {
+          errors.endDate = 'End date cannot be before the start date.';
+        }
+        
+        // Check if end date is in the past
+        if (endDate < today) {
+          errors.endDate = 'End date cannot be in the past.';
+        }
       }
+      
       return errors;
     }
     function setupOfferTypeChange(formId, prefix = '') {
@@ -355,6 +377,28 @@
       });
     }
     document.addEventListener('DOMContentLoaded', function() {
+      // Set minimum dates for date inputs to prevent past dates
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('offerStartDate').min = today;
+      document.getElementById('offerEndDate').min = today;
+      document.getElementById('editOfferStartDate').min = today;
+      document.getElementById('editOfferEndDate').min = today;
+      
+      // Update end date min when start date changes
+      document.getElementById('offerStartDate').addEventListener('change', function() {
+        document.getElementById('offerEndDate').min = this.value;
+        if (document.getElementById('offerEndDate').value && this.value > document.getElementById('offerEndDate').value) {
+          document.getElementById('offerEndDate').value = this.value;
+        }
+      });
+      
+      document.getElementById('editOfferStartDate').addEventListener('change', function() {
+        document.getElementById('editOfferEndDate').min = this.value;
+        if (document.getElementById('editOfferEndDate').value && this.value > document.getElementById('editOfferEndDate').value) {
+          document.getElementById('editOfferEndDate').value = this.value;
+        }
+      });
+      
       setupOfferTypeChange('addOfferForm');
       setupOfferTypeChange('editOfferForm', 'edit');
       setupRealtimeValidation('addOfferForm');

@@ -563,6 +563,30 @@
         if (!data.validFrom) errors.validFrom = 'Valid from date is required.';
         if (!data.validUntil) errors.validUntil = 'Valid until date is required.';
 
+        // Date validation
+        if (data.validFrom && data.validUntil) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          
+          const validFrom = new Date(data.validFrom);
+          const validUntil = new Date(data.validUntil);
+          
+          // Check if valid from date is in the past
+          if (validFrom < today) {
+            errors.validFrom = 'Valid from date cannot be in the past.';
+          }
+          
+          // Check if valid until date is before valid from date
+          if (validUntil < validFrom) {
+            errors.validUntil = 'Valid until date cannot be before the valid from date.';
+          }
+          
+          // Check if valid until date is in the past
+          if (validUntil < today) {
+            errors.validUntil = 'Valid until date cannot be in the past.';
+          }
+        }
+
         // Business logic validation
         const minAmount = parseFloat(data.minAmount);
         const maxAmount = parseFloat(data.maxAmount);
@@ -681,6 +705,30 @@
         if (!data.minAmount) errors.minAmount = 'Minimum order amount is required.';
         if (!data.validFrom) errors.validFrom = 'Valid from date is required.';
         if (!data.validUntil) errors.validUntil = 'Valid until date is required.';
+
+        // Date validation
+        if (data.validFrom && data.validUntil) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          
+          const validFrom = new Date(data.validFrom);
+          const validUntil = new Date(data.validUntil);
+          
+          // Check if valid from date is in the past
+          if (validFrom < today) {
+            errors.validFrom = 'Valid from date cannot be in the past.';
+          }
+          
+          // Check if valid until date is before valid from date
+          if (validUntil < validFrom) {
+            errors.validUntil = 'Valid until date cannot be before the valid from date.';
+          }
+          
+          // Check if valid until date is in the past
+          if (validUntil < today) {
+            errors.validUntil = 'Valid until date cannot be in the past.';
+          }
+        }
 
         // Business logic validation
         const minAmount = parseFloat(data.minAmount);
@@ -862,6 +910,42 @@
     // Setup real-time validation for both forms on page load
     setupRealtimeValidation('addCouponForm');
     setupRealtimeValidation('editCouponForm', 'edit-');
+
+    // Set minimum dates for date inputs to prevent past dates
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Set min dates for add form
+      const addValidFrom = document.querySelector('#addCouponForm input[name="validFrom"]');
+      const addValidUntil = document.querySelector('#addCouponForm input[name="validUntil"]');
+      if (addValidFrom) addValidFrom.min = today;
+      if (addValidUntil) addValidUntil.min = today;
+      
+      // Set min dates for edit form
+      const editValidFrom = document.querySelector('#editCouponForm input[name="validFrom"]');
+      const editValidUntil = document.querySelector('#editCouponForm input[name="validUntil"]');
+      if (editValidFrom) editValidFrom.min = today;
+      if (editValidUntil) editValidUntil.min = today;
+      
+      // Update valid until min when valid from changes
+      if (addValidFrom && addValidUntil) {
+        addValidFrom.addEventListener('change', function() {
+          addValidUntil.min = this.value;
+          if (addValidUntil.value && this.value > addValidUntil.value) {
+            addValidUntil.value = this.value;
+          }
+        });
+      }
+      
+      if (editValidFrom && editValidUntil) {
+        editValidFrom.addEventListener('change', function() {
+          editValidUntil.min = this.value;
+          if (editValidUntil.value && this.value > editValidUntil.value) {
+            editValidUntil.value = this.value;
+          }
+        });
+      }
+    });
 
     // Update maxAmount min attribute when minAmount changes
     function setupAmountValidation(formId) {

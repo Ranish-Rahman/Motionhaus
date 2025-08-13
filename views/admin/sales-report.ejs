@@ -157,6 +157,7 @@
       <div class="mb-4 d-flex align-items-center gap-2">
         <button class="btn btn-custom me-2" id="dailyBtn">Daily</button>
         <button class="btn btn-custom me-2" id="weeklyBtn">Weekly</button>
+        <button class="btn btn-custom me-2" id="monthlyBtn">Monthly</button>
         <button class="btn btn-custom me-2" id="yearlyBtn">Yearly</button>
         <input type="date" id="startDate" class="form-control date-range me-2" style="width: 160px;">
         <span class="mx-1">to</span>
@@ -216,6 +217,7 @@
     const ordersTable = document.getElementById('ordersTable');
     const dailyBtn = document.getElementById('dailyBtn');
     const weeklyBtn = document.getElementById('weeklyBtn');
+    const monthlyBtn = document.getElementById('monthlyBtn');
     const yearlyBtn = document.getElementById('yearlyBtn');
     const customBtn = document.getElementById('customBtn');
     const startDate = document.getElementById('startDate');
@@ -250,7 +252,7 @@
     };
 
     function setActive(btn) {
-      [dailyBtn, weeklyBtn, yearlyBtn, customBtn].forEach(b => b.classList.remove('active'));
+      [dailyBtn, weeklyBtn, monthlyBtn, yearlyBtn, customBtn].forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
@@ -373,6 +375,13 @@
       currentRange = 'weekly'; 
       currentPage = 1;
       fetchReport('weekly', null, null, currentPage); 
+    };
+    
+    monthlyBtn.onclick = () => { 
+      setActive(monthlyBtn); 
+      currentRange = 'monthly'; 
+      currentPage = 1;
+      fetchReport('monthly', null, null, currentPage); 
     };
     
     yearlyBtn.onclick = () => { 

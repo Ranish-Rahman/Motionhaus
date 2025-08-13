@@ -162,13 +162,6 @@
                                                 <div>
                                                     <div class="small"><%= item.product.name %></div>
                                                     <div class="small text-muted">Size: <%= item.size %></div>
-                                                    <% 
-                                                        const productSize = item.product.sizes.find(s => Number(s.size) === Number(item.size));
-                                                        const isOutOfStock = !productSize || productSize.quantity < item.quantity;
-                                                    %>
-                                                    <div class="small <%= isOutOfStock ? 'text-danger' : 'text-success' %>">
-                                                        <%= isOutOfStock ? 'Out of Stock' : 'In Stock (' + productSize.quantity + ' available)' %>
-                                                    </div>
                                                     <div class="small text-muted">
                                                         Status: 
                                                         <span class="badge bg-<%= item.status === 'Pending' ? 'warning' : 

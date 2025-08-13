@@ -51,15 +51,67 @@ export const getDashboard = async (req, res) => {
   }
 
   // Fetch data for both periods
-  const currentOrders = await Order.find({ createdAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd }, paymentStatus: 'paid' });
-  const previousOrders = await Order.find({ createdAt: { $gte: previousPeriodStart, $lt: previousPeriodEnd }, paymentStatus: 'paid' });
+  const currentOrders = await Order.find({ 
+    createdAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd }, 
+    paymentStatus: 'paid' 
+  }).populate('items.product');
+  
+  const previousOrders = await Order.find({ 
+    createdAt: { $gte: previousPeriodStart, $lt: previousPeriodEnd }, 
+    paymentStatus: 'paid' 
+  }).populate('items.product');
   
   const currentCustomers = await User.countDocuments({ createdAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd }});
   const previousCustomers = await User.countDocuments({ createdAt: { $gte: previousPeriodStart, $lt: previousPeriodEnd }});
 
+  // Calculate actual revenue excluding returned items
+  const calculateActualRevenue = (orders) => {
+    let totalRevenue = 0;
+    let returnedRevenue = 0;
+    let cancelledRevenue = 0;
+    
+    orders.forEach(order => {
+      let orderRevenue = 0;
+      let orderReturnedRevenue = 0;
+      let orderCancelledRevenue = 0;
+      
+      for (const item of order.items) {
+        const itemRevenue = (item.paidPrice || item.price) * item.quantity;
+        
+        // Skip items that have been returned
+        const isItemReturned = item.returnRequest && item.returnRequest.status === 'approved';
+        const isItemCancelled = item.status === 'Cancelled';
+        
+        if (isItemReturned) {
+          orderReturnedRevenue += itemRevenue;
+        } else if (isItemCancelled) {
+          orderCancelledRevenue += itemRevenue;
+        } else {
+          // Add the item's revenue to total
+          orderRevenue += itemRevenue;
+        }
+      }
+      
+      totalRevenue += orderRevenue;
+      returnedRevenue += orderReturnedRevenue;
+      cancelledRevenue += orderCancelledRevenue;
+    });
+    
+    // Debug logging
+    console.log('=== Dashboard Revenue Calculation ===');
+    console.log('Total orders processed:', orders.length);
+    console.log('Actual revenue (excluding returns):', totalRevenue);
+    console.log('Returned revenue (excluded):', returnedRevenue);
+    console.log('Cancelled revenue (excluded):', cancelledRevenue);
+    console.log('Total potential revenue:', totalRevenue + returnedRevenue + cancelledRevenue);
+    console.log('=== End Revenue Calculation ===');
+    
+    return totalRevenue;
+  };
+
   // Calculate stats dynamically
-  const totalRevenue = currentOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const lastRevenue = previousOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const totalRevenue = calculateActualRevenue(currentOrders);
+  const lastRevenue = calculateActualRevenue(previousOrders);
   const revenueChange = lastRevenue ? Math.round(((totalRevenue - lastRevenue) / lastRevenue) * 100) : totalRevenue > 0 ? 100 : 0;
 
   const totalOrders = currentOrders.length;
@@ -76,6 +128,27 @@ export const getDashboard = async (req, res) => {
 
   // Sales Analytics
   const salesAnalytics = { labels: [], data: [] };
+  
+  // Helper function to calculate actual revenue for analytics
+  const calculateAnalyticsRevenue = (orders) => {
+    let totalRevenue = 0;
+    
+    orders.forEach(order => {
+      for (const item of order.items) {
+        // Skip items that have been returned
+        const isItemReturned = item.returnRequest && item.returnRequest.status === 'approved';
+        const isItemCancelled = item.status === 'Cancelled';
+        
+        if (!isItemReturned && !isItemCancelled) {
+          // Add the item's revenue to total
+          totalRevenue += (item.paidPrice || item.price) * item.quantity;
+        }
+      }
+    });
+    
+    return totalRevenue;
+  };
+  
   if (activePeriod === 'custom') {
     const dateIterator = new Date(currentPeriodStart);
     while (dateIterator <= currentPeriodEnd) {
@@ -87,10 +160,10 @@ export const getDashboard = async (req, res) => {
       const dayOrders = await Order.find({
         createdAt: { $gte: dayStart, $lt: dayEnd },
         paymentStatus: 'paid'
-      });
+      }).populate('items.product');
 
       salesAnalytics.labels.push(dayStart.toLocaleDateString('en-CA')); // YYYY-MM-DD
-      salesAnalytics.data.push(dayOrders.reduce((sum, o) => sum + o.totalAmount, 0));
+      salesAnalytics.data.push(calculateAnalyticsRevenue(dayOrders));
       
       dateIterator.setDate(dateIterator.getDate() + 1);
     }
@@ -104,9 +177,10 @@ export const getDashboard = async (req, res) => {
         const dayOrders = await Order.find({
             createdAt: { $gte: start, $lt: end },
             paymentStatus: 'paid'
-        });
+        }).populate('items.product');
+        
         salesAnalytics.labels.push(start.toLocaleString('default', { weekday: 'short' }));
-        salesAnalytics.data.push(dayOrders.reduce((sum, o) => sum + o.totalAmount, 0));
+        salesAnalytics.data.push(calculateAnalyticsRevenue(dayOrders));
     }
   } else if (activePeriod === 'yearly') {
       for (let i = 4; i >= 0; i--) {
@@ -117,9 +191,10 @@ export const getDashboard = async (req, res) => {
           const yearOrders = await Order.find({
               createdAt: { $gte: start, $lt: end },
               paymentStatus: 'paid'
-          });
+          }).populate('items.product');
+          
           salesAnalytics.labels.push(year.toString());
-          salesAnalytics.data.push(yearOrders.reduce((sum, o) => sum + o.totalAmount, 0));
+          salesAnalytics.data.push(calculateAnalyticsRevenue(yearOrders));
       }
   } else { // 'monthly' is the default
       for (let m = 0; m < 12; m++) {
@@ -128,9 +203,10 @@ export const getDashboard = async (req, res) => {
           const monthOrders = await Order.find({
             createdAt: { $gte: start, $lt: end },
             paymentStatus: 'paid'
-          });
+          }).populate('items.product');
+          
           salesAnalytics.labels.push(start.toLocaleString('default', { month: 'short' }));
-          salesAnalytics.data.push(monthOrders.reduce((sum, o) => sum + o.totalAmount, 0));
+          salesAnalytics.data.push(calculateAnalyticsRevenue(monthOrders));
       }
   }
 

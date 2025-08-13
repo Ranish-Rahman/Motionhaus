@@ -9,33 +9,40 @@ const TIMEZONE = 'Asia/Kolkata';
 // Helper function to get date range
 const getDateRange = (type, customStartDate, customEndDate) => {
     const now = moment().tz(TIMEZONE);
+    
     switch (type) {
         case 'daily':
+            // Show today's data
             return {
                 start: now.clone().startOf('day'),
                 end: now.clone().endOf('day')
             };
         case 'weekly':
+            // Show current week's data (Monday to Sunday)
             return {
                 start: now.clone().startOf('week'),
                 end: now.clone().endOf('week')
             };
         case 'monthly':
+            // Show current month's data
             return {
                 start: now.clone().startOf('month'),
                 end: now.clone().endOf('month')
             };
         case 'yearly':
+            // Show current year's data
             return {
                 start: now.clone().startOf('year'),
                 end: now.clone().endOf('year')
             };
         case 'custom':
+            // Use provided custom dates
             return {
                 start: moment.tz(customStartDate, TIMEZONE).startOf('day'),
                 end: moment.tz(customEndDate, TIMEZONE).endOf('day')
             };
         default:
+            // Default to today
             return {
                 start: now.clone().startOf('day'),
                 end: now.clone().endOf('day')
@@ -56,8 +63,19 @@ export const getSalesReport = async (req, res) => {
   try {
     const { range, startDate, endDate, page = 1, limit = 10 } = req.query;
     
+    console.log('=== Sales Report Debug ===');
+    console.log('Request params:', { range, startDate, endDate, page, limit });
+    
     // Get date range based on request
     const { start, end } = getDateRange(range, startDate, endDate);
+    
+    console.log('Date range:', {
+      range,
+      startDate: start.format('YYYY-MM-DD HH:mm:ss'),
+      endDate: end.format('YYYY-MM-DD HH:mm:ss'),
+      startISO: start.toISOString(),
+      endISO: end.toISOString()
+    });
     
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -70,9 +88,13 @@ export const getSalesReport = async (req, res) => {
       }
     };
 
+    console.log('MongoDB query:', JSON.stringify(query, null, 2));
+
     // Get total count for pagination
     const totalOrders = await Order.countDocuments(query);
     const totalPages = Math.ceil(totalOrders / parseInt(limit));
+
+    console.log('Query results:', { totalOrders, totalPages, skip, limit });
 
     // Fetch orders with pagination
     const orders = await Order.find(query)
@@ -83,6 +105,22 @@ export const getSalesReport = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    console.log('Orders found:', orders.length);
+    if (orders.length > 0) {
+      console.log('Sample order dates:', orders.slice(0, 3).map(o => ({
+        orderID: o.orderID,
+        createdAt: o.createdAt,
+        createdAtISO: o.createdAt.toISOString()
+      })));
+      
+      // Debug order statuses
+      const orderStatuses = [...new Set(orders.map(o => o.status))];
+      const itemStatuses = [...new Set(orders.flatMap(o => o.items.map(item => item.status)))];
+      console.log('Available order statuses:', orderStatuses);
+      console.log('Available item statuses:', itemStatuses);
+    }
+    console.log('=== End Debug ===');
+
     let tableData = [];
     let totalSales = 0;
     let totalDiscount = 0;
@@ -90,8 +128,13 @@ export const getSalesReport = async (req, res) => {
     for (const order of orders) {
       let orderHasSale = false;
 
+      // Check if order represents a completed sale
+      const isCompletedOrder = ['Delivered', 'Completed', 'Shipped', 'Processing'].includes(order.status) || 
+                              order.paymentStatus === 'paid';
+
       for (const item of order.items) {
-        if (item.status === 'Delivered' || item.status === 'Completed') {
+        // Include items that are delivered, completed, or from paid orders
+        if (item.status === 'Delivered' || item.status === 'Completed' || isCompletedOrder) {
           orderHasSale = true;
 
           const itemTotal = item.paidPrice * item.quantity;
@@ -149,7 +192,10 @@ export const downloadPdfReport = async (req, res) => {
 
     const orders = await Order.find({
       createdAt: { $gte: start.toDate(), $lte: end.toDate() },
-      status: { $in: ['Delivered', 'Completed'] },
+      $or: [
+        { status: { $in: ['Delivered', 'Completed', 'Shipped', 'Processing'] } },
+        { paymentStatus: 'paid' }
+      ]
     })
     .populate('user', 'email name')
     .populate('items.product', 'name');
@@ -274,7 +320,10 @@ export const downloadExcelReport = async (req, res) => {
 
     const orders = await Order.find({
       createdAt: { $gte: start.toDate(), $lte: end.toDate() },
-      status: { $in: ['Delivered', 'Completed'] },
+      $or: [
+        { status: { $in: ['Delivered', 'Completed', 'Shipped', 'Processing'] } },
+        { paymentStatus: 'paid' }
+      ]
     })
     .populate('user', 'name email')
     .populate('items.product', 'name');

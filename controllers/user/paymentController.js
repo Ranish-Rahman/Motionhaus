@@ -9,6 +9,20 @@ import { getBestOffer } from './productController.js';
 import Coupon from '../../models/couponModel.js';
 import User from '../../models/userModel.js';
 import { processReferralReward } from '../../utils/referralCodeGenerator.js';
+import Category from '../../models/categoryModel.js';
+import { calculateCartTotals } from '../../utils/cartHelper.js';
+
+// Helper function to check if product's category is deleted
+const isProductCategoryDeleted = async (product) => {
+  if (!product || !product.category) return false;
+  
+  const category = await Category.findOne({ 
+    name: product.category, 
+    isDeleted: false 
+  });
+  
+  return !category; // Return true if category is deleted or doesn't exist
+};
 
 // Generate unique order ID
 const generateOrderId = () => {
@@ -417,7 +431,62 @@ export const verifyPayment = async (req, res) => {
         if (pendingOrder.couponCode) {
             const coupon = await Coupon.findOne({ code: pendingOrder.couponCode });
             if (coupon) {
+                // Validate coupon is still valid at order placement time
+                const now = new Date();
+                if (!coupon.isActive) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'The applied coupon is no longer active.'
+                    });
+                }
+                
+                if (now < coupon.validFrom) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `This coupon is not valid until ${coupon.validFrom.toLocaleDateString()}.`
+                    });
+                }
+                
+                if (now > coupon.validUntil) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'This coupon has expired.'
+                    });
+                }
+                
+                // Check usage limits
+                if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'This coupon has reached its maximum usage limit.'
+                    });
+                }
+                
+                // Check if user has already used this coupon
+                if (coupon.usedBy && coupon.usedBy.includes(userId)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'You have already used this coupon.'
+                    });
+                }
+                
                 couponId = coupon._id;
+            }
+        }
+
+        // Validate that no products have deleted categories
+        if (pendingOrder.items && pendingOrder.items.length > 0) {
+            for (const item of pendingOrder.items) {
+                const product = await Product.findById(item.product);
+                if (product) {
+                    const categoryDeleted = await isProductCategoryDeleted(product);
+                    if (categoryDeleted) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Product "${product.name}" is no longer available as its category has been removed. Please remove it from your cart and try again.`
+                        });
+                    }
+                }
             }
         }
 

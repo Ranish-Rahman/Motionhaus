@@ -1,8 +1,21 @@
 import Cart from '../../models/cartModel.js';
 import Product from '../../models/ProductModel.js';
 import Coupon from '../../models/couponModel.js';
+import Category from '../../models/categoryModel.js';
 import { getBestOffer } from './productController.js';
 import { calculateCartTotals } from '../../utils/cartHelper.js';
+
+// Helper function to check if product's category is deleted
+const isProductCategoryDeleted = async (product) => {
+  if (!product || !product.category) return false;
+  
+  const category = await Category.findOne({ 
+    name: product.category, 
+    isDeleted: false 
+  });
+  
+  return !category; // Return true if category is deleted or doesn't exist
+};
 
 // Add to cart 
 export const addToCart = async (req, res) => {
@@ -39,6 +52,12 @@ export const addToCart = async (req, res) => {
     // Check if product is blocked
     if (product.isBlocked) {
       return res.status(400).json({ success: false, message: 'This product is currently unavailable and cannot be added to your cart.' });
+    }
+
+    // Check if product's category is deleted
+    const categoryDeleted = await isProductCategoryDeleted(product);
+    if (categoryDeleted) {
+      return res.status(400).json({ success: false, message: 'This product is no longer available as its category has been removed.' });
     }
 
     // Validate size
@@ -214,6 +233,23 @@ export const updateCartItem = async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: 'This product is no longer available and has been removed from your cart.',
+        cart
+      });
+    }
+
+    // Check if product's category is deleted
+    const categoryDeleted = await isProductCategoryDeleted(product);
+    if (categoryDeleted) {
+      // Remove the item from cart
+      cart.items = cart.items.filter(item => item.product.toString() !== itemId);
+      await cart.save();
+      
+      // Populate product details for response
+      await cart.populate('items.product');
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This product is no longer available as its category has been removed and has been removed from your cart.',
         cart
       });
     }
@@ -484,7 +520,7 @@ export const removeCoupon = async (req, res) => {
     }
 
     const userId = sessionUser._id || sessionUser.id;
-    const cart = await Cart.findOne({ user: userId });
+    const cart = await Cart.findOne({ user: userId }).populate('coupon');
 
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found.' });
@@ -492,6 +528,14 @@ export const removeCoupon = async (req, res) => {
 
     if (!cart.coupon) {
       return res.status(400).json({ success: false, message: 'No coupon to remove.' });
+    }
+
+    // IMPORTANT: Decrement usage count and remove user from usedBy list
+    if (cart.coupon) {
+      await Coupon.findByIdAndUpdate(cart.coupon._id, {
+        $pull: { usedBy: userId }, // Remove user from the usedBy list
+        $inc: { usageCount: -1 } // Decrement the usage count
+      });
     }
 
     // Clear coupon from cart
@@ -552,6 +596,20 @@ export const validateStock = async (req, res) => {
           requested: item.quantity,
           available: 0,
           reason: 'Product is no longer available'
+        });
+        continue;
+      }
+
+      // Check if product's category is deleted
+      const categoryDeleted = await isProductCategoryDeleted(item.product);
+      if (categoryDeleted) {
+        hasStockIssues = true;
+        issues.push({
+          name: item.product.name,
+          size: item.size,
+          requested: item.quantity,
+          available: 0,
+          reason: 'Product category has been removed'
         });
         continue;
       }

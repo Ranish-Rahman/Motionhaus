@@ -360,7 +360,6 @@
               <option value="Delivered">Delivered</option>
               <option value="Returned">Returned</option>
               <option value="Return Denied">Return Denied</option>
-              <option value="Cancelled">Cancelled</option>
             </select>
             <select class="form-select" id="sortBy">
               <option value="newest">Newest First</option>
@@ -579,17 +578,19 @@
                           </td>
                           <td>₹${(actualPrice * item.quantity).toFixed(2)}</td>
                           <td>
-                            <select class="form-select form-select-sm item-status-select"
-                                    data-order-id="${order._id}"
+                            <select class="form-select form-select-sm item-status-select" 
+                                    data-order-id="${order._id}" 
                                     data-item-id="${item._id}"
-                                    ${item.status === 'Delivered' ? 'disabled' : ''}>
-                              <option value="Pending" ${item.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                              <option value="Confirmed" ${item.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
-                              <option value="Processing" ${item.status === 'Processing' ? 'selected' : ''}>Processing</option>
-                              <option value="Shipped" ${item.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
-                              <option value="Delivered" ${item.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                              <option value="Cancelled" ${item.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                              <option value="Returned" ${item.status === 'Returned' ? 'selected' : ''}>Returned</option>
+                                    ${item.returnRequest && item.returnRequest.status === 'approved' ? 'disabled' : ''}>
+                              ${item.returnRequest && item.returnRequest.status === 'approved' ? 
+                                '<option value="Returned" selected>Returned</option>' 
+                                : 
+                                `<option value="Pending" ${item.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                 <option value="Confirmed" ${item.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
+                                 <option value="Processing" ${item.status === 'Processing' ? 'selected' : ''}>Processing</option>
+                                 <option value="Shipped" ${item.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
+                                 <option value="Delivered" ${item.status === 'Delivered' ? 'selected' : ''}>Delivered</option>`
+                              }
                             </select>
                             ${item.status === 'Delivered' ? 
                               '<small class="text-muted d-block mt-1">Status cannot be changed after delivery</small>' 

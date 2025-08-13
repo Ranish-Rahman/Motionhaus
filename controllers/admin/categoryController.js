@@ -251,7 +251,16 @@ export const softDeleteCategory = async (req, res) => {
             return res.redirect('/admin/categories');
         }
 
-        req.flash('success', 'Category deleted successfully');
+        // IMPORTANT: Block all products in this category
+        const Product = mongoose.model('Product');
+        const updateResult = await Product.updateMany(
+            { category: category.name, isDeleted: false },
+            { isBlocked: true }
+        );
+
+        console.log(`Blocked ${updateResult.modifiedCount} products in category: ${category.name}`);
+
+        req.flash('success', `Category deleted successfully. ${updateResult.modifiedCount} products have been blocked.`);
         res.redirect('/admin/categories');
     } catch (error) {
         console.error('Error deleting category:', error);
@@ -279,7 +288,16 @@ export const restoreCategory = async (req, res) => {
             return res.redirect('/admin/categories');
         }
 
-        req.flash('success', 'Category restored successfully');
+        // IMPORTANT: Unblock all products in this category
+        const Product = mongoose.model('Product');
+        const updateResult = await Product.updateMany(
+            { category: category.name, isBlocked: true },
+            { isBlocked: false }
+        );
+
+        console.log(`Unblocked ${updateResult.modifiedCount} products in category: ${category.name}`);
+
+        req.flash('success', `Category restored successfully. ${updateResult.modifiedCount} products have been unblocked.`);
         res.redirect('/admin/categories');
     } catch (error) {
         console.error('Error restoring category:', error);

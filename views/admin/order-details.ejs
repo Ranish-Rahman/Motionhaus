@@ -2,14 +2,17 @@
   <div class="d-flex gap-2">
     <select class="form-select form-select-sm item-status-select" 
             data-order-id="<%= order._id %>" 
-            data-item-id="<%= item._id %>">
-      <option value="Pending" <%= item.status === 'Pending' ? 'selected' : '' %>>Pending</option>
-      <option value="Confirmed" <%= item.status === 'Confirmed' ? 'selected' : '' %>>Confirmed</option>
-      <option value="Processing" <%= item.status === 'Processing' ? 'selected' : '' %>>Processing</option>
-      <option value="Shipped" <%= item.status === 'Shipped' ? 'selected' : '' %>>Shipped</option>
-      <option value="Delivered" <%= item.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
-      <option value="Cancelled" <%= item.status === 'Cancelled' ? 'selected' : '' %>>Cancelled</option>
-      <option value="Returned" <%= item.status === 'Returned' ? 'selected' : '' %>>Returned</option>
+            data-item-id="<%= item._id %>"
+            <%= item.returnRequest && item.returnRequest.status === 'approved' ? 'disabled' : '' %>>
+      <% if (item.returnRequest && item.returnRequest.status === 'approved') { %>
+        <option value="Returned" selected>Returned</option>
+      <% } else { %>
+        <option value="Pending" <%= item.status === 'Pending' ? 'selected' : '' %>>Pending</option>
+        <option value="Confirmed" <%= item.status === 'Confirmed' ? 'selected' : '' %>>Confirmed</option>
+        <option value="Processing" <%= item.status === 'Processing' ? 'selected' : '' %>>Processing</option>
+        <option value="Shipped" <%= item.status === 'Shipped' ? 'selected' : '' %>>Shipped</option>
+        <option value="Delivered" <%= item.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
+      <% } %>
     </select>
     <% if (item.status === 'Pending') { %>
       <button class="btn btn-sm btn-danger cancel-item" 

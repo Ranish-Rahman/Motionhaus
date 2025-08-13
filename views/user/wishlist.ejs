@@ -364,6 +364,16 @@
       color: #666;
       font-weight: 500;
     }
+
+    .selected-size {
+      margin-bottom: 10px;
+    }
+
+    .size-label {
+      font-size: 14px;
+      color: #333;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -448,18 +458,11 @@
                 </td>
                 <td>
                   <% if (Array.isArray(item.product.sizes) && item.product.sizes.length > 0) { %>
-                    <select class="size-selector" onchange="updateAddToCartButton(this)">
-                      <option value="">Select Size</option>
-                      <% item.product.sizes.forEach(function(sizeInfo) { %>
-                        <% if (sizeInfo && sizeInfo.quantity > 0) { %>
-                          <option value="<%= sizeInfo.size %>" <%= Number(sizeInfo.size) === Number(item.size) ? 'selected' : '' %>>
-                            UK <%= sizeInfo.size %> (<%= sizeInfo.quantity %> left)
-                          </option>
-                        <% } %>
-                      <% }); %>
-                    </select>
+                    <div class="selected-size">
+                      <span class="size-label">Selected Size: UK <%= item.size %></span>
+                    </div>
                     <button class="add-to-cart <%= item.product.selectedSizeStock > 0 ? '' : 'disabled' %>" 
-                            onclick="addToCart('<%= item.product._id %>', this)"
+                            onclick="addToCart('<%= item.product._id %>', '<%= item.size %>', this)"
                             <%= item.product.selectedSizeStock > 0 ? '' : 'disabled' %>>
                       <%= item.product.selectedSizeStock > 0 ? 'ADD TO CART' : 'OUT OF STOCK' %>
                     </button>
@@ -508,38 +511,23 @@
       }, 3000);
     }
 
-    function updateAddToCartButton(sizeSelector) {
-      const row = sizeSelector.closest('tr');
-      const addToCartBtn = row.querySelector('.add-to-cart');
-      const errorMessage = row.querySelector('.error-message');
-      
-      if (sizeSelector.value) {
-        addToCartBtn.disabled = false;
-        addToCartBtn.classList.remove('disabled');
-        errorMessage.style.display = 'none';
-      } else {
-        addToCartBtn.disabled = true;
-        addToCartBtn.classList.add('disabled');
-      }
-    }
-
-    function addToCart(productId, button) {
+    function addToCart(productId, size, button) {
       console.log('Adding to cart:', {
         productId,
+        size,
         button: button.className
       });
 
       const row = button.closest('tr');
-      const sizeSelector = row.querySelector('.size-selector');
       const errorMessage = row.querySelector('.error-message');
       
-      if (!sizeSelector.value) {
-        console.log('No size selected');
+      if (!size) {
+        console.log('No size provided');
         errorMessage.style.display = 'block';
         return;
       }
 
-      console.log('Selected size:', sizeSelector.value);
+      console.log('Using size:', size);
 
       button.disabled = true;
       const originalText = button.textContent;
@@ -554,7 +542,7 @@
         body: JSON.stringify({
           productId: productId,
           quantity: 1,
-          size: sizeSelector.value
+          size: size
         })
       })
       .then(response => response.json())
@@ -566,7 +554,7 @@
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ size: sizeSelector.value })
+            body: JSON.stringify({ size: size })
           }).then(response => response.json());
         } else {
           throw new Error(data.message || 'Failed to add product to cart');
