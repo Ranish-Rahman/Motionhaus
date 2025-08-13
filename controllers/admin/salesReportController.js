@@ -54,46 +54,65 @@ export const getSalesReportPage = (req, res) => {
 // Fetch sales report data (AJAX)
 export const getSalesReport = async (req, res) => {
   try {
-    const orders = await Order.find({
+    const { range, startDate, endDate, page = 1, limit = 10 } = req.query;
+    
+    // Get date range based on request
+    const { start, end } = getDateRange(range, startDate, endDate);
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build query for orders
+    const query = {
       createdAt: {
-        $gte: moment().startOf('month').toDate(),
-        $lte: moment().endOf('month').toDate(),
+        $gte: start.toDate(),
+        $lte: end.toDate(),
       }
-    }).populate('user', 'name email')
-      .populate('items.product', 'name');
+    };
+
+    // Get total count for pagination
+    const totalOrders = await Order.countDocuments(query);
+    const totalPages = Math.ceil(totalOrders / parseInt(limit));
+
+    // Fetch orders with pagination
+    const orders = await Order.find(query)
+      .populate('user', 'name email')
+      .populate('items.product', 'name')
+      .populate('coupon', 'code')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
     let tableData = [];
     let totalSales = 0;
-    let totalOrders = 0;
     let totalDiscount = 0;
 
     for (const order of orders) {
       let orderHasSale = false;
 
-     for (const item of order.items) {
-  if (item.status === 'Delivered' || item.status === 'Completed') {
-    orderHasSale = true;
+      for (const item of order.items) {
+        if (item.status === 'Delivered' || item.status === 'Completed') {
+          orderHasSale = true;
 
-    const itemTotal = item.paidPrice * item.quantity;
-    totalSales += itemTotal;
+          const itemTotal = item.paidPrice * item.quantity;
+          totalSales += itemTotal;
 
-    tableData.push({
-      id: order.orderID,
-      date: moment(order.createdAt).tz("Asia/Kolkata").format("DD/MM/YYYY, h:mm A"),
-      customer: order.user?.name || order.user?.email || 'N/A',
-      product: item.product?.name || 'Unknown Product',
-      quantity: item.quantity,
-      price: item.paidPrice,
-      total: itemTotal,
-      status: item.status,
-      paymentMethod: order.paymentMethod
-    });
-  }
-}
-
+          tableData.push({
+            id: order.orderID || order._id.toString().substring(0, 8),
+            date: moment(order.createdAt).tz(TIMEZONE).format("DD/MM/YYYY, h:mm A"),
+            customer: order.user?.name || order.user?.email || 'N/A',
+            product: item.product?.name || 'Unknown Product',
+            quantity: item.quantity,
+            price: item.paidPrice,
+            total: itemTotal,
+            status: item.status,
+            paymentMethod: order.paymentMethod,
+            coupon: order.coupon?.code || '-'
+          });
+        }
+      }
 
       if (orderHasSale) {
-        totalOrders++;
         totalDiscount += order.discountAmount || 0;
       }
     }
@@ -106,12 +125,12 @@ export const getSalesReport = async (req, res) => {
       },
       tableData,
       pagination: {
-        currentPage: 1,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPrevPage: false,
+        currentPage: parseInt(page),
+        totalPages,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1,
         totalOrders,
-        limit: tableData.length
+        limit: parseInt(limit)
       }
     });
 
@@ -209,11 +228,22 @@ export const downloadPdfReport = async (req, res) => {
       rowData.forEach((cellData, cellIndex) => {
         doc.rect(currentX, currentY, colWidths[cellIndex], 20).stroke();
         // Make Total column bold like in the image
-        if (cellIndex === 3) { // Total column
-          doc.fontSize(8).font('Helvetica-Bold').text(cellData, currentX + 3, currentY + 5);
-        } else {
-          doc.fontSize(8).font('Helvetica').text(cellData, currentX + 3, currentY + 5);
-        }
+        const textOptions = {
+    width: colWidths[cellIndex] - 6, // padding inside cell
+    ellipsis: true,
+    align: 'left'
+  };
+
+  // Make Total column bold
+  if (cellIndex === 3) {
+    doc.fontSize(8)
+       .font('Helvetica-Bold')
+       .text(cellData, currentX + 3, currentY + 5, textOptions);
+  } else {
+    doc.fontSize(8)
+       .font('Helvetica')
+       .text(cellData, currentX + 3, currentY + 5, textOptions);
+  }
         currentX += colWidths[cellIndex];
       });
 

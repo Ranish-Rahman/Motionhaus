@@ -199,7 +199,7 @@
           </div>
           <div class="pagination">
             <span class="pagination-info">
-              Showing <span id="showingStart">0</span> to <span id="showingEnd">0</span> of <span id="totalOrders">0</span> orders
+              Showing <span id="showingStart">0</span> to <span id="showingEnd">0</span> of <span id="totalOrdersCount">0</span> orders
             </span>
             <div id="paginationControls" class="d-flex gap-2"></div>
           </div>
@@ -222,6 +222,7 @@
     const endDate = document.getElementById('endDate');
     const showingStart = document.getElementById('showingStart');
     const showingEnd = document.getElementById('showingEnd');
+    const totalOrdersCount = document.getElementById('totalOrdersCount');
     const paginationControls = document.getElementById('paginationControls');
     const downloadPdf = document.getElementById('downloadPdf');
     const downloadExcel = document.getElementById('downloadExcel');
@@ -317,7 +318,7 @@
       const end = Math.min(start + pagination.limit - 1, pagination.totalOrders);
       showingStart.textContent = start;
       showingEnd.textContent = end;
-      totalOrders.textContent = pagination.totalOrders;
+      totalOrdersCount.textContent = pagination.totalOrders;
 
       // Create pagination controls
       createPaginationControls(pagination);
@@ -346,9 +347,9 @@
               <td>${order.id}</td>
               <td>${order.date}</td>
               <td>${order.customer}</td>
-              <td>₹${order.total}</td>
+              <td>₹${Number(order.total).toFixed(2)}</td>
               <td>${order.status}</td>
-              <td>${order.coupon}</td>
+              <td>${order.coupon || '-'}</td>
             </tr>
           `).join('');
         }
@@ -382,12 +383,20 @@
     };
     
     customBtn.onclick = () => {
-      if (startDate.value && endDate.value) {
-        setActive(customBtn);
-        currentRange = 'custom';
-        currentPage = 1;
-        fetchReport('custom', startDate.value, endDate.value, currentPage);
+      if (!startDate.value || !endDate.value) {
+        alert('Please select both start and end dates');
+        return;
       }
+      
+      if (new Date(startDate.value) > new Date(endDate.value)) {
+        alert('Start date cannot be after end date');
+        return;
+      }
+      
+      setActive(customBtn);
+      currentRange = 'custom';
+      currentPage = 1;
+      fetchReport('custom', startDate.value, endDate.value, currentPage);
     };
 
     // Fetch daily report on load
