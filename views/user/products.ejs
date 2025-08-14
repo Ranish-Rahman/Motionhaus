@@ -828,20 +828,7 @@
             <span>Showing all <%= products.length %> products</span>
           </div>
         <% } else { %>
-          <!-- Debug info - remove this in production -->
-          <div style="text-align: center; padding: 20px; color: #666; font-size: 14px;">
-            <% if (typeof pagination === 'undefined') { %>
-              Pagination data is undefined
-            <% } else if (!pagination) { %>
-              Pagination data is null/empty
-            <% } else if (pagination.totalPages <= 1) { %>
-              Only <%= pagination.totalPages %> page available (no pagination needed)
-            <% } else { %>
-              Pagination should show here
-            <% } %>
-            <br>
-            Products count: <%= products ? products.length : 'undefined' %>
-          </div>
+          
         <% } %>
       </div>
     </main>

@@ -1788,54 +1788,119 @@ export const generateInvoice = async (req, res) => {
       return res.redirect('/profile/orders');
     }
 
-    // Fallback-only implementation using PDFKit (no Chromium required)
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    // Generate modern PDF invoice using PDFKit
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.orderID}.pdf`);
 
-    doc.fontSize(20).text('MotionHaus', { align: 'left' });
-    doc.moveDown(0.5);
-    doc.fontSize(12).text(`Invoice #: ${order.orderID}`);
-    doc.text(`Date: ${new Date(order.orderDate).toLocaleDateString()}`);
-    doc.text(`Customer: ${order.user?.name || ''}`);
-    doc.text(`Email: ${order.user?.email || ''}`);
-    doc.moveDown();
+    // Company header with background
+    doc.rect(0, 0, 595, 80).fill('#2c3e50');
+    doc.fontSize(28).font('Helvetica-Bold').fillColor('white').text('MotionHaus', 40, 25);
+    doc.fontSize(14).font('Helvetica').fillColor('#ecf0f1').text('Premium Fashion Store', 40, 55);
+    
+    // Reset colors
+    doc.fillColor('black');
 
-    doc.fontSize(12).text('Items:', { underline: true });
-    doc.moveDown(0.5);
-    order.items.forEach((item) => {
+    // Invoice title
+    doc.fontSize(32).font('Helvetica-Bold').text('INVOICE', 400, 25);
+    
+    // Invoice details box
+    doc.rect(400, 80, 155, 80).stroke('#bdc3c7');
+    doc.fontSize(10).font('Helvetica-Bold').text('INVOICE DETAILS', 410, 90);
+    doc.fontSize(9).font('Helvetica').text(`Invoice #:`, 410, 105);
+    doc.text(`${order.orderID}`, 410, 115);
+    doc.text(`Date: ${new Date(order.orderDate).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'})}`, 410, 130);
+    doc.text(`Status: ${order.status}`, 410, 140);
+    doc.text(`Payment: ${order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod === 'razorpay' ? 'Online Payment' : order.paymentMethod}`, 410, 150);
+
+    // Customer details box
+    doc.rect(40, 80, 340, 80).stroke('#bdc3c7');
+    doc.fontSize(10).font('Helvetica-Bold').text('CUSTOMER DETAILS', 50, 90);
+    doc.fontSize(9).font('Helvetica').text(`Name: ${order.user?.name || 'N/A'}`, 50, 105);
+    doc.text(`Email: ${order.user?.email || 'N/A'}`, 50, 115);
+    doc.text(`Phone: ${order.user?.phone || 'N/A'}`, 50, 125);
+
+    // Items table header
+    doc.moveDown(3);
+    const tableY = doc.y;
+    
+    // Header background
+    doc.rect(40, tableY, 515, 25).fill('#34495e');
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('white').text('Item', 50, tableY + 8);
+    doc.text('Qty', 300, tableY + 8);
+    doc.text('Unit Price', 380, tableY + 8);
+    doc.text('Total', 480, tableY + 8);
+    
+    // Reset colors
+    doc.fillColor('black');
+
+    // Items
+    let currentY = tableY + 25;
+    order.items.forEach((item, index) => {
       const name = item.product?.name || 'Product';
       const qty = item.quantity || 1;
       const price = (item.finalPrice !== undefined ? item.finalPrice : item.price) || 0;
       const total = price * qty;
-      doc.text(`${name}  x${qty}  -  ₹${price.toFixed(2)}  =  ₹${total.toFixed(2)}`);
-    });
-
-    doc.moveDown();
-    doc.text(`Subtotal: ₹${order.originalAmount.toFixed(2)}`);
-
-    let totalOfferDiscount = 0;
-    order.items.forEach(item => {
-      if (item.originalPrice && item.originalPrice > item.price) {
-        totalOfferDiscount += (item.originalPrice - item.price) * item.quantity;
+      
+      // Alternate row colors
+      if (index % 2 === 0) {
+        doc.rect(40, currentY, 515, 20).fill('#f8f9fa');
       }
+      
+      doc.fontSize(10).font('Helvetica').fillColor('black');
+      doc.text(name, 50, currentY + 5);
+      doc.text(qty.toString(), 300, currentY + 5);
+      doc.text(`₹${price.toFixed(2)}`, 380, currentY + 5);
+      doc.text(`₹${total.toFixed(2)}`, 480, currentY + 5);
+      
+      currentY += 20;
     });
-    const couponDiscount = (order.discountAmount || 0) - totalOfferDiscount;
 
-    if (totalOfferDiscount > 0) {
-      doc.text(`Offer Discount: -₹${totalOfferDiscount.toFixed(2)}`);
+    // Table border
+    doc.rect(40, tableY, 515, currentY - tableY).stroke('#bdc3c7');
+
+    // Totals section
+    doc.moveDown(1);
+    const totalsY = currentY + 20;
+    
+    const subtotal = order.items.reduce((sum, item) => {
+      const price = (item.finalPrice !== undefined ? item.finalPrice : item.price) || 0;
+      return sum + (price * item.quantity);
+    }, 0);
+
+    // Totals box
+    doc.rect(350, totalsY, 225, 120).stroke('#bdc3c7').fill('#f8f9fa');
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('black').text('ORDER SUMMARY', 360, totalsY + 10);
+    
+    doc.fontSize(10).font('Helvetica').fillColor('black');
+    doc.text('Subtotal:', 360, totalsY + 30);
+    doc.text(`₹${subtotal.toFixed(2)}`, 500, totalsY + 30);
+
+    // Coupon discount
+    if (order.coupon) {
+      const couponDiscount = order.couponDiscount || (order.originalAmount - order.totalAmount);
+      if (couponDiscount > 0) {
+        doc.text('Coupon Discount:', 360, totalsY + 45);
+        doc.text(`-₹${couponDiscount.toFixed(2)}`, 500, totalsY + 45);
+        doc.text(`(${order.coupon.code})`, 360, totalsY + 55);
+      }
     }
-    if (order.coupon && couponDiscount > 0) {
-      doc.text(`Coupon (${order.coupon.code}): -₹${couponDiscount.toFixed(2)}`);
-    }
 
-    doc.text('Shipping: Free');
-    doc.moveDown(0.5);
-    doc.fontSize(14).text(`Total: ₹${order.totalAmount.toFixed(2)}`, { align: 'right' });
+    doc.text('Shipping:', 360, totalsY + 70);
+    doc.text('Free', 500, totalsY + 70);
 
-    doc.moveDown();
-    doc.fontSize(10).text('* This invoice includes all items in the order, regardless of their current status.');
-    doc.fontSize(10).text('This is a computer-generated invoice, no signature required.');
+    // Total line
+    doc.moveTo(360, totalsY + 85).lineTo(540, totalsY + 85).stroke();
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('black');
+    doc.text('TOTAL:', 360, totalsY + 95);
+    doc.text(`₹${order.totalAmount.toFixed(2)}`, 500, totalsY + 95);
+
+    // Footer - centered at bottom
+    const footerY = totalsY + 140;
+    doc.fontSize(9).font('Helvetica').fillColor('#2c3e50');
+    doc.text('Thank you for shopping with MotionHaus!', 297, footerY, { align: 'center' });
+    doc.text('This is a computer-generated invoice. No signature required.', 297, footerY + 15, { align: 'center' });
+    doc.text('For any queries, please contact us at support@motionhaus.com', 297, footerY + 30, { align: 'center' });
 
     doc.end();
     return doc.pipe(res);

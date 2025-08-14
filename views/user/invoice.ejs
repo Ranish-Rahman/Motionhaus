@@ -10,12 +10,13 @@
             margin: 20px;
         }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Courier New', monospace;
             margin: 0;
             padding: 20px;
-            color: #333;
+            color: #000;
             font-size: 12px;
-            line-height: 1.4;
+            line-height: 1.2;
+            background: #fff;
         }
         .invoice-container {
             max-width: 100%;
@@ -23,200 +24,165 @@
             padding: 20px;
         }
         .invoice-header {
-            display: flex;
-            justify-content: space-between;
+            text-align: center;
             margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 2px solid #eee;
+            border-bottom: 2px solid #000;
         }
         .company-info {
-            flex: 1;
-        }
-        .invoice-info {
-            text-align: right;
+            margin-bottom: 20px;
         }
         .invoice-title {
-            color: #333;
+            color: #000;
             font-size: 24px;
             margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+        .invoice-info {
+            text-align: center;
+            margin-bottom: 20px;
         }
         .invoice-details {
             margin: 20px 0;
         }
-        .customer-info, .shipping-info {
+        .customer-info {
             margin-bottom: 20px;
+            text-align: center;
+        }
+        .shipping-info {
+            display: none;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
+            font-family: 'Courier New', monospace;
         }
         th, td {
-            padding: 8px;
+            padding: 8px 4px;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid #000;
+            font-size: 12px;
         }
         th {
-            background-color: #f8f9fa;
+            background-color: #f0f0f0;
             font-weight: bold;
+            text-align: center;
         }
         .total-section {
             margin-top: 20px;
             text-align: right;
+            font-family: 'Courier New', monospace;
         }
         .total-row {
             font-size: 14px;
             font-weight: bold;
         }
+        .total-row p {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
         .footer {
             margin-top: 40px;
             text-align: center;
-            color: #666;
+            color: #000;
             font-size: 12px;
-            border-top: 1px solid #eee;
+            border-top: 1px solid #000;
             padding-top: 20px;
+            font-family: 'Courier New', monospace;
         }
         h3 {
             margin: 0 0 10px 0;
-            color: #333;
+            color: #000;
             font-size: 16px;
+            text-align: center;
         }
         p {
             margin: 5px 0;
+            text-align: center;
         }
         .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 500;
+            display: none;
         }
-        .status-delivered { background: #d4edda; color: #155724; }
-        .status-completed { background: #cce5ff; color: #004085; }
-        .status-cancelled { background: #f8d7da; color: #721c24; }
-        .status-returned { background: #fff3cd; color: #856404; }
+        .divider {
+            border-top: 1px solid #000;
+            margin: 10px 0;
+        }
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .item-name {
+            flex: 2;
+        }
+        .item-qty {
+            flex: 1;
+            text-align: center;
+        }
+        .item-price {
+            flex: 1;
+            text-align: right;
+        }
+        .item-total {
+            flex: 1;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
     <div class="invoice-container">
         <div class="invoice-header">
             <div class="company-info">
-                <h1 class="invoice-title">MotionHaus</h1>
-                <p>123 Fashion Street</p>
-                <p>Mumbai, Maharashtra 400001</p>
-                <p>Phone: +91 1234567890</p>
-                <p>Email: support@motionhaus.com</p>
+                <h1 class="invoice-title">MotionHaus (Logo)</h1>
             </div>
             <div class="invoice-info">
-                <h2>INVOICE</h2>
+                <h2>Invoice</h2>
                 <p><strong>Invoice #:</strong> <%= order.orderID %></p>
-                <p><strong>Date:</strong> <%= new Date(order.orderDate).toLocaleDateString() %></p>
-                <p><strong>Status:</strong> <%= order.status %></p>
-                <p><strong>Payment Method:</strong> <%= order.paymentMethod === 'cod' ? 'Cash on Delivery' : 
-                                                      order.paymentMethod === 'razorpay' ? 'Razorpay' : 
-                                                      order.paymentMethod === 'wallet' ? 'Wallet' : 
-                                                      order.paymentMethod %></p>
+                <p><strong>Date:</strong> <%= new Date(order.orderDate).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) %></p>
+                <p><strong>Customer Email:</strong> <%= order.user.email %></p>
             </div>
         </div>
 
+        <div class="divider"></div>
+
         <div class="invoice-details">
-            <div class="customer-info">
-                <h3>Customer Information</h3>
-                <p><strong>Name:</strong> <%= order.user.name %></p>
-                <p><strong>Email:</strong> <%= order.user.email %></p>
-                <p><strong>Phone:</strong> <%= order.user.phone %></p>
+            <div class="item-row" style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px;">
+                <span class="item-name">Item</span>
+                <span class="item-qty">Qty</span>
+                <span class="item-price">Unit Price</span>
+                <span class="item-total">Total</span>
             </div>
-
-            <div class="shipping-info">
-                <h3>Shipping Address</h3>
-                <p><%= order.shippingAddress.fullName %></p>
-                <p><%= order.shippingAddress.address %></p>
-                <p><%= order.shippingAddress.city %>, <%= order.shippingAddress.state %></p>
-                <p><%= order.shippingAddress.postalCode %></p>
-                <p>Phone: <%= order.shippingAddress.phone %></p>
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>Size</th>
-                        <th>Quantity</th>
-                        <th>Price</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% order.items.forEach(item => { %>
-                        <tr>
-                            <td><%= item.product.name %></td>
-                            <td>UK <%= item.size %></td>
-                            <td><%= item.quantity %></td>
-                            <td>
-                                ₹<%= item.price.toFixed(2) %>
-                                <% if (item.originalPrice && item.originalPrice > item.price) { %>
-                                    <br><small style="text-decoration: line-through; color: #666;">₹<%= item.originalPrice.toFixed(2) %></small>
-                                    <br><small style="color: #28a745;">-₹<%= (item.originalPrice - item.price).toFixed(2) %></small>
-                                <% } %>
-                            </td>
-                            <td>₹<%= (item.price * item.quantity).toFixed(2) %></td>
-                            <td>
-                                <span class="status-badge status-<%= item.status.toLowerCase() %>">
-                                    <%= item.status %>
-                                </span>
-                            </td>
-                        </tr>
-                    <% }); %>
-                </tbody>
-            </table>
+            
+            <% order.items.forEach(item => { %>
+                <div class="item-row">
+                    <span class="item-name"><%= item.product.name %></span>
+                    <span class="item-qty"><%= item.quantity %></span>
+                    <span class="item-price">₹ <%= item.price.toFixed(2) %></span>
+                    <span class="item-total">₹ <%= (item.price * item.quantity).toFixed(2) %></span>
+                </div>
+            <% }); %>
+            
+            <div class="divider"></div>
 
             <div class="total-section">
                 <div class="total-row">
-                    <p>Subtotal: ₹<%= order.items
-                        .filter(item => item.status === 'Delivered' || item.status === 'Completed')
-                        .reduce((total, item) => total + (item.price * item.quantity), 0)
-                        .toFixed(2) %></p>
-                    <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
-                    <p>Original Amount: ₹<%= order.originalAmount.toFixed(2) %></p>
-                    <% } %>
+                    <p>Subtotal:                          ₹ <%= order.items.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2) %></p>
                     <% if (order.coupon) { %>
-                    <p>Coupon Applied: <%= order.coupon.code %>
-                        <% if (order.coupon.discountType === 'percentage') { %>
-                            (<%= order.coupon.discountValue %>% off)
-                        <% } else { %>
-                            (₹<%= order.coupon.discountValue %> off)
-                        <% } %>
-                    </p>
+                    <p>Coupon (<%= order.coupon.code %>):                -₹ <%= order.couponDiscount ? order.couponDiscount.toFixed(2) : '0.00' %></p>
                     <% } %>
-                    <% 
-                    // Calculate offer discounts from individual items
-                    let totalOfferDiscount = 0;
-                    order.items.forEach(item => {
-                        if (item.originalPrice && item.originalPrice > item.price) {
-                            totalOfferDiscount += (item.originalPrice - item.price) * item.quantity;
-                        }
-                    });
-                    %>
-                    <% if (totalOfferDiscount > 0) { %>
-                    <p>Offer Discounts: -₹<%= totalOfferDiscount.toFixed(2) %></p>
-                    <% } %>
-                    <% if (order.originalAmount && order.originalAmount > order.totalAmount) { %>
-                    <p>Total Discount: -₹<%= (order.originalAmount - order.totalAmount).toFixed(2) %></p>
-                    <% } %>
-                    <p>Shipping: Free</p>
-                    <p>Total: ₹<%= order.totalAmount.toFixed(2) %></p>
-                </div>
-                <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                    <p>* This invoice includes all items in the order, regardless of their current status.</p>
-                    <p>* Items may have different statuses (Delivered, Completed, Cancelled, or Returned).</p>
-                    <p>* The total amount reflects only the delivered and completed items.</p>
+                    <p>Shipping:                           Free</p>
+                    <div class="divider"></div>
+                    <p>TOTAL:                             ₹ <%= order.totalAmount.toFixed(2) %></p>
                 </div>
             </div>
         </div>
 
+        <div class="divider"></div>
+
         <div class="footer">
-            <p>Thank you for shopping with MotionHaus!</p>
+            <p>*This invoice includes all items in the order, regardless of their current status.</p>
             <p>This is a computer-generated invoice, no signature required.</p>
         </div>
     </div>
